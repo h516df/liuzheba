@@ -23,3 +23,5 @@ fork 必须更换 `UpdateConfig.kt` 中自己的更新仓库、包名与资产�
 `app/src/main/assets/release-notes.json` 是 App 和 Release 中文更新说明的共同来源。标签如 `v0.5`，发布三个资产：`shicang-v0.5-universal.apk`、`shicang-v0.5-release-notes.json`、`shicang-v0.5-SHA256.txt`。安装包必须经过测试并与源码提交绑定。
 
 发布后匿名重新下载，核对三个资产的大小和 SHA256，再用原生更新模块验证下载及同签名升级。不要覆盖已发布版本；修复使用递增版本。用户本人手机的下载、系统安装及数据保留仍需真实手机验收，CI 和模拟器不能代替。
+
+完整备份保留原 ZIP 格式与原始媒体，尚未加密。0.6 起必须先确认隐私提示才能选择保存位置；确认提示不改变恢复兼容性。
