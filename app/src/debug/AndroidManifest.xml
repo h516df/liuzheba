@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The isolated verification app compares downloaded updates against the installed official app. -->
+    <queries><package android:name="dev.h516.shicang" /></queries>
+</manifest>
