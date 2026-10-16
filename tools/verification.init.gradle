@@ -1,0 +1,6 @@
+// Isolate instrumentation from the installed release without changing release configuration.
+gradle.beforeProject { project ->
+    project.plugins.withId('com.android.application') {
+        project.android.buildTypes.getByName('debug').applicationIdSuffix = '.verification'
+    }
+}

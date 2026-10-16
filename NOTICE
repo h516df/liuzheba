@@ -1,0 +1,10 @@
+Shicang / 拾藏
+Copyright 2026 h516df
+
+This source distribution is based on the Shicang v0.4 application.
+Private development history, signing keys, credentials, internal operational
+records, device evidence and portrait test media are not part of this distribution.
+The portrait test fixture was replaced by an original deterministic geometric PNG.
+
+Third-party libraries and the Gradle wrapper remain under their respective licenses.
+See THIRD_PARTY_NOTICES.md. This notice does not relicense third-party works.

@@ -1,0 +1,223 @@
+package dev.h516.shicang
+
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import android.graphics.BitmapFactory
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.io.FileInputStream
+import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+
+data class Appearance(val style:String="极简画廊", val mode:String="浅色", val accent:String="苔绿",
+    val theme:String="月白", val skin:String="全幅", val fit:String="铺满") {
+    fun json()=JSONObject().put("style",style).put("mode",mode).put("accent",accent).put("theme",theme).put("skin",skin).put("fit",fit)
+    companion object {
+        fun read(o:JSONObject):Appearance {
+            val mode=o.optString("mode","跟随系统")
+            val theme=o.optString("theme",when(mode){"深色"->"曜石";"浅色"->"月白";else->"跟随系统"})
+            val skin=o.optString("skin",if(o.optString("style")=="纸质相框") "留白" else "暗房")
+            val fit=o.optString("fit","完整")
+            require(theme in listOf("曜石","月白","海盐","跟随系统") && skin in listOf("全幅","留白","暗房") && fit in listOf("完整","铺满")) {"外观设置不支持"}
+            return Appearance(o.optString("style","极简画廊"),mode,o.optString("accent","苔绿"),theme,skin,fit)
+        }
+    }
+}
+
+data class ImportResult(val photos: List<Photo>, val errors: List<String>)
+class Store(private val context: Context) {
+    private val prefs=context.getSharedPreferences("device",Context.MODE_PRIVATE)
+    private val gate=Mutex()
+    private var generation=prefs.getString("generation","initial")!!
+    private var root=File(context.filesDir,"libraries/$generation").apply { mkdirs() }
+    private var db=open(root)
+    val photoDir get()=File(root,"photos").apply { mkdirs() }
+    val isLocked get()=prefs.getBoolean("appLock",false)
+    fun setLock(value: Boolean) { check(prefs.edit().putBoolean("appLock",value).commit()) }
+    private fun open(dir: File): SQLiteDatabase {
+        dir.mkdirs()
+        return SQLiteDatabase.openOrCreateDatabase(File(dir,"library.db"),null).apply {
+            require(version<=1) { "资料版本比当前应用新，请升级应用后再打开" }
+            execSQL("CREATE TABLE IF NOT EXISTS objects(kind TEXT NOT NULL,id TEXT NOT NULL,json TEXT NOT NULL,PRIMARY KEY(kind,id))")
+            execSQL("PRAGMA user_version=1")
+        }
+    }
+    private fun rows(kind: String) = db.rawQuery("SELECT json FROM objects WHERE kind=?",arrayOf(kind)).use { c -> buildList { while(c.moveToNext()) add(JSONObject(c.getString(0))) } }
+    private fun put(kind: String,id: String,json: JSONObject, target: SQLiteDatabase=db) { target.execSQL("INSERT OR REPLACE INTO objects(kind,id,json) VALUES(?,?,?)",arrayOf(kind,id,json.toString())) }
+    private fun remove(kind: String,id: String) { db.execSQL("DELETE FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)) }
+    private fun loadUnsafe()=Library(rows("archive").map(Codec::archive),rows("draft").map(Codec::archive),
+        rows("label").map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
+        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read))
+    suspend fun load()=withContext(Dispatchers.IO) { gate.withLock { loadUnsafe() } }
+    suspend fun appearance()=withContext(Dispatchers.IO) { gate.withLock { rows("settings").firstOrNull()?.let(Appearance::read) ?: Appearance() } }
+    suspend fun appearance(a: Appearance)=withContext(Dispatchers.IO) { gate.withLock { put("settings","appearance",a.json()) } }
+    suspend fun saveTemplate(t:FieldTemplate)=withContext(Dispatchers.IO) {gate.withLock {
+        Templates.validate(t)
+        val existing=rows("template").map(Templates::read)
+        require(existing.size<500 || existing.any{it.id==t.id}) {"模板已达上限"}
+        require(existing.none{it.id!=t.id && normalizedLabel(it.name)==normalizedLabel(t.name)}) {"同名模板已存在"}
+        put("template",t.id,Templates.json(t))
+    }}
+    suspend fun deleteTemplate(id:String)=withContext(Dispatchers.IO) {gate.withLock {remove("template",id)}}
+    suspend fun draft(a: Archive)=withContext(Dispatchers.IO) { gate.withLock { put("draft",a.id,Codec.archive(a)) } }
+    suspend fun discard(id: String)=withContext(Dispatchers.IO) { gate.withLock { remove("draft",id) } }
+    private fun saveTrash(t: PhotoTrash) { put("photoTrash",t.id,JSONObject().put("id",t.id).put("archiveId",t.archiveId).put("photo",Codec.photo(t.photo)).put("index",t.index).put("removed",t.removed)) }
+    suspend fun save(input: Archive)=withContext(Dispatchers.IO) { gate.withLock {
+        val a=input.copy(fields=input.fields.filter{it.name.isNotBlank() || it.value.isNotBlank()}.map {f -> if(f.type=="链接" && f.value.isNotBlank()) f.copy(value=Links.normalize(f.value) ?: error("${f.name.ifBlank{"链接"}}：请填写有效的网址或分享链接")) else f})
+        require(a.name.isNotBlank()) { "请填写名称或称呼" }
+        require(a.fields.all { it.name.isNotBlank() && (it.value.isBlank() || when(it.type) {
+            "数字" -> it.value.toBigDecimalOrNull()!=null
+            "链接" -> Links.normalize(it.value)!=null
+            "日期" -> runCatching { java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.ROOT).apply { isLenient=false }.parse(it.value)?.let { d -> java.text.SimpleDateFormat("yyyy-MM-dd",java.util.Locale.ROOT).format(d)==it.value } ?: false }.getOrDefault(false)
+            else -> true
+        }) }) { "字段名不能留空；数字填写数值，日期使用 YYYY-MM-DD" }
+        require(a.fields.size<=40 && a.fields.map{normalizedLabel(it.name)}.distinct().size==a.fields.size) {"字段最多 40 个，名称不能重复"}
+        require(a.photos.all { File(photoDir,it.file).isFile }) { "照片尚未保存，请等待导入完成" }
+        val library=loadUnsafe()
+        require((a.category.isEmpty() || library.labels.any{it.id==a.category && it.kind=="category"}) && a.tags.all{id -> library.labels.any{it.id==id && it.kind=="tag"}}) {"分类或标签已变更，请重新选择"}
+        val old=library.archives.firstOrNull { it.id==a.id }
+        db.beginTransaction()
+        try {
+            old?.photos?.forEachIndexed { index,p -> if(a.photos.none { it.id==p.id }) saveTrash(PhotoTrash(archiveId=a.id,photo=p,index=index,removed=System.currentTimeMillis())) }
+            put("archive",a.id,Codec.archive(a.copy(name=a.name.trim(),cover=a.coverPhoto()?.id.orEmpty(),updated=System.currentTimeMillis(),deleted=0)))
+            remove("draft",a.id); db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+    } }
+    suspend fun trash(id: String, restore: Boolean=false)=withContext(Dispatchers.IO) { gate.withLock {
+        val a=loadUnsafe().archives.firstOrNull { it.id==id } ?: return@withLock
+        put("archive",id,Codec.archive(a.copy(deleted=if(restore) 0 else System.currentTimeMillis(),updated=System.currentTimeMillis())))
+    } }
+    suspend fun restorePhoto(id: String)=withContext(Dispatchers.IO) { gate.withLock {
+        val l=loadUnsafe(); val t=l.photoTrash.firstOrNull { it.id==id } ?: return@withLock
+        val a=l.archives.firstOrNull { it.id==t.archiveId } ?: error("原档案已经永久删除")
+        val ps=a.photos.toMutableList().apply { if(none { it.id==t.photo.id }) add(t.index.coerceAtMost(size),t.photo) }
+        db.beginTransaction();try { put("archive",a.id,Codec.archive(a.copy(photos=ps,updated=System.currentTimeMillis()))); remove("photoTrash",id);db.setTransactionSuccessful() } finally {db.endTransaction()}
+    } }
+    suspend fun label(kind: String, name: String): String=withContext(Dispatchers.IO) { gate.withLock {
+        require(name.isNotBlank()); val existing=loadUnsafe().labels.firstOrNull { it.kind==kind && normalizedLabel(it.name)==normalizedLabel(name) }
+        existing?.id ?: uid().also { put("label",it,JSONObject().put("id",it).put("kind",kind).put("name",name.trim())) }
+    } }
+    suspend fun renameLabel(id: String,name: String)=withContext(Dispatchers.IO) { gate.withLock {
+        require(name.isNotBlank()) { "名称不能留空" }; val l=loadUnsafe();val item=l.labels.first { it.id==id }
+        require(l.labels.none { it.id!=id && it.kind==item.kind && normalizedLabel(it.name)==normalizedLabel(name) }) { "同名分类或标签已存在" }
+        put("label",id,JSONObject().put("id",id).put("kind",item.kind).put("name",name.trim()))
+    } }
+    suspend fun deleteLabel(id: String)=withContext(Dispatchers.IO) { gate.withLock {
+        val l=loadUnsafe();db.beginTransaction();try {
+            l.archives.forEach { put("archive",it.id,Codec.archive(it.copy(category=if(it.category==id) "" else it.category,tags=it.tags-id))) }
+            l.drafts.forEach { put("draft",it.id,Codec.archive(it.copy(category=if(it.category==id) "" else it.category,tags=it.tags-id))) }
+            remove("label",id);db.setTransactionSuccessful()
+        } finally {db.endTransaction()}
+    } }
+    suspend fun importPhotos(uris: List<Uri>): ImportResult=withContext(Dispatchers.IO) { gate.withLock {
+        val good=mutableListOf<Photo>();val errors=mutableListOf<String>()
+        val operation=coroutineContext
+        try {
+        uris.forEachIndexed { index,uri ->
+            operation.ensureActive()
+            val id=uid();val tmp=File(photoDir,"$id.pending"); val final=File(photoDir,"$id.original")
+            try {
+                val declared=context.contentResolver.getType(uri).orEmpty()
+                val digest=MessageDigest.getInstance("SHA-256");var bytes=0L
+                context.contentResolver.openInputStream(uri).use { input -> requireNotNull(input) { "无法读取所选图片" };tmp.outputStream().use { out -> val b=ByteArray(65536);while(true) {operation.ensureActive();val n=input.read(b);if(n<0) break;bytes+=n;require(bytes<=Codec.MAX_MEDIA_BYTES) {"单个视频最多1GB，照片最多200MB"};digest.update(b,0,n);out.write(b,0,n)} } }
+                val metadata=inspectMedia(tmp,declared)
+                require(bytes<=(if(metadata.first.startsWith("video/")) Codec.MAX_MEDIA_BYTES else Codec.MAX_PHOTO_BYTES)) {"单张照片最多200MB"}
+                require(tmp.renameTo(final)) { "照片保存失败" }
+                good.add(Photo(id,final.name,bytes,digest.digest().hex(),metadata.first,metadata.second))
+            } catch(e:CancellationException) {tmp.delete();throw e}
+            catch(e: Exception) {tmp.delete();errors.add("第${index+1}张：${e.message ?: "导入失败"}")}
+        }
+        } catch(e:CancellationException) {good.forEach{File(photoDir,it.file).delete()};throw e}
+        ImportResult(good,errors)
+    } }
+    private fun photos(l: Library)=(l.archives+l.drafts).flatMap { it.photos }.plus(l.photoTrash.map {it.photo}).distinctBy {it.file}
+    suspend fun space()=withContext(Dispatchers.IO) { gate.withLock { mapOf("照片与视频" to photoDir.walkTopDown().filter{it.isFile}.sumOf{it.length()},"图片缓存" to File(context.cacheDir,"previews").walkTopDown().filter{it.isFile}.sumOf{it.length()},"恢复前副本" to File(context.filesDir,"libraries").listFiles().orEmpty().filter{it.name!=generation}.sumOf { f -> f.walkTopDown().filter{it.isFile}.sumOf{it.length()} }) } }
+    suspend fun purge()=withContext(Dispatchers.IO) { gate.withLock {
+        val l=loadUnsafe();db.beginTransaction();try {
+            l.archives.filter {it.deleted!=0L}.forEach {remove("archive",it.id);remove("draft",it.id)}
+            db.execSQL("DELETE FROM objects WHERE kind='photoTrash'");db.setTransactionSuccessful()
+        } finally {db.endTransaction()}
+        val used=photos(loadUnsafe()).map{it.file}.toSet();photoDir.listFiles().orEmpty().filter {it.name !in used}.forEach {check(it.delete()) {"文件暂时无法清理，资料已更新，可重试"}}
+    } }
+    suspend fun clearCache()=withContext(Dispatchers.IO) { File(context.cacheDir,"previews").deleteRecursively();Unit }
+    suspend fun backup(uri: Uri, progress: (String)->Unit)=withContext(Dispatchers.IO) { gate.withLock {
+        val operation=coroutineContext
+        val l=loadUnsafe();val ps=photos(l);val appearance=rows("settings").firstOrNull() ?: Appearance().json()
+        val manifest=Codec.library(l).put("appearance",appearance)
+        val tmp=File(context.cacheDir,"backup-${uid()}.zip")
+        try {
+            ZipOutputStream(tmp.outputStream().buffered()).use { zip ->
+                zip.putNextEntry(ZipEntry("manifest.json"));zip.write(manifest.toString().toByteArray(Charsets.UTF_8));zip.closeEntry()
+                ps.forEachIndexed { i,p ->
+                    operation.ensureActive()
+                    val f=File(photoDir,p.file);require(f.length()==p.bytes && sha(f)==p.sha256) { "照片校验失败，备份未完成" }
+                    progress("打包媒体 ${i+1}/${ps.size}");zip.putNextEntry(ZipEntry("photos/${p.file}"));f.inputStream().use{copyChecked(it,zip){operation.ensureActive()}};zip.closeEntry()
+                }
+            }
+            progress("写入所选位置")
+            operation.ensureActive()
+            context.contentResolver.openOutputStream(uri,"w").use { out -> requireNotNull(out);tmp.inputStream().use {copyChecked(it,out){operation.ensureActive()}} }
+            // Read back the destination, not just the temporary zip.
+            val actual=context.contentResolver.openInputStream(uri).use { requireNotNull(it);hashStream(it) }
+            require(actual==sha(tmp)) { "备份位置校验失败，请重新备份" }
+            prefs.edit().putLong("lastBackup",System.currentTimeMillis()).putString("backupLocation",uri.toString()).apply()
+        } catch(e:Exception) { runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver,uri) };throw e }
+        finally {tmp.delete()}
+    } }
+    suspend fun restore(uri: Uri, progress: (String)->Unit)=withContext(Dispatchers.IO) { gate.withLock {
+        val operation=coroutineContext
+        val newId=uid();val stage=File(context.filesDir,"libraries/$newId").apply{mkdirs()};val dir=File(stage,"photos").apply{mkdirs()}
+        var committed=false
+        try {
+            var manifest: JSONObject?=null;var total=0L;val entries=mutableSetOf<String>()
+            context.contentResolver.openInputStream(uri).use { input -> requireNotNull(input);ZipInputStream(input.buffered()).use { zip ->
+                while(true) {
+                    operation.ensureActive()
+                    val entry=zip.nextEntry ?: break;val n=entry.name
+                    require(!entry.isDirectory && entries.add(n) && entries.size<=100001 && (n=="manifest.json" || n.matches(Regex("photos/[a-f0-9-]{36}\\.original")))) { "备份包含异常或重复条目" }
+                    val max=if(n=="manifest.json") 32L*1024*1024 else Codec.MAX_MEDIA_BYTES
+                    val dst=if(n=="manifest.json") File(stage,"manifest.json") else File(dir,n.removePrefix("photos/"))
+                    dst.outputStream().use {out ->var size=0L;val buf=ByteArray(65536);while(true){operation.ensureActive();val k=zip.read(buf);if(k<0) break;size+=k;total+=k;require(size<=max && total<=20L*1024*1024*1024) {"备份展开容量超限"};out.write(buf,0,k)}}
+                    if(n=="manifest.json") manifest=JSONObject(dst.readText(Charsets.UTF_8))
+                    progress("校验恢复文件 ${entries.size}");zip.closeEntry()
+                }
+            } }
+            val o=requireNotNull(manifest) { "缺少备份清单" };val l=Codec.library(o);val ps=photos(l)
+            require(entries==ps.map { "photos/${it.file}" }.toSet()+"manifest.json") { "备份照片清单不一致" }
+            ps.forEach { operation.ensureActive();val f=File(dir,it.file);require(f.length()==it.bytes && sha(f)==it.sha256) {"备份照片损坏"} }
+            val next=open(stage);try {
+                next.beginTransaction();try {
+                    l.archives.forEach{put("archive",it.id,Codec.archive(it),next)};l.drafts.forEach{put("draft",it.id,Codec.archive(it),next)}
+                    l.labels.forEach{put("label",it.id,JSONObject().put("id",it.id).put("kind",it.kind).put("name",it.name),next)}
+                    l.photoTrash.forEach{put("photoTrash",it.id,JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",Codec.photo(it.photo)).put("index",it.index).put("removed",it.removed),next)}
+                    l.templates.forEach{put("template",it.id,Templates.json(it),next)}
+                    put("settings","appearance",Appearance.read(o.optJSONObject("appearance") ?: JSONObject()).json(),next)
+                    next.setTransactionSuccessful()
+                } finally {next.endTransaction()}
+            } finally {next.close()}
+            progress("切换到已校验资料")
+            operation.ensureActive()
+            check(prefs.edit().putString("previousGeneration",generation).putString("generation",newId).commit()) { "恢复状态保存失败" }
+            committed=true;db.close();generation=newId;root=stage;db=open(root)
+        } finally {if(!committed) stage.deleteRecursively()}
+    } }
+    fun lastBackup()=prefs.getLong("lastBackup",0)
+    suspend fun undoRestore()=withContext(Dispatchers.IO) {gate.withLock {
+        val old=prefs.getString("previousGeneration",null) ?: error("没有恢复前副本")
+        require(Codec.validId(old)||old=="initial");val next=File(context.filesDir,"libraries/$old");require(File(next,"library.db").isFile)
+        check(prefs.edit().putString("generation",old).putString("previousGeneration",generation).commit());db.close();generation=old;root=next;db=open(root)
+    }}
+}
+fun ByteArray.hex()=joinToString("") {"%02x".format(it)}
+fun hashStream(input: java.io.InputStream): String {val d=MessageDigest.getInstance("SHA-256");val b=ByteArray(65536);while(true){val n=input.read(b);if(n<0) break;d.update(b,0,n)};return d.digest().hex()}
+fun sha(file: File)=FileInputStream(file).use(::hashStream)
+private fun copyChecked(input:java.io.InputStream,output:java.io.OutputStream,check:()->Unit) {val b=ByteArray(65536);while(true){check();val n=input.read(b);if(n<0)break;output.write(b,0,n)}}
