@@ -288,7 +288,9 @@ private val Muted: Color
             s.library.templates.forEach{t->Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(t.name,fontSize=14.sp);Text("${t.fields.size} 个字段",fontSize=11.sp,color=Muted)};TextButton(onClick={confirm("删除模板「${t.name}」？已建档案及字段保留。",{model.deleteTemplate(t)})},enabled=!s.busy){Text("删除",fontSize=12.sp)}}}
         }}
         item {SettingButton("分类与标签","改名保持关联，删除不删除档案"){navigate("labels")}}
-        item {SettingButton("完整备份","包含原照片与视频、字段、模板、草稿、回收站和外观",!s.busy,backup);if(model.store.lastBackup()>0) Text("上次成功：${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(model.store.lastBackup()))}",fontSize=11.sp,color=Muted)}
+        item {SettingButton("完整备份","包含原照片与视频、字段、模板、草稿、回收站和外观；文件未加密",!s.busy) {
+            confirm("备份文件未加密，包含完整档案、原始照片与视频、草稿和回收站。原始媒体可能保留拍摄位置。\n\n应用锁不会保护导出的备份。请保存到可信位置，勿公开上传或随意转发。\n\n确认后选择保存位置；取消不创建备份。",backup)
+        };if(model.store.lastBackup()>0) Text("上次成功：${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(model.store.lastBackup()))}",fontSize=11.sp,color=Muted)}
         item {SettingButton("从备份恢复","选择 ZIP 备份，校验完成后切换资料",!s.busy,restore);Text("备份含私人资料，应用锁不会加密导出的备份。",fontSize=11.sp,color=Muted)}
         item {SettingButton("撤销最近一次恢复","切回恢复前保留的资料副本",!s.busy,model::undoRestore)}
         item {SettingButton("回收站","恢复档案与移除的照片"){navigate("bin")}}
