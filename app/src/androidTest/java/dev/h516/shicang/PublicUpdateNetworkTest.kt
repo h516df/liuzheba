@@ -22,7 +22,8 @@ class PublicUpdateNetworkTest {
         instrumentation.runOnMainSync { updater = Updater(context) }
         assertEquals(5, updater.installedVersionCode())
         fun waitFor(done: (UpdateState) -> Boolean): UpdateState {
-            val deadline = SystemClock.uptimeMillis() + 180_000
+            // Direct release-asset downloads can be slow; retain a bounded ten-minute acceptance window.
+            val deadline = SystemClock.uptimeMillis() + 600_000
             var observed: UpdateState = UpdateState.Idle
             while (SystemClock.uptimeMillis() < deadline) {
                 instrumentation.runOnMainSync { observed = updater.state }
