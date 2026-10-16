@@ -35,6 +35,7 @@ internal object UpdateCatalog {
         val releases = JSONArray(releasesJson)
         return (0 until releases.length()).mapNotNull { i ->
             val release = releases.optJSONObject(i) ?: return@mapNotNull null
+            if (release.optBoolean("draft") || release.optBoolean("prerelease")) return@mapNotNull null
             val tag = release.optString("tag_name")
             val version = versionOf(tag) ?: return@mapNotNull null
             val assets = release.optJSONArray("assets") ?: return@mapNotNull null

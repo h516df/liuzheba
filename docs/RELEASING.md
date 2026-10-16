@@ -2,26 +2,24 @@
 
 ## 调试构建
 
-`testDebugUnitTest assembleDebug` 不需要正式密钥。调试签名与官方正式签名不同，不能覆盖安装正式版。若要并排测试，使用 `tools/verification.init.gradle` 的 `.verification` 独立包。
+`testDebugUnitTest assembleDebug` 不需要正式密钥。调试签名与官方正式签名不同，不能覆盖正式版。并排测试使用 `tools/verification.init.gradle` 的 `.verification` 独立包；不要为调试卸载存有资料的正式版。
 
 ## 正式签名
 
-仓库不包含正式密钥或密码。维护者在本机或受控密钥存储中保管密钥，并至少保留独立离线备份；不要把密钥放进 Issue、构建日志、Release 或 Git 历史。
+公开仓库不包含正式密钥、密码或旧私有历史。维护者在仓库外保存密钥，另留离线备份。构建时通过 `SHICANG_SIGNING_PROPERTIES` 指向包含 `storePassword` 和 `keyPassword` 的本地配置，通过 `SHICANG_KEYSTORE` 指向正式 JKS，alias 为 `shicang`。不要打印或提交这些内容。也支持本地忽略的 `keystore.properties` 和 `keystore/shicang.jks`，但官方维护推荐使用仓库外路径。
 
-现有 Gradle 配置可从本地未跟踪的 `keystore.properties` 读取 `storePassword` 和 `keyPassword`，正式密钥位置为本地忽略目录 `keystore/shicang.jks`，alias为 `shicang`。这些文件只能在受控构建环境创建，不应提交。没有这些文件时，调试构建仍可运行，release 不会使用官方签名。
+没有签名配置时，`assembleRelease` 生成 unsigned APK，不能发布为官方安装包。正式更新必须沿用相同签名并递增 versionCode。安装前核对大小、SHA256、包名、版本、签名及架构；异常时保留旧版本，不通过卸载解决签名冲突。
 
-更新必须沿用相同签名并递增 versionCode。安装前核对大小、SHA256、包名、版本、签名及架构；异常时保留旧版本。不要通过卸载来处理签名冲突，因为卸载会清除应用专有目录内的资料。
+## 公开更新
 
-## 更新模块
+v0.5 起匿名读取 `h516df/shicang` 的公开稳定 Release，不需要 GitHub 登录，不发送旧版更新令牌。检查更新时清理旧更新授权存储，不读取或解密旧令牌，不影响档案数据。草稿和预发布版本不进入自动更新。
 
-当前源码来自 v0.4，保留发行配置与设备授权模块。`UpdateConfig.kt` 中的 client id 是公开标识，不是 client secret；库中不提供服务器秘密或维护者账号令牌。
+旧版使用私有仓库授权；仓库重建后可能无法继续检查更新。首次迁移应从公开 Release 下载同签名的 v0.5 APK，交给 Android 系统覆盖安装，切勿卸载。之后使用 App 的检查更新入口。
 
-fork 后需要配置自己的仓库、仓库标识和公开 client id，并检查 `UpdateHttp.kt` 的地址白名单。源码公开不代表旧发行库已经迁移；不得在未核对真实地址和安装行为前声称所有用户的自动更新可用。
-
-若清理历史时更换 GitHub 仓库，先准备旧版本到新入口的迁移、同签名候选和回退，再处理旧库。删除仓库会影响旧 Release、Issue/PR 和现有更新入口，不能靠修改 README 修复。
+fork 必须更换 `UpdateConfig.kt` 中自己的更新仓库、包名与资产前缀，并使用自己的签名。不要发布会冒充官方更新源的同名发行包。
 
 ## 发布约定
 
-App 的 `app/src/main/assets/release-notes.json` 与 Release 中文更新说明使用同一份来源。标签例如 `v0.4`，资产为 `shicang-v0.4-universal.apk`、`shicang-v0.4-release-notes.json`、`shicang-v0.4-SHA256.txt`。
+`app/src/main/assets/release-notes.json` 是 App 和 Release 中文更新说明的共同来源。标签如 `v0.5`，发布三个资产：`shicang-v0.5-universal.apk`、`shicang-v0.5-release-notes.json`、`shicang-v0.5-SHA256.txt`。安装包必须经过测试并与源码提交绑定。
 
-发布后重新下载核对资产大小和摘要。CI 或模拟器通过不能替代用户本人在手机上完成下载与系统安装。
+发布后匿名重新下载，核对三个资产的大小和 SHA256，再用原生更新模块验证下载及同签名升级。不要覆盖已发布版本；修复使用递增版本。用户本人手机的下载、系统安装及数据保留仍需真实手机验收，CI 和模拟器不能代替。

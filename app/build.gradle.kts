@@ -5,7 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 val signingProperties=Properties().apply {
-    val source=rootProject.file("keystore.properties")
+    val source=rootProject.file(System.getenv("SHICANG_SIGNING_PROPERTIES") ?: "keystore.properties")
     if(source.exists()) source.inputStream().use {load(it)}
 }
 android {
@@ -15,8 +15,8 @@ android {
         applicationId = "dev.h516.shicang"
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.4"
+        versionCode = 6
+        versionName = "0.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
@@ -26,7 +26,7 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     signingConfigs {
         if(signingProperties.isNotEmpty()) create("release") {
-            storeFile=rootProject.file("keystore/shicang.jks")
+            storeFile=rootProject.file(System.getenv("SHICANG_KEYSTORE") ?: "keystore/shicang.jks")
             storePassword=signingProperties.getProperty("storePassword")
             keyAlias="shicang"
             keyPassword=signingProperties.getProperty("keyPassword")

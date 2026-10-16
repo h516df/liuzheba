@@ -15,7 +15,6 @@ import java.util.concurrent.Executors
 sealed class UpdateState {
     object Idle : UpdateState()
     object Checking : UpdateState()
-    class NeedAuth(val userCode: String, val verifyUri: String) : UpdateState()
     class Latest(val notes: ReleaseNotes?) : UpdateState()
     class Available(val candidate: UpdateCandidate) : UpdateState()
     class Downloading(val percent: Int) : UpdateState()
@@ -26,14 +25,13 @@ sealed class UpdateState {
 /**
  * 检查更新 → 下载 → 校验 → 交给系统安装。
  *
- * 联网、授权、下载都在后台线程，状态回主线程；任何一步失败都只影响这次更新，旧版本继续用。
+ * 联网、下载都在后台线程，状态回主线程；任何一步失败都只影响这次更新，旧版本继续用。
  */
 class Updater(private val context: Context) {
 
-    private val http = UpdateHttp()
-    private val tokens = UpdateTokenStore(context)
+    private var http = UpdateHttp()
     private val io = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "jiaoban-update").apply { isDaemon = true }
+        Thread(r, "shicang-update").apply { isDaemon = true }
     }
     private val main = Handler(Looper.getMainLooper())
 
@@ -59,16 +57,17 @@ class Updater(private val context: Context) {
     fun check() {
         if (state is UpdateState.Checking || state is UpdateState.Downloading) return
         cancelled = false
+        http = UpdateHttp()
         candidate = null
         set(UpdateState.Checking)
         io.execute {
             try {
-                val token = tokenOrAuthorize()
-                val releases = http.json("/releases?per_page=20", token)
+                clearLegacyUpdateAuthorization(context)
+                val releases = http.json("/releases?per_page=20")
                 val published = UpdateCatalog.parse(releases)
                 val newest = UpdateCatalog.newest(published)
                     ?: throw UpdateFailure("还没发布过带更新说明的版本，请稍后再试")
-                val notes = ReleaseNotes.decode(http.assetText(newest.notesAsset.id, token))
+                val notes = ReleaseNotes.decode(http.assetText(newest.notesAsset.id))
                 val installed = UpdateVerify.installedVersionCode(context)
                 when (val result = UpdateCatalog.decide(notes, newest.assets, installed, UpdateVerify.deviceAbis())) {
                     is UpdateCatalog.Result.Latest -> set(UpdateState.Latest(result.notes))
@@ -82,7 +81,7 @@ class Updater(private val context: Context) {
             } catch (e: InterruptedException) {
                 set(UpdateState.Idle)
             } catch (e: Exception) {
-                set(UpdateState.Failed("检查更新失败，请稍后重试"))
+                set(if (cancelled) UpdateState.Idle else UpdateState.Failed("检查更新失败，请稍后重试"))
             }
         }
     }
@@ -91,17 +90,17 @@ class Updater(private val context: Context) {
         val target = candidate ?: return
         if (state is UpdateState.Downloading) return
         cancelled = false
+        http = UpdateHttp()
         set(UpdateState.Downloading(0))
         io.execute {
             try {
-                val token = tokens.load()?.access ?: throw UpdateFailure("授权失效了，请重新检查更新")
                 val dir = File(context.cacheDir, "updates").apply { mkdirs() }
                 dir.listFiles()?.forEach { it.delete() }
                 val dest = File(dir, target.apk.name)
-                http.downloadApk(target.apk.id, token, target.apk.size, dest) { percent ->
+                http.downloadApk(target.apk.id, target.apk.size, dest) { percent ->
                     set(UpdateState.Downloading(percent))
                 }
-                val expectedSha = target.shaFile?.let { UpdateVerify.parseShaFile(http.assetText(it.id, token)) }
+                val expectedSha = target.shaFile?.let { UpdateVerify.parseShaFile(http.assetText(it.id)) }
                     ?: target.apk.apiDigest
                     ?: throw UpdateFailure("发布资料里缺校验值，请稍后再试")
                 UpdateVerify.verifyHash(dest, target.apk.size, expectedSha, target.apk.apiDigest)
@@ -112,7 +111,7 @@ class Updater(private val context: Context) {
             } catch (e: InterruptedException) {
                 set(UpdateState.Idle)
             } catch (e: Exception) {
-                set(UpdateState.Failed("下载或校验失败，请稍后重试"))
+                set(if (cancelled) UpdateState.Idle else UpdateState.Failed("下载或校验失败，请稍后重试"))
             }
         }
     }
@@ -132,82 +131,15 @@ class Updater(private val context: Context) {
         }
     }
 
-    /** 忘掉这台手机上的授权（令牌存在手机里，随时可以清掉）。 */
-    fun forgetAuthorization() {
-        tokens.clear()
-        candidate = null
-        set(UpdateState.Idle)
-    }
-
-    fun hasAuthorization(): Boolean = tokens.load() != null
-
     fun cancel() {
         cancelled = true
         http.cancel()
+        candidate = null
+        if (state !is UpdateState.Checking && state !is UpdateState.Downloading) set(UpdateState.Idle)
     }
 
     private fun set(value: UpdateState) {
         main.post { state = value }
     }
 
-    private fun tokenOrAuthorize(): String {
-        val now = System.currentTimeMillis()
-        val stored = tokens.load()
-        if (stored != null) {
-            if (!stored.expired(now)) return stored.access
-            if (!stored.refreshExpired(now)) {
-                runCatching { return refresh(stored.refresh) }
-            }
-            tokens.clear()
-        }
-        return authorize()
-    }
-
-    private fun refresh(refreshToken: String): String {
-        val json = http.oauth(
-            "oauth/access_token",
-            mapOf(
-                "client_id" to UpdateConfig.CLIENT_ID,
-                "grant_type" to "refresh_token",
-                "refresh_token" to refreshToken,
-            ),
-        )
-        val authorization = UpdateAuthorization.fromResponse(json, System.currentTimeMillis())
-        tokens.save(authorization)
-        return authorization.access
-    }
-
-    /** 设备授权：给你一个码，你在浏览器里输一次，并勾选 Jiaoban 这个仓库。 */
-    private fun authorize(): String {
-        val grant = UpdateGrant.decode(
-            http.oauth("device/code", mapOf("client_id" to UpdateConfig.CLIENT_ID)),
-            System.currentTimeMillis(),
-        )
-        set(UpdateState.NeedAuth(grant.userCode, UpdateConfig.VERIFY_URI))
-        var interval = grant.intervalSeconds
-        while (System.currentTimeMillis() < grant.expiresAt) {
-            if (cancelled) throw InterruptedException()
-            Thread.sleep(interval * 1000L)
-            val poll = UpdatePoll.decode(
-                http.oauth(
-                    "oauth/access_token",
-                    mapOf(
-                        "client_id" to UpdateConfig.CLIENT_ID,
-                        "device_code" to grant.deviceCode,
-                        "grant_type" to "urn:ietf:params:oauth:grant-type:device_code",
-                    ),
-                ),
-                interval,
-                System.currentTimeMillis(),
-            )
-            when (poll) {
-                is UpdatePoll.Pending -> interval = poll.nextIntervalSeconds
-                is UpdatePoll.Approved -> {
-                    tokens.save(poll.authorization)
-                    return poll.authorization.access
-                }
-            }
-        }
-        throw UpdateFailure("授权超时了，请重新点检查更新")
-    }
 }

@@ -2,6 +2,10 @@
 
 Android 本地私人档案应用。人物与物品共用一种结构：只有称呼也能建档，照片、视频和自定义资料以后再补。
 
+[下载正式版](https://github.com/h516df/shicang/releases/latest) · [提交问题](https://github.com/h516df/shicang/issues)
+
+从旧版本升级请下载正式 APK **覆盖安装，不要卸载**；本地资料会保留。v0.5 起检查、下载更新无需 GitHub 登录。
+
 ## 功能
 
 - **发现**：完整照片或姓名卡；左右浏览同一档案的媒体，上下切换档案。
@@ -26,7 +30,7 @@ Windows 使用 `gradlew.bat`。调试安装包位于 `app/build/outputs/apk/debu
 
 ## 测试
 
-19 项 JVM 逻辑测试覆盖档案编解码、搜索、随机浏览、模板、链接与旧备份兼容。原生测试覆盖持久化、备份、编辑/保存/重开、照片、视频及应用锁。
+23 项 JVM 逻辑测试覆盖档案编解码、搜索、随机浏览、模板、链接与旧备份兼容。原生测试覆盖持久化、备份、编辑/保存/重开、照片、视频及应用锁。
 
 ```sh
 ./gradlew --init-script tools/verification.init.gradle assembleDebug assembleDebugAndroidTest
@@ -44,7 +48,7 @@ adb -s <your-emulator> shell am instrument -w dev.h516.shicang.verification.test
 
 最低 Android 7.0 / API24。SQLite schema1，备份 format3 支持照片和视频，读取旧格式1/2。备份包含私人资料且未加密，请自行选择安全的保存位置；应用锁不等于备份加密。
 
-这份源码以 v0.4 功能为基准。模拟器和自动测试不能证明所有手机、大尺寸媒体或系统关联跳转均兼容。当前更新模块保留原发行配置；fork 后应配置自己的更新地址和公开 client id，详见发布文档。
+v0.5 延续 v0.4 的资料与界面。更新资料从本项目公开 Release 匿名读取，不上传私人资料。模拟器和自动测试不能证明所有手机、大尺寸媒体或系统关联跳转均兼容。fork 后应配置自己的更新地址和包名，详见发布文档。
 
 ## 许可与贡献
 

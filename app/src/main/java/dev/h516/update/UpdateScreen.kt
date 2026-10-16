@@ -17,10 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -74,12 +71,6 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
                 Text("正在检查…", fontSize = 14.sp)
             }
 
-            is UpdateState.NeedAuth -> AuthCard(
-                userCode = state.userCode,
-                onOpenBrowser = { openBrowser(context, state.verifyUri) },
-                onCancel = { updater.cancel() },
-            )
-
             is UpdateState.Latest -> {
                 Text("已是最新版本", fontSize = 15.sp)
                 Button(onClick = { updater.check() }) { Text("再检查一次") }
@@ -122,43 +113,10 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
         }
         currentNotes?.let { NotesBlock("本版说明 ${it.version}", it) }
 
-        if (updater.hasAuthorization()) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Text(
-                text = "这台手机已经授权过。授权只用于读发布资料，随时可以清掉。",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = { updater.forgetAuthorization() }) { Text("清掉授权") }
-        }
-    }
-}
-
-@Composable
-private fun AuthCard(userCode: String, onOpenBrowser: () -> Unit, onCancel: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("需要你授权一次", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = "在浏览器打开 GitHub 的授权页，输入下面这个码，勾选 ${UpdateConfig.REPO_NAME} 这个仓库。授权完这边会自动继续。",
-                fontSize = 13.sp,
-            )
-            Text(
-                text = userCode,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onOpenBrowser) { Text("去浏览器授权") }
-                TextButton(onClick = onCancel) { Text("取消") }
-            }
+        Text("公开更新，无需登录 GitHub", fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = { openBrowser(context, "https://github.com/" + UpdateConfig.REPO) }) {
+            Text("查看开源项目")
         }
     }
 }
