@@ -85,7 +85,16 @@ class ViewerLockTest {
             waitNode("完整照片，双击或双指缩放")
             preferences.edit().putBoolean("appLock",true).commit()
             assertTrue(automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME))
-            Thread.sleep(700)
+            // Wait for the actual background transition; launcher animations can exceed 700 ms.
+            var stopped=false
+            val stopDeadline=SystemClock.uptimeMillis()+10000
+            while(!stopped && SystemClock.uptimeMillis()<stopDeadline) {
+                instrumentation.runOnMainSync {
+                    stopped=(activity as MainActivity).lifecycle.currentState==androidx.lifecycle.Lifecycle.State.CREATED
+                }
+                if(!stopped) Thread.sleep(80)
+            }
+            assertTrue("Viewer must reach onStop before testing its locked return",stopped)
             instrumentation.context.startActivity(Intent(context,MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
             waitNode("解锁拾藏")
