@@ -1,0 +1,13 @@
+{
+  "device": "emulator-5588 Android16 API36 x86_64",
+  "officialPackage": "dev.h516.shicang",
+  "fromVersion": "0.11/code12",
+  "toVersion": "0.12/code13",
+  "installation": "adb install -r of anonymously downloaded official APK; no uninstall or data clear",
+  "fixtureName": "Upgrade-v012-fixture",
+  "fieldName": "Note",
+  "fieldValue": "Anonymous-kept-value",
+  "preservedAfterUpgrade": true,
+  "apkSha256": "3ca05fc449509757914e6e5bd588a5b7794967b0e1443ec7da51a8a5d0044d24",
+  "physicalPhoneVerified": false
+}
