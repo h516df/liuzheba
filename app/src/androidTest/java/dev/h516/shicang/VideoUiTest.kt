@@ -20,7 +20,7 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class VideoUiTest {
-    @Test fun manualMutedVideoStopsWhenBackgroundedAndReturnsToPoster()=runBlocking<Unit> {
+    @Test fun videoRetainsPositionAndSoundAcrossBackgroundAndCollapse()=runBlocking<Unit> {
         val i=InstrumentationRegistry.getInstrumentation();val c=i.targetContext
         check(c.packageName.endsWith(".verification"))
         val prefs=c.getSharedPreferences("device",Context.MODE_PRIVATE)
@@ -34,9 +34,9 @@ class VideoUiTest {
         val ui=i.uiAutomation
         fun node(text:String):AccessibilityNodeInfo? {
             fun visit(n:AccessibilityNodeInfo?):AccessibilityNodeInfo? {if(n==null)return null;if(n.isVisibleToUser && (n.text?.toString()==text || n.contentDescription?.toString()==text))return n;repeat(n.childCount){visit(n.getChild(it))?.let{return it}};return null}
-            return visit(ui.rootInActiveWindow)
+            ui.clearCache();return visit(ui.rootInActiveWindow)
         }
-        fun waitFor(text:String):AccessibilityNodeInfo {val end=SystemClock.uptimeMillis()+12000;while(SystemClock.uptimeMillis()<end){node(text)?.let{return it};Thread.sleep(100)};error("Missing video control $text")}
+        fun waitFor(text:String):AccessibilityNodeInfo {val end=SystemClock.uptimeMillis()+12000;while(SystemClock.uptimeMillis()<end){node("Got it")?.performAction(AccessibilityNodeInfo.ACTION_CLICK);node(text)?.let{return it};Thread.sleep(100)};val shot=ui.takeScreenshot();if(shot!=null){File(c.getExternalFilesDir(null),"video-failure.png").outputStream().use{shot.compress(Bitmap.CompressFormat.PNG,100,it)};shot.recycle()};error("Missing video control $text")}
         fun click(text:String){
             ui.waitForIdle(300,5000)
             val target=waitFor(text)
@@ -48,14 +48,35 @@ class VideoUiTest {
         try {
             activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             waitFor("播放视频");assertNull(node("开启声音"));click("播放视频");waitFor("开启声音")
-            Thread.sleep(700);assertNull(node("此视频无法播放 · 返回预览"))
+            Thread.sleep(700);assertNull(node("视频暂时无法播放，原文件仍保留"))
             click("开启声音");waitFor("静音")
+            fun playerIn(view:android.view.View):androidx.media3.common.Player? {
+                if(view is androidx.media3.ui.PlayerView)return view.player
+                if(view is android.view.ViewGroup) repeat(view.childCount){playerIn(view.getChildAt(it))?.let{return it}}
+                return null
+            }
+            i.runOnMainSync { val player=playerIn(activity!!.window.decorView)!!;player.pause();player.seekTo(1000L) }
             val folder=File(c.filesDir,"v04-ui").apply{mkdirs()}
             val shot=ui.takeScreenshot() ?: error("No video screenshot")
             try{File(folder,"video-playing.png").outputStream().use{shot.compress(Bitmap.CompressFormat.PNG,100,it)}}finally{shot.recycle()}
             assertTrue(ui.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME));Thread.sleep(500)
             i.context.startActivity(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-            waitFor("播放视频");assertNull(node("静音"));assertNull(node("开启声音"));click("播放视频");waitFor("开启声音");assertNull(node("静音"))
+            waitFor("静音")
+            i.runOnMainSync { val player=playerIn(activity!!.window.decorView)!!;assertTrue(kotlin.math.abs(player.currentPosition-1000L)<150L);assertFalse(player.playWhenReady) }
+            assertNull(node("播放视频"));assertNull(node("视频暂时无法播放，原文件仍保留"))
+            click("1.0×");waitFor("1.5×")
+            click("收起播放")
+            val until=SystemClock.uptimeMillis()+5000
+            fun resumeNode(n:AccessibilityNodeInfo?):AccessibilityNodeInfo? {
+                if(n==null)return null
+                if(n.text?.toString()?.startsWith("继续播放 · ")==true)return n
+                repeat(n.childCount){resumeNode(n.getChild(it))?.let{return it}}
+                return null
+            }
+            var resume=resumeNode(ui.rootInActiveWindow)
+            while(resume==null && SystemClock.uptimeMillis()<until){Thread.sleep(100);resume=resumeNode(ui.rootInActiveWindow)}
+            check(resume!=null){"Playback position was lost when collapsed"}
+            click(resume!!.text.toString());waitFor("静音");waitFor("1.5×")
         } finally {
             i.runOnMainSync{activity?.finish()}
             prefs.edit().putString("generation",generation).putBoolean("appLock",locked).commit();input.delete()
