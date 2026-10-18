@@ -1,0 +1,9 @@
+
+dev.h516.shicang.ContentFirstUiTest:.
+dev.h516.shicang.ShareSwipeTest:.
+
+Time: 18.669
+
+OK (2 tests)
+
+
