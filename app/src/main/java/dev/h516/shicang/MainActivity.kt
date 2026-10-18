@@ -49,10 +49,13 @@ class MainActivity: FragmentActivity() {
         cameraUri=savedInstanceState?.getString("cameraUri")?.let(Uri::parse)
         unlocked.value=!getSharedPreferences("device",MODE_PRIVATE).getBoolean("appLock",false)
         securePreview()
+        if(savedInstanceState==null) receiveShare(intent)
         setContent {ShicangApp(model,unlocked.value,{authenticate()},::setLock,::choosePhotos,::takePhoto,
             {backup.launch("拾藏备份-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.ROOT).format(java.util.Date())}.zip")},
             {restore.launch(arrayOf("application/zip","application/octet-stream"))})}
     }
+    override fun onNewIntent(intent:Intent) {super.onNewIntent(intent);setIntent(intent);receiveShare(intent)}
+    private fun receiveShare(intent:Intent) {if(intent.action==Intent.ACTION_SEND && intent.type?.startsWith("text/")==true) model.receiveShare(intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty())}
     override fun onSaveInstanceState(out: Bundle) {out.putString("targetDraft",targetDraft);out.putString("cameraUri",cameraUri?.toString());super.onSaveInstanceState(out)}
     override fun onStop() {super.onStop();if(getSharedPreferences("device",MODE_PRIVATE).getBoolean("appLock",false)) unlocked.value=false}
     private fun securePreview() {if(getSharedPreferences("device",MODE_PRIVATE).getBoolean("appLock",false)) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)}

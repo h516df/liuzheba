@@ -54,6 +54,7 @@ import java.io.File
     busy:Boolean=false, close:(()->Unit)?=null
 ) {
     val pager=rememberPagerState(initialPage=photoIndex(a,initialPhoto),pageCount={a.photos.size.coerceAtLeast(1)})
+    var videoPlaying by remember {mutableStateOf(false)}
     var controls by rememberSaveable {mutableStateOf(true)}
     var menu by remember {mutableStateOf(false)}
     var information by remember {mutableStateOf(false)}
@@ -79,12 +80,12 @@ import java.io.File
     fun touch() {activity++;hint=false;preferences.edit().putBoolean("frameHintV2",true).apply()}
     BackHandler(menu) {menu=false}
     Box(Modifier.fillMaxSize().background(background).archiveSwipe(
-        enabled=!zoomed && !menu && !information && (next!=null || previous!=null),
+        enabled=!videoPlaying && !zoomed && !menu && !information && (next!=null || previous!=null),
         onNext={touch();next?.invoke()},onPrevious={touch();previous?.invoke()}
     )) {
         val framed=appearance.skin=="留白"
         HorizontalPager(pager,Modifier.fillMaxSize(),
-            key={a.photos.getOrNull(it)?.id ?: a.id},userScrollEnabled=!zoomed,
+            key={a.photos.getOrNull(it)?.id ?: a.id},userScrollEnabled=!videoPlaying && !zoomed,
             beyondViewportPageCount=0) { page ->
             val p=a.photos.getOrNull(page)
             if(p==null) NameCard(a,Modifier.fillMaxSize().clickable {touch();controls=!controls})
@@ -103,7 +104,7 @@ import java.io.File
                     val width=minOf((maxWidth-40.dp).coerceAtLeast(1.dp),(maxHeight-140.dp).coerceAtLeast(1.dp)*ratio)
                     val canvas=if(framed) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
-                if(p.isVideo) VideoMedia(p,model,page==pager.currentPage && !menu && !information && !busy,complete){touch();controls=!controls}
+                if(p.isVideo) VideoMedia(p,model,page==pager.currentPage && !menu && !information && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
                 else if(page==pager.currentPage) {
                     ZoomPhoto(p,model,{touch();controls=!controls},selectedImageState,!menu && !information,imageScale)
                 } else AsyncImage(model=model.photoFile(p),contentDescription="${a.name} · 第${page+1}张",
@@ -112,11 +113,11 @@ import java.io.File
                 }
             }
         }
-        if(hint) Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(24.dp)
+        if(hint && !videoPlaying) Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(24.dp)
             .clickable {touch()},color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(16.dp)) {
             Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
-        if(controls) {
+        if(controls && !videoPlaying) {
             val ink=if(a.photos.isNotEmpty() && (appearance.skin=="全幅" || appearance.skin=="暗房")) Color.White else MaterialTheme.colorScheme.onSurface
             Column(Modifier.fillMaxWidth().align(Alignment.BottomCenter)
                 .then(if(a.photos.isNotEmpty() && appearance.skin!="留白") Modifier.background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.7f)))) else Modifier)

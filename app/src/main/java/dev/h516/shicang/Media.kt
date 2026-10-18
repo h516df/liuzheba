@@ -87,13 +87,16 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
 
 /** A player exists only for the visible, explicitly started video. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,tap:()->Unit) {
+@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,playback:(Boolean)->Unit={},tap:()->Unit) {
     var started by rememberSaveable(p.id){mutableStateOf(false)}
     var muted by rememberSaveable(p.id){mutableStateOf(true)}
     var position by rememberSaveable(p.id){mutableLongStateOf(0L)}
     var speed by rememberSaveable(p.id){mutableFloatStateOf(1f)}
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current
+    LaunchedEffect(active,started){playback(active && started)}
+    DisposableEffect(Unit){onDispose{playback(false)}}
+    androidx.activity.compose.BackHandler(active && started){started=false}
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if(!active || !started) {
             MediaThumb(p,model,Modifier.fillMaxSize().clickable{tap()},scale=if(fit) ContentScale.Fit else ContentScale.Crop)
@@ -132,15 +135,12 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
                     lifecycle.lifecycle.removeObserver(observer);player.removeListener(listener);player.release()
                 }
             }
-            AndroidView(factory={PlayerView(it).apply{useController=true}},
+            AndroidView(factory={PlayerView(it).apply{useController=false}},
                 update={view->view.player=player;view.keepScreenOn=playing
                     view.resizeMode=if(fit) AspectRatioFrameLayout.RESIZE_MODE_FIT else AspectRatioFrameLayout.RESIZE_MODE_ZOOM},
                 modifier=Modifier.fillMaxSize(),onRelease={it.player=null;it.keepScreenOn=false})
-            Row(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp).background(Color.Black.copy(alpha=.65f))) {
-                TextButton(onClick={speed=when(speed){1f->1.5f;1.5f->2f;else->1f};player.setPlaybackSpeed(speed)}){Text("${speed}×",color=Color.White)}
-                TextButton(onClick={muted=!muted;player.volume=if(muted) 0f else 1f}){Text(if(muted) "开启声音" else "静音",color=Color.White)}
-                TextButton(onClick={position=player.currentPosition;started=false}){Text("收起播放",color=Color.White)}
-            }
+            PlayerControls(player,speed,muted,{speed=it;player.setPlaybackSpeed(it)},
+                {muted=!muted;player.volume=if(muted)0f else 1f},{position=player.currentPosition;started=false})
             if(buffering && !failure) CircularProgressIndicator(Modifier.align(Alignment.Center),color=Color.White)
             if(failure) Surface(Modifier.align(Alignment.Center),color=Color.Black.copy(alpha=.85f)){
                 Column(Modifier.padding(16.dp),horizontalAlignment=Alignment.CenterHorizontally){

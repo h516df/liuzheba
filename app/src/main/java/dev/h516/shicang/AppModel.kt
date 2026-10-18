@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-data class AppState(val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap())
+data class AppState(val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList())
 class AppModel(app: Application): AndroidViewModel(app) {
     private val mutable=MutableStateFlow(AppState())
     val state=mutable.asStateFlow()
@@ -28,6 +28,24 @@ class AppModel(app: Application): AndroidViewModel(app) {
         catch(e:Exception) {mutable.value=mutable.value.copy(message="资料打开失败：${e.message}")}
     }}
     private suspend fun reload() {val l=store.load();val a=store.appearance();mutable.value=mutable.value.copy(library=l,appearance=a)}
+    fun receiveShare(text:String) {
+        if(text.isBlank()) return
+        if(text.length>32000){message("分享内容过长，请只分享链接");return}
+        if(SharedLinks.parse(text)==null){message("暂未识别到抖音、小红书或快手链接");return}
+        mutable.value=mutable.value.copy(shares=mutable.value.shares+text)
+    }
+    fun dismissShare(){mutable.value=mutable.value.copy(shares=mutable.value.shares.drop(1))}
+    fun importShare() {
+        val text=mutable.value.shares.firstOrNull() ?: return
+        if(!mutable.value.ready || mutable.value.busy)return
+        draftJob?.cancel()
+        work("正在识别分享链接") {
+            mutable.value.editor?.let{store.draft(it)}
+            val link=withContext(Dispatchers.IO){SharedLinks.resolve(text)} ?: error("链接无法识别")
+            val draft=link.archive();store.draft(draft)
+            mutable.value=mutable.value.copy(editor=draft,shares=mutable.value.shares.drop(1),draftStatus="草稿已保存 · 请核对识别结果")
+        }
+    }
     fun refreshSpace() {viewModelScope.launch {try {val value=store.space();mutable.value=mutable.value.copy(space=value)} catch(e:Exception){message("空间统计暂不可用")}}}
     fun dismissMessage() {mutable.value=mutable.value.copy(message="")}
     fun message(s: String) {mutable.value=mutable.value.copy(message=s)}
