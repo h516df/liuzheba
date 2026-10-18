@@ -23,6 +23,7 @@ object Links {
         fun belongs(domain:String)=h==domain || h.endsWith(".$domain")
         return when {
             belongs("douyin.com")->"抖音"
+            belongs("kuaishou.com") || belongs("gifshow.com")->"快手"
             belongs("bilibili.com") || belongs("b23.tv")->"哔哩哔哩"
             belongs("xiaohongshu.com") || belongs("xhslink.com")->"小红书"
             belongs("weibo.com") || belongs("weibo.cn")->"微博"

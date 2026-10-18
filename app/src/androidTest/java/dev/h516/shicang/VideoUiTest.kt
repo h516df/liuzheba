@@ -27,7 +27,7 @@ class VideoUiTest {
         val generation=prefs.getString("generation","initial");val locked=prefs.getBoolean("appLock",false)
         prefs.edit().putString("generation",uid()).putBoolean("appLock",false).putBoolean("frameHintV2",true).commit()
         val s=Store(c);val input=File(c.cacheDir,"video-ui.mp4")
-        i.context.assets.open("sample-video.mp4").use{src->input.outputStream().use{src.copyTo(it)}}
+        i.context.assets.open("sample-long-video.mp4").use{src->input.outputStream().use{src.copyTo(it)}}
         val p=s.importPhotos(listOf(Uri.fromFile(input))).photos.single()
         s.save(Archive(name="视频测试档案",photos=listOf(p)))
         var activity:Activity?=null
@@ -65,6 +65,24 @@ class VideoUiTest {
             i.runOnMainSync { val player=playerIn(activity!!.window.decorView)!!;assertTrue(kotlin.math.abs(player.currentPosition-1000L)<150L);assertFalse(player.playWhenReady) }
             assertNull(node("播放视频"));assertNull(node("视频暂时无法播放，原文件仍保留"))
             click("1.0×");waitFor("1.5×")
+            fun event(action:Int,x:Float,y:Float,down:Long) {val e=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,x,y,0);ui.injectInputEvent(e,true);e.recycle()}
+            val bounds=Rect();waitFor("视频手势区域：双击左右快退快进，长按倍速，左右拖动进度").getBoundsInScreen(bounds)
+            val x=bounds.centerX().toFloat();val y=bounds.top+bounds.height()*.32f
+            var down=SystemClock.uptimeMillis();event(MotionEvent.ACTION_DOWN,x,y,down);Thread.sleep(800)
+            i.runOnMainSync{assertEquals(2f,playerIn(activity!!.window.decorView)!!.playbackParameters.speed,.01f)}
+            event(MotionEvent.ACTION_UP,x,y,down);Thread.sleep(200)
+            i.runOnMainSync{assertEquals(1.5f,playerIn(activity!!.window.decorView)!!.playbackParameters.speed,.01f)}
+            click("快进10秒")
+            i.runOnMainSync{assertEquals(11000L,playerIn(activity!!.window.decorView)!!.currentPosition)}
+            click("快退10秒")
+            i.runOnMainSync{assertEquals(1000L,playerIn(activity!!.window.decorView)!!.currentPosition)}
+            repeat(2){down=SystemClock.uptimeMillis();event(MotionEvent.ACTION_DOWN,bounds.right-90f,y,down);Thread.sleep(55);event(MotionEvent.ACTION_UP,bounds.right-90f,y,down);Thread.sleep(65)}
+            Thread.sleep(300)
+            i.runOnMainSync{assertEquals(11000L,playerIn(activity!!.window.decorView)!!.currentPosition)}
+            down=SystemClock.uptimeMillis();event(MotionEvent.ACTION_DOWN,x,y,down)
+            repeat(12){Thread.sleep(25);event(MotionEvent.ACTION_MOVE,x+(it+1)*20f,y,down)}
+            event(MotionEvent.ACTION_UP,x+240f,y,down);Thread.sleep(300)
+            i.runOnMainSync{assertTrue(playerIn(activity!!.window.decorView)!!.currentPosition>15000L)}
             click("收起播放")
             val until=SystemClock.uptimeMillis()+5000
             fun resumeNode(n:AccessibilityNodeInfo?):AccessibilityNodeInfo? {

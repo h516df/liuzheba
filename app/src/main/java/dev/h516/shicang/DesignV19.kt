@@ -64,6 +64,7 @@ import kotlinx.coroutines.withContext
 }
 
 @Composable internal fun LibraryV19(model:AppModel,s:AppState,open:(String)->Unit,view:(Archive)->Unit) {
+    var deleteTarget by remember {mutableStateOf<Archive?>(null)}
     var query by rememberSaveable{mutableStateOf("")}
     var category by rememberSaveable{mutableStateOf("")}
     var tags by rememberSaveable{mutableStateOf(listOf<String>())}
@@ -104,7 +105,7 @@ import kotlinx.coroutines.withContext
             TextButton(onClick={if(query.isNotBlank()||category.isNotBlank()||tags.isNotEmpty()){query="";category="";tags=emptyList()}else model.edit()}){Text(if(s.library.active.isEmpty()) "新建第一份档案" else "清除搜索与筛选")}
         } else if(covers) LazyVerticalGrid(GridCells.Adaptive(148.dp),verticalArrangement=Arrangement.spacedBy(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
             items(results,key={it.id}){a->
-                Column(Modifier.clickable{open(a.id)}) {
+                Column(Modifier.animateItem().clickable{open(a.id)}) {
                     Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)).background(c.primaryContainer).clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)},contentAlignment=Alignment.Center) {
                         if(a.photos.isNotEmpty()) IdentityCover(a,model,Modifier.fillMaxSize())
                         else Text(a.name.take(1),style=MaterialTheme.typography.headlineLarge,color=c.onPrimaryContainer)
@@ -122,7 +123,10 @@ import kotlinx.coroutines.withContext
             }
         } else LazyColumn(contentPadding=PaddingValues(bottom=24.dp)) {
             items(results,key={it.id}){a->
-                Column {
+                val swipe=rememberSwipeToDismissBoxState(confirmValueChange={value->if(value==SwipeToDismissBoxValue.EndToStart) deleteTarget=a;false})
+                SwipeToDismissBox(state=swipe,modifier=Modifier.animateItem(),enableDismissFromStartToEnd=false,gesturesEnabled=!s.busy,
+                    backgroundContent={Box(Modifier.fillMaxSize().background(c.errorContainer).padding(20.dp),contentAlignment=Alignment.CenterEnd){Text("移入回收站",color=c.onErrorContainer)}}) {
+                Column(Modifier.background(c.background)) {
                     Row(Modifier.fillMaxWidth().clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)}.padding(top=16.dp,bottom=16.dp),verticalAlignment=Alignment.CenterVertically) {
                         if(a.photos.isEmpty()) Surface(shape=RoundedCornerShape(16.dp),color=c.primaryContainer){Box(Modifier.size(60.dp),contentAlignment=Alignment.Center){Text(a.name.take(1),style=MaterialTheme.typography.headlineMedium,color=c.onPrimaryContainer)}}
                         else IdentityCover(a,model,Modifier.size(72.dp))
@@ -137,9 +141,11 @@ import kotlinx.coroutines.withContext
                     }
                     HorizontalDivider(color=c.outlineVariant.copy(alpha=.45f))
                 }
+                }
             }
         }
     }
+    deleteTarget?.let{a->AlertDialog(onDismissRequest={deleteTarget=null},title={Text("移入回收站？")},text={Text("「${a.name}」的资料和媒体可以从回收站恢复。")},confirmButton={TextButton(onClick={deleteTarget=null;model.trash(a)}){Text("移入回收站")}},dismissButton={TextButton(onClick={deleteTarget=null}){Text("取消")}})}
     if(filters) LabelPicker(s.library,category,tags,{category=it.first;tags=it.second;filters=false},{filters=false},"筛选档案")
 }
 
