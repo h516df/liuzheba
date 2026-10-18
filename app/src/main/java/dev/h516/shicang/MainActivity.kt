@@ -40,6 +40,8 @@ class MainActivity: FragmentActivity() {
     }
     private val backup=registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) {uri -> if(uri!=null) model.backup(uri)}
     private val restore=registerForActivityResult(ActivityResultContracts.OpenDocument()) {uri -> if(uri!=null) model.restoreBackup(uri)}
+    override fun onResume(){super.onResume();GrowthSession.resume(this)}
+    override fun onPause(){GrowthSession.pause();super.onPause()}
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge()
         SingletonImageLoader.setSafe { context ->
@@ -51,7 +53,7 @@ class MainActivity: FragmentActivity() {
         securePreview()
         if(savedInstanceState==null) receiveShare(intent)
         setContent {ShicangApp(model,unlocked.value,{authenticate()},::setLock,::choosePhotos,::takePhoto,
-            {backup.launch("拾藏备份-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.ROOT).format(java.util.Date())}.zip")},
+            {backup.launch("留册备份-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.ROOT).format(java.util.Date())}.zip")},
             {restore.launch(arrayOf("application/zip","application/octet-stream"))})}
     }
     override fun onNewIntent(intent:Intent) {super.onNewIntent(intent);setIntent(intent);receiveShare(intent)}
@@ -69,10 +71,10 @@ class MainActivity: FragmentActivity() {
                 override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){unlocked.value=true;verifiedAction?.invoke();verifiedAction=null}
                 override fun onAuthenticationError(code:Int,text:CharSequence){model.message("验证未完成：$text");verifiedAction=null}
             })
-            prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("解锁拾藏").setSubtitle("使用手机系统身份验证").setAllowedAuthenticators(allowed).build())
+            prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("解锁留册").setSubtitle("使用手机系统身份验证").setAllowedAuthenticators(allowed).build())
         } else {
             val keyguard=getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val intent=keyguard.createConfirmDeviceCredentialIntent("解锁拾藏","使用手机锁屏密码验证")
+            val intent=keyguard.createConfirmDeviceCredentialIntent("解锁留册","使用手机锁屏密码验证")
             if(intent==null) model.message("请先在手机系统设置中启用锁屏密码") else credential.launch(intent)
         }
     }

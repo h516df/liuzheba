@@ -97,7 +97,7 @@ class ViewerLockTest {
             assertTrue("Viewer must reach onStop before testing its locked return",stopped)
             instrumentation.context.startActivity(Intent(context,MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-            waitNode("解锁拾藏")
+            waitNode("解锁留册")
             assertNull("A locked viewer must not render its previous photo",node("完整照片，双击或双指缩放"))
             assertNull("A locked viewer must not expose its private title",node(archive.name))
         } finally {
