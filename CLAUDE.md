@@ -4,4 +4,4 @@
 
 这是公开库，不包含正式签名或旧私人历史。不要从本地归档、其他仓库或历史缓存恢复并推送它们。
 
-0.10/code11 仅更换显示名称与图标，dev.h516.shicang、更新前缀 shicang 和正式签名保持不变。照片 Pager 内使用稳定 ZoomableAsyncImage，不能在 currentPage 改变时替换图片组件。成长统计仅本机保存，与资料备份格式分开。
+0.11/code12 仅更换显示名称与图标，dev.h516.shicang、更新前缀 shicang 和正式签名保持不变。照片 Pager 内使用稳定 ZoomableAsyncImage，不能在 currentPage 改变时替换图片组件。成长统计仅本机保存，与资料备份格式分开。
