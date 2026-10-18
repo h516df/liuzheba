@@ -29,6 +29,10 @@ class PhotoSwipeTest {
    Thread.sleep(2500)
    ui.rootInActiveWindow?.findAccessibilityNodeInfosByText("Got it")?.firstOrNull()?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
    Thread.sleep(300)
+   var discovery=ui.rootInActiveWindow?.findAccessibilityNodeInfosByText("发现")?.firstOrNull()
+   while(discovery!=null && !discovery.isClickable)discovery=discovery.parent
+   check(discovery?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true)
+   Thread.sleep(1800)
    var minimum=1.0;var frames=0
    fun sample(){val b=ui.takeScreenshot()?:error("No screenshot");var light=0;var total=0
     for(y in b.height*42/100 until b.height*56/100 step 8)for(x in b.width/10 until b.width*9/10 step 8){val p=b.getPixel(x,y);if(Color.red(p)+Color.green(p)+Color.blue(p)>180)light++;total++}

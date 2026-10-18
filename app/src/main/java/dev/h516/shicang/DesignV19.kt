@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,15 +73,14 @@ import kotlinx.coroutines.withContext
     var byName by rememberSaveable{mutableStateOf(false)}
     var filters by rememberSaveable{mutableStateOf(false)}
     val prefs=LocalContext.current.getSharedPreferences("device",0)
-    var covers by rememberSaveable{mutableStateOf(prefs.getBoolean("libraryCovers",false))}
+    var covers by rememberSaveable{mutableStateOf(prefs.getBoolean("libraryCovers",true))}
     var results by remember{mutableStateOf(emptyList<Archive>())}
     val c=MaterialTheme.colorScheme
     LaunchedEffect(s.library,query,category,tags,byName){results=withContext(Dispatchers.Default){s.library.find(query,category).filter{a->tags.all{it in a.tags}}.let{if(byName) it.sortedBy{a->a.name} else it.sortedByDescending{a->a.updated}}}}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp)) {
-        GrowthEntry(collectionGrowth(s.library))
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             TextField(query,{query=it},Modifier.weight(1f),singleLine=true,
-                placeholder={Text("搜索名称、标签、资料",style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)},
+                placeholder={Text("搜索档案",style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)},
                 leadingIcon={FrameGlyph("搜索",c.onSurfaceVariant)},shape=RoundedCornerShape(16.dp),
                 textStyle=MaterialTheme.typography.bodyLarge,
                 colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
@@ -106,19 +107,26 @@ import kotlinx.coroutines.withContext
             TextButton(onClick={if(query.isNotBlank()||category.isNotBlank()||tags.isNotEmpty()){query="";category="";tags=emptyList()}else model.edit()}){Text(if(s.library.active.isEmpty()) "新建第一份档案" else "清除搜索与筛选")}
         } else if(covers) LazyVerticalGrid(GridCells.Adaptive(148.dp),verticalArrangement=Arrangement.spacedBy(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
             items(results,key={it.id}){a->
-                Column(Modifier.animateItem().clickable{open(a.id)}) {
-                    Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)).background(c.primaryContainer).clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)},contentAlignment=Alignment.Center) {
-                        if(a.photos.isNotEmpty()) IdentityCover(a,model,Modifier.fillMaxSize())
-                        else Text(a.name.take(1),style=MaterialTheme.typography.headlineLarge,color=c.onPrimaryContainer)
-                    }
-                    Text(a.name,Modifier.fillMaxWidth().padding(top=12.dp,bottom=4.dp),style=MaterialTheme.typography.titleMedium,color=c.onSurface,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis)
-                    val categoryName=s.library.labelName(a.category)
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        Text(listOfNotNull(categoryName.takeIf{it.isNotBlank()},if(a.photos.isNotEmpty()) "${a.photos.size} 项" else null).joinToString(" · ").ifBlank{"私人档案"},Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
-                        TextButton(onClick={open(a.id)},modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=4.dp)){
-                            Text("资料",style=MaterialTheme.typography.labelMedium)
-                            Spacer(Modifier.width(2.dp));FrameGlyph("展开",c.primary)
+                val swipe=rememberSwipeToDismissBoxState(confirmValueChange={value->if(value==SwipeToDismissBoxValue.EndToStart) deleteTarget=a;false})
+                SwipeToDismissBox(state=swipe,modifier=Modifier.animateItem(),enableDismissFromStartToEnd=false,gesturesEnabled=!s.busy,
+                    backgroundContent={Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(c.errorContainer).padding(16.dp),contentAlignment=Alignment.CenterEnd){Text("回收站",color=c.onErrorContainer)}}) {
+                    Column(Modifier.background(c.background).clickable{open(a.id)}.padding(bottom=8.dp)) {
+                        Box(Modifier.fillMaxWidth().aspectRatio(.82f).clip(RoundedCornerShape(16.dp)).background(c.surfaceVariant),contentAlignment=Alignment.Center) {
+                            if(a.photos.isNotEmpty()) IdentityCover(a,model,Modifier.fillMaxSize())
+                            else Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                                FrameGlyph("我的",c.onSurfaceVariant)
+                                Text(a.name.take(1),style=MaterialTheme.typography.headlineLarge,color=c.onSurface)
+                            }
+                            if(a.photos.isNotEmpty()) Surface(onClick={view(a)},modifier=Modifier.align(Alignment.BottomEnd).padding(8.dp).semantics{contentDescription="浏览${a.name}的照片与视频"},
+                                color=Color.Black.copy(alpha=.64f),contentColor=Color.White,shape=RoundedCornerShape(12.dp)) {
+                                Row(Modifier.heightIn(min=48.dp).padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                                    FrameGlyph("全部照片",Color.White);Text("${a.photos.size}",style=MaterialTheme.typography.labelMedium)
+                                }
+                            }
                         }
+                        Text(a.name,Modifier.fillMaxWidth().padding(top=12.dp,bottom=4.dp),style=MaterialTheme.typography.titleMedium,color=c.onSurface,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        val categoryName=s.library.labelName(a.category)
+                        if(categoryName.isNotBlank()) Text(categoryName,style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -128,9 +136,9 @@ import kotlinx.coroutines.withContext
                 SwipeToDismissBox(state=swipe,modifier=Modifier.animateItem(),enableDismissFromStartToEnd=false,gesturesEnabled=!s.busy,
                     backgroundContent={Box(Modifier.fillMaxSize().background(c.errorContainer).padding(20.dp),contentAlignment=Alignment.CenterEnd){Text("移入回收站",color=c.onErrorContainer)}}) {
                 Column(Modifier.background(c.background)) {
-                    Row(Modifier.fillMaxWidth().clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)}.padding(top=16.dp,bottom=16.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clickable{open(a.id)}.padding(top=16.dp,bottom=16.dp),verticalAlignment=Alignment.CenterVertically) {
                         if(a.photos.isEmpty()) Surface(shape=RoundedCornerShape(16.dp),color=c.primaryContainer){Box(Modifier.size(60.dp),contentAlignment=Alignment.Center){Text(a.name.take(1),style=MaterialTheme.typography.headlineMedium,color=c.onPrimaryContainer)}}
-                        else IdentityCover(a,model,Modifier.size(72.dp))
+                        else IdentityCover(a,model,Modifier.size(72.dp).clickable{view(a)}.semantics{contentDescription="浏览${a.name}的照片与视频"})
                         Column(Modifier.weight(1f).padding(start=14.dp,end=4.dp)) {
                             Text(a.name,style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
                             val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
@@ -157,22 +165,28 @@ import kotlinx.coroutines.withContext
         PageBar("档案",back){FilledTonalButton(onClick={model.edit(a)},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp)){Text("编辑")}}
         LazyColumn(contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=32.dp)) {
             item {
-                Row(Modifier.fillMaxWidth().padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).padding(end=16.dp)) {
-                        Text(a.name,style=MaterialTheme.typography.headlineLarge)
-                        val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
-                        if(labels.isNotEmpty()) Text(labels.joinToString(" · "),Modifier.padding(top=8.dp),style=MaterialTheme.typography.bodyMedium,color=c.onSurfaceVariant)
-                    }
-                    IdentityCover(a,model,Modifier.width(72.dp).height(if(a.photos.isEmpty()) 72.dp else 88.dp))
-                }
-                Spacer(Modifier.height(16.dp))
+                Text(a.name,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(top=4.dp,bottom=10.dp))
+                val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
+                if(labels.isNotEmpty()) Text(labels.joinToString("  ·  "),style=MaterialTheme.typography.bodyMedium,color=c.onSurfaceVariant)
+                Spacer(Modifier.height(24.dp))
             }
             if(a.photos.isNotEmpty()) item {
-                SectionTitle("照片与视频"){TextButton(onClick=album){Text("查看全部",style=MaterialTheme.typography.labelMedium)}}
-                val photoCount=a.photos.count{!it.isVideo};val videoCount=a.photos.count{it.isVideo}
-                Text(listOfNotNull(if(photoCount>0) "$photoCount 张照片" else null,if(videoCount>0) "$videoCount 个视频" else null).joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,modifier=Modifier.padding(bottom=12.dp))
-                LazyRow(horizontalArrangement=Arrangement.spacedBy(10.dp)){items(a.photos.take(6),key={it.id}){p->MediaThumb(p,model,Modifier.width(100.dp).height(128.dp).clip(RoundedCornerShape(16.dp)).clickable{zoom(p.id)},"查看${if(p.isVideo) "视频" else "照片"}")}}
-                Spacer(Modifier.height(18.dp))
+                val cover=a.coverPhoto() ?: a.photos.first()
+                Box(Modifier.fillMaxWidth().aspectRatio(1.15f).clip(RoundedCornerShape(20.dp)).clickable{zoom(cover.id)}) {
+                    MediaThumb(cover,model,Modifier.fillMaxSize(),"浏览${a.name}的照片与视频")
+                    Surface(modifier=Modifier.align(Alignment.BottomEnd).padding(12.dp),color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(12.dp)) {
+                        Row(Modifier.padding(horizontal=12.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            FrameGlyph("全部照片",Color.White);Text("${a.photos.size} 项",color=Color.White,style=MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(top=8.dp,bottom=12.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Text("照片与视频",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
+                    TextButton(onClick=album){Text("查看全部",style=MaterialTheme.typography.labelMedium);FrameGlyph("展开",c.primary)}
+                }
+                if(a.photos.size>1) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(bottom=12.dp)) {
+                    items(a.photos.filter{it.id!=cover.id}.take(5),key={it.id}){p->MediaThumb(p,model,Modifier.size(76.dp).clip(RoundedCornerShape(12.dp)).clickable{zoom(p.id)},"查看${if(p.isVideo) "视频" else "照片"}")}
+                }
             }
             item{SectionTitle("资料")}
             if(a.fields.isEmpty()) item{Text("还没有补充资料",Modifier.padding(vertical=18.dp),color=c.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)}
@@ -232,7 +246,14 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 item {
                     Text("称呼",Modifier.padding(bottom=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     TextField(a.name,{change(a.copy(name=it))},Modifier.fillMaxWidth(),enabled=!s.busy,singleLine=true,shape=RoundedCornerShape(16.dp),placeholder={Text("名称或称呼",style=MaterialTheme.typography.headlineMedium)},textStyle=MaterialTheme.typography.headlineMedium,colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,disabledContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
-                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.fillMaxWidth().clickable(enabled=!s.busy){labels=true}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("分类与标签",style=MaterialTheme.typography.bodyMedium)
+                            val selectedLabels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
+                            if(selectedLabels.isNotEmpty()) Text(selectedLabels.joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        }
+                        FrameGlyph("展开",c.onSurfaceVariant)
+                    }
                     SectionTitle("照片与视频"){FilledTonalButton(onClick={addMedia=true},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=14.dp)){Text("添加")}}
                     if(a.photos.isEmpty()) Text("可稍后添加，只有资料也能保存。",fontSize=12.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=10.dp))
                     LazyRow(horizontalArrangement=Arrangement.spacedBy(10.dp)) {items(a.photos,key={it.id}){p->
@@ -270,7 +291,6 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 }
                 item {
                     TextButton(onClick={change(a.copy(fields=a.fields+Field()))},enabled=!s.busy && a.fields.size<40){Text("＋ 添加字段")}
-                    TextButton(onClick={labels=true},enabled=!s.busy){Text("分类与标签${if(a.category.isNotBlank()||a.tags.isNotEmpty()) " · 已选择" else ""}")}
                     Text(s.draftStatus,Modifier.padding(top=12.dp),color=c.onSurfaceVariant,fontSize=11.sp)
                     TextButton(onClick={confirm("放弃这份草稿？已保存的档案保持原样。",model::discardEditor)},enabled=!s.busy){Text("放弃草稿",fontSize=12.sp,color=c.onSurfaceVariant)}
                 }
@@ -305,10 +325,10 @@ private fun openLink(context:Context,url:String,model:AppModel) {
     }
     val c=MaterialTheme.colorScheme
     ModalBottomSheet(onDismissRequest=close,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=c.background){
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.86f).padding(horizontal=24.dp).imePadding()) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.86f).padding(horizontal=20.dp).imePadding()) {
             Row(verticalAlignment=Alignment.CenterVertically){Text(title,Modifier.weight(1f),fontSize=20.sp,fontWeight=FontWeight.SemiBold);TextButton(onClick={category="";tags=emptyList()}){Text("清除")};Button(onClick={apply(category to tags)},enabled=pending==null && !busy,shape=RoundedCornerShape(12.dp)){Text("完成")}}
             Row{FilterChip(kind=="category",{kind="category"},label={Text("分类")});Spacer(Modifier.width(10.dp));FilterChip(kind=="tag",{kind="tag"},label={Text("标签 · ${tags.size}")})}
-            if(tags.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            if(tags.isNotEmpty()) FlowRow(Modifier.heightIn(max=112.dp).verticalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 library.labels.filter{it.id in tags}.forEach{label->
                     InputChip(selected=true,onClick={tags=tags-label.id},label={Text(label.name)},
                         trailingIcon={Text("×",modifier=Modifier.semantics{contentDescription="移除标签 ${label.name}"})})
@@ -318,7 +338,7 @@ private fun openLink(context:Context,url:String,model:AppModel) {
             if(createError.isNotEmpty()) Text(createError,color=c.error,style=MaterialTheme.typography.bodySmall)
 
             LazyColumn(Modifier.weight(1f)) {
-                items(library.labels.filter{it.kind==kind && it.name.contains(query,true)},key={it.id}){l->Row(Modifier.fillMaxWidth().clickable{if(kind=="category") category=if(category==l.id) "" else l.id else tags=if(l.id in tags) tags-l.id else tags+l.id}.padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Text(l.name,Modifier.weight(1f),fontSize=15.sp);Checkbox(if(kind=="category") category==l.id else l.id in tags,null)}}
+                items(library.labels.filter{it.kind==kind && it.name.contains(query,true)},key={it.id}){l->Row(Modifier.fillMaxWidth().clickable{if(kind=="category") category=if(category==l.id) "" else l.id else tags=if(l.id in tags) tags-l.id else tags+l.id}.padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Text(l.name,Modifier.weight(1f),fontSize=15.sp);if(kind=="category") RadioButton(category==l.id,null) else Checkbox(l.id in tags,null)}}
                 if(create!=null && query.isNotBlank() && library.labels.none{it.kind==kind && normalizedLabel(it.name)==normalizedLabel(query)}) item{TextButton(enabled=pending==null && !busy,onClick={createError="";pending=kind to query.trim();create(kind,query.trim())}){Text("新建${if(kind=="category") "分类" else "标签"}「$query」")}}
             }
             Text(if(kind=="category") "每份档案选择一个分类。" else "可以选择多个标签，筛选时同时匹配。",fontSize=11.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=14.dp))

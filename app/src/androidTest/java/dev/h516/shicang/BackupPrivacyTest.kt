@@ -85,7 +85,7 @@ class BackupPrivacyTest {
         }
         try {
             activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-            click("设置与恢复备份")
+            click("设置");click("备份与恢复")
             reveal("完整备份")
             click("完整备份")
             val warning=waitFor("备份文件未加密").text.toString()

@@ -1,6 +1,8 @@
 package dev.h516.shicang
 
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -53,7 +55,7 @@ import java.time.ZoneId
             MedalMark(true,Modifier.size(32.dp))
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text(stats.title,fontWeight=FontWeight.Medium)
-                Text("Lv.${GrowthRules.level(points)} · ${badges.count{it.id in earned}} 枚徽章",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${badges.count{it.id in earned}} 枚留念",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("查看",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)
         }
@@ -74,6 +76,7 @@ import java.time.ZoneId
     var timeline by rememberSaveable{mutableStateOf(false)}
     var information by remember{mutableStateOf(false)}
     val next=badges.filter{it.id !in earned}.maxByOrNull{it.progress}
+    var goals by rememberSaveable{mutableStateOf(false)}
     val colors=MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=6.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -82,42 +85,34 @@ import java.time.ZoneId
             TextButton(onClick={information=true}){Text("说明")}
         }
         LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(horizontal=28.dp,vertical=24.dp),verticalArrangement=Arrangement.spacedBy(32.dp)) {
-            item {Row(Modifier.fillMaxWidth().padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(20.dp)) {
-                MedalMark(true,Modifier.size(48.dp))
-                Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text("Lv.${GrowthRules.level(points)}",fontSize=26.sp,fontWeight=FontWeight.SemiBold)
-                    Text("收获 ${badges.count{it.id in earned}} 枚徽章",fontSize=14.sp,color=colors.onSurfaceVariant)
-                }
+            item {Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Text("慢慢收集，慢慢记得",style=MaterialTheme.typography.headlineMedium)
+                Text("在留册相伴 ${java.time.temporal.ChronoUnit.DAYS.between(firstDate,today).coerceAtLeast(0)+1} 天",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
             }}
-            item {Row(Modifier.fillMaxWidth()) {
-                listOf("相伴" to "${java.time.temporal.ChronoUnit.DAYS.between(firstDate,today).coerceAtLeast(0)+1} 天","连续使用" to "${GrowthRules.streak(days,today)} 天").forEach{(label,value)->
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                        Text(label,fontSize=14.sp,color=colors.onSurfaceVariant)
-                        Text(value,fontSize=22.sp,fontWeight=FontWeight.Medium)
-                    }
+            item {Text("收获的留念",style=MaterialTheme.typography.titleMedium)}
+            if(earned.isEmpty()) item {Text("留下一份档案，故事就开始了。",color=colors.onSurfaceVariant)}
+            badges.filter{it.id in earned}.take(4).chunked(2).forEach{row->item {Row(horizontalArrangement=Arrangement.spacedBy(24.dp)) {
+                row.forEach{badge->Column(Modifier.weight(1f).padding(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    MedalMark(true,Modifier.size(44.dp));Text(badge.title,style=MaterialTheme.typography.titleSmall)
+                    Text(Instant.ofEpochMilli(earned.getValue(badge.id)).atZone(ZoneId.systemDefault()).toLocalDate().toString(),style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                }}
+                if(row.size==1)Spacer(Modifier.weight(1f))
+            }}}
+            if(next!=null)item {Row(Modifier.fillMaxWidth().padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                MedalMark(false)
+                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    Text(next.title,style=MaterialTheme.typography.titleSmall)
+                    Text(next.detail,style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
+                Text("${next.current} / ${next.target}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
             }}
-            item {HorizontalDivider(color=colors.outlineVariant.copy(alpha=.5f))}
-            item {Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                    Text("本周小目标",Modifier.weight(1f),fontWeight=FontWeight.SemiBold,fontSize=18.sp)
-                    Text("${stats.weekValue} / $goal",fontSize=15.sp,color=colors.primary)
+            item {Column(Modifier.animateContentSize(tween(220)),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick={goals=!goals},contentPadding=PaddingValues(0.dp)){Text("本周小目标")}
+                if(goals) {
+                    Text("${stats.weekValue} / $goal ${stats.weekUnit}",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){stats.weekGoals.forEach{value->FilterChip(selected=goal==value,onClick={goal=value;store.goal(value,true)},label={Text("$value ${stats.weekUnit}")})}}
+                    if(stats.weekValue>=goal)Text("本周已达成",style=MaterialTheme.typography.bodySmall,color=colors.primary)
                 }
-                LinearProgressIndicator(progress={(stats.weekValue.toFloat()/goal).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().height(4.dp))
-                FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){stats.weekGoals.forEach{value->FilterChip(selected=goal==value,onClick={goal=value;store.goal(value,true)},label={Text("$value ${stats.weekUnit}",fontSize=12.sp)})}}
-                if(stats.weekValue>=goal)Text("本周已达成",fontSize=12.sp,color=colors.primary)
-            }}
-            if(next!=null)item {Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Text("下一枚徽章",fontSize=12.sp,color=colors.onSurfaceVariant)
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-                    MedalMark(false)
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                        Text(next.title,fontSize=18.sp,fontWeight=FontWeight.Medium)
-                        Text(next.detail,fontSize=12.sp,color=colors.onSurfaceVariant)
-                    }
-                }
-                LinearProgressIndicator(progress={next.progress},modifier=Modifier.fillMaxWidth().height(4.dp))
-                Text("${next.current} / ${next.target}",fontSize=12.sp,color=colors.onSurfaceVariant)
             }}
             item {Column {
                 TextButton(onClick={allBadges=!allBadges},contentPadding=PaddingValues(0.dp)) {Text(if(allBadges)"收起徽章" else "查看全部徽章 · ${badges.size}")}
@@ -128,7 +123,7 @@ import java.time.ZoneId
                     MedalMark(unlocked)
                     Text(badge.title,fontWeight=FontWeight.Medium,fontSize=15.sp)
                     Text(if(unlocked)"已获得" else badge.detail,fontSize=12.sp,color=colors.onSurfaceVariant)
-                    if(!unlocked)LinearProgressIndicator(progress={badge.progress},modifier=Modifier.fillMaxWidth().height(3.dp))
+                    if(!unlocked)Text("${badge.current} / ${badge.target}",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                 }
             };if(row.size==1)Spacer(Modifier.weight(1f))}}}
             if(timeline){
@@ -159,7 +154,7 @@ import java.time.ZoneId
     val context=LocalContext.current;val store=remember{GrowthStore(context)}
     var hidden by remember{mutableStateOf(store.hidden)}
     Row(Modifier.fillMaxWidth().heightIn(min=64.dp).semantics{contentDescription="从最近任务中隐藏"}.toggleable(value=hidden,role=Role.Switch,onValueChange={hidden=it;store.hideRecents(it)}).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)){Text("从最近任务中隐藏");Text("桌面仍能打开；不影响系统省电限制",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        Text("从最近任务中隐藏",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
         Switch(hidden,onCheckedChange=null)
     }
 }

@@ -3,6 +3,10 @@ package dev.h516.shicang
 
 import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -125,9 +129,9 @@ import java.io.File
             .clickable {touch()},color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(16.dp)) {
             Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
-        if(controls && !videoPlaying) {
+        AnimatedVisibility(visible=controls && !videoPlaying,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             val ink=if(a.photos.isNotEmpty() && (appearance.skin=="全幅" || appearance.skin=="暗房")) Color.White else MaterialTheme.colorScheme.onSurface
-            Column(Modifier.fillMaxWidth().align(Alignment.BottomCenter)
+            Column(Modifier.fillMaxWidth()
                 .then(if(a.photos.isNotEmpty() && appearance.skin!="留白") Modifier.background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.7f)))) else Modifier)
                 .navigationBarsPadding().padding(horizontal=22.dp)) {
                 Row(Modifier.fillMaxWidth().padding(top=36.dp,bottom=12.dp),verticalAlignment=Alignment.CenterVertically) {

@@ -47,7 +47,7 @@ class VideoUiTest {
         }
         try {
             activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            waitFor("播放视频");assertNull(node("开启声音"));click("播放视频");waitFor("开启声音")
+            click("发现");waitFor("播放视频");assertNull(node("开启声音"));click("播放视频");waitFor("开启声音")
             Thread.sleep(700);assertNull(node("视频暂时无法播放，原文件仍保留"))
             click("开启声音");waitFor("静音")
             fun playerIn(view:android.view.View):androidx.media3.common.Player? {

@@ -10,7 +10,7 @@ class GrowthUiTest {
   prefs.edit().putString("generation",uid()).putBoolean("appLock",false).putBoolean("frameHintV2",true).commit()
   val store=Store(c);store.save(Archive(name="成长合成档案",fields=listOf(Field(name="备注",value="原生验收"))))
   val activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-  try {check(GrowthJourney.run(i,activity,"收藏成长","我的","3 份整理").startsWith("GROWTH_PASS"))}
+  try {check(GrowthJourney.run(i,activity,"收藏成长","设置","3 份整理").startsWith("GROWTH_PASS"))}
   finally{i.runOnMainSync{activity.finish()};prefs.edit().putString("generation",old).putBoolean("appLock",lock).commit()}
  }
 }
