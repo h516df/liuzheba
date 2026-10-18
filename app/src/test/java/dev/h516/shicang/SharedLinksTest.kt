@@ -2,6 +2,12 @@ package dev.h516.shicang
 import org.junit.Assert.*
 import org.junit.Test
 class SharedLinksTest {
+ @Test(timeout=1000) fun completeLinksPrefillWithoutWaitingForTheNetwork(){
+  listOf("示例直播间 https://live.kuaishou.com/u/demo", "https://www.douyin.com/user/abc", "https://www.xiaohongshu.com/explore/abc").forEach { text ->
+   assertEquals(SharedLinks.parse(text),SharedLinks.resolve(text))
+  }
+ }
+
  @Test fun recognizesPlatformAndType() {
   listOf("https://www.douyin.com/user/abc" to "个人主页","https://live.douyin.com/123" to "直播间","https://www.xiaohongshu.com/user/profile/abc" to "个人主页","https://www.kuaishou.com/profile/abc" to "个人主页","https://live.kuaishou.com/u/abc" to "直播间","https://www.kuaishou.com/short-video/123" to "作品").forEach{(url,kind)->assertEquals(kind,SharedLinks.parse(url)!!.kind)}
  }

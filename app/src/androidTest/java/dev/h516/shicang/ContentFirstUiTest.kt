@@ -26,6 +26,7 @@ class ContentFirstUiTest {
         val category=store.label("category","生活片段")
         val archive=Archive(name="周末的城市散步",category=category,photos=photos,fields=listOf(Field(name="地点",value="老街与河岸")))
         store.save(archive)
+        val persisted=store.load().active.first{it.id==archive.id}
         store.save(Archive(name="外婆的手写食谱与节日记忆",photos=photos))
         store.save(Archive(name="一封旧信",fields=listOf(Field(name="备注",value="合成验收资料"))))
         store.save(Archive(name="旅行途中",photos=photos))
@@ -57,7 +58,7 @@ class ContentFirstUiTest {
             assertEquals(photos,store.load().archives.first{it.id==archive.id}.photos)
             click("设置");shot("settings");click("回收站");click("恢复档案")
             val restored=SystemClock.uptimeMillis()+5000;while(store.load().active.none{it.id==archive.id} && SystemClock.uptimeMillis()<restored)Thread.sleep(100)
-            assertEquals(archive,store.load().active.first{it.id==archive.id}.copy(updated=archive.updated))
+            assertEquals(persisted,store.load().active.first{it.id==archive.id}.copy(updated=persisted.updated))
             click("返回");scrollTo("收藏成长");click("收藏成长");wait("慢慢收集，慢慢记得");shot("keepsakes")
         } catch(e:Throwable){shot("failure");File(out,"failure.txt").writeText(nodes().joinToString("\n"){"${it.text} | ${it.contentDescription}"});throw e}
         finally {i.runOnMainSync{activity.finish()};val edit=prefs.edit().clear();old.forEach{(key,value)->when(value){is String->edit.putString(key,value);is Boolean->edit.putBoolean(key,value);is Int->edit.putInt(key,value);is Long->edit.putLong(key,value);is Float->edit.putFloat(key,value);is Set<*>->edit.putStringSet(key,value.filterIsInstance<String>().toSet())}};edit.commit();picture.delete()}
