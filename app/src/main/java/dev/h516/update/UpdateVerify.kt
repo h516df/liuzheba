@@ -54,7 +54,7 @@ internal object UpdateVerify {
     fun verifyArchive(context: Context, file: File, expectedCode: Int) {
         val pm = context.packageManager
         val info = packageInfo(context, file.absolutePath, pm)
-        requireUpdate(info.packageName == UpdateConfig.PACKAGE, "安装包不属于拾藏，已停止更新")
+        requireUpdate(info.packageName == UpdateConfig.PACKAGE, "安装包不属于留册，已停止更新")
 
         val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
         requireUpdate(code == expectedCode.toLong(), "安装包版本对不上，已停止更新")

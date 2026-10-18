@@ -62,8 +62,8 @@ import java.io.File
     val context=LocalContext.current
     val accessibility=remember {context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager}
     val current=a.photos.getOrNull(pager.currentPage)
-    val selectedImageState=key(current?.id ?: a.id) {rememberZoomableImageState()}
-    val zoomed=(selectedImageState.zoomableState.zoomFraction ?: 0f)>.001f
+    val imageStates=remember(a.id) {mutableStateMapOf<String,ZoomableImageState>()}
+    val zoomed=(imageStates[current?.id]?.zoomableState?.zoomFraction ?: 0f)>.001f
     val complete=appearance.skin!="全幅" || appearance.fit=="完整"
     val imageScale=if(complete) ContentScale.Fit else ContentScale.Crop
     val background=if(appearance.skin!="留白") Color.Black else MaterialTheme.colorScheme.background
@@ -86,7 +86,7 @@ import java.io.File
         val framed=appearance.skin=="留白"
         HorizontalPager(pager,Modifier.fillMaxSize(),
             key={a.photos.getOrNull(it)?.id ?: a.id},userScrollEnabled=!videoPlaying && !zoomed,
-            beyondViewportPageCount=0) { page ->
+            beyondViewportPageCount=1) { page ->
             val p=a.photos.getOrNull(page)
             if(p==null) NameCard(a,Modifier.fillMaxSize().clickable {touch();controls=!controls})
             else key(p.id) {
@@ -105,10 +105,18 @@ import java.io.File
                     val canvas=if(framed) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
                 if(p.isVideo) VideoMedia(p,model,page==pager.currentPage && !menu && !information && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
-                else if(page==pager.currentPage) {
-                    ZoomPhoto(p,model,{touch();controls=!controls},selectedImageState,!menu && !information,imageScale)
-                } else AsyncImage(model=model.photoFile(p),contentDescription="${a.name} · 第${page+1}张",
-                    contentScale=imageScale,modifier=Modifier.fillMaxSize())
+                else {
+                    // Keep the renderer and its decoded image stable across the pager midpoint.
+                    val imageState=rememberZoomableImageState()
+                    DisposableEffect(p.id,imageState) {
+                        imageStates[p.id]=imageState
+                        onDispose {imageStates.remove(p.id)}
+                    }
+                    LaunchedEffect(page==pager.settledPage) {
+                        if(page!=pager.settledPage) imageState.zoomableState.resetZoom()
+                    }
+                    ZoomPhoto(p,model,{touch();controls=!controls},imageState,page==pager.currentPage && !menu && !information,imageScale)
+                }
                     }
                 }
             }
@@ -223,7 +231,7 @@ private fun Modifier.archiveSwipe(enabled:Boolean,onNext:()->Unit,onPrevious:()-
     }
     BackHandler(zoomed && backAllowed) {scope.launch {state.zoomableState.resetZoom()}}
     val request=remember(p.id,retry) {ImageRequest.Builder(context).data(model.photoFile(p))
-        .memoryCacheKey("${model.photoFile(p).path}:$retry").crossfade(120)
+        .memoryCacheKey("${model.photoFile(p).path}:$retry").crossfade(false)
         .listener(onError={_,_->failure=true},onSuccess={_,_->failure=false}).build()}
     Box(Modifier.fillMaxSize()) {
         ZoomableAsyncImage(model=request,state=state,contentDescription=if(imageScale==ContentScale.Fit) "完整照片，双击或双指缩放" else "全幅照片，双击或双指缩放",

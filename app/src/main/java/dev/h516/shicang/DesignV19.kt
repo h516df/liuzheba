@@ -76,6 +76,7 @@ import kotlinx.coroutines.withContext
     val c=MaterialTheme.colorScheme
     LaunchedEffect(s.library,query,category,tags,byName){results=withContext(Dispatchers.Default){s.library.find(query,category).filter{a->tags.all{it in a.tags}}.let{if(byName) it.sortedBy{a->a.name} else it.sortedByDescending{a->a.updated}}}}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp)) {
+        GrowthEntry(collectionGrowth(s.library))
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             TextField(query,{query=it},Modifier.weight(1f),singleLine=true,
                 placeholder={Text("搜索名称、标签、资料",style=MaterialTheme.typography.bodyMedium,maxLines=1,overflow=TextOverflow.Ellipsis)},

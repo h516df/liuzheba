@@ -132,8 +132,8 @@ private val Muted: Color
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
-                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"我的";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"拾藏"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
-                        if(route=="frame" && !editing) Text("拾藏 · 私人档案",fontSize=11.sp,color=Muted)}
+                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"我的";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留册"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
+                        if(route=="frame" && !editing) Text("留册 · 私人档案",fontSize=11.sp,color=Muted)}
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
                         FilledTonalIconButton(onClick={openSettings()},modifier=Modifier.size(48.dp).semantics{contentDescription="设置"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("设置",scheme.onSurfaceVariant)}
                         Spacer(Modifier.width(8.dp))
@@ -151,7 +151,7 @@ private val Muted: Color
                 when {
                     editing && unlocked->Unit // The full-page editor owns navigation and accessibility while open.
                     !s.ready->Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally){CircularProgressIndicator();Text(if(s.message.isNotEmpty()) s.message else "正在打开资料",Modifier.padding(16.dp))}
-                    !unlocked->Column(Modifier.align(Alignment.Center).padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally){Text("你的拾藏，妥善留存",fontSize=23.sp);Text("解锁后查看私人档案",Modifier.padding(20.dp),color=Muted);Button(onClick=unlock){Text("解锁拾藏")}}
+                    !unlocked->Column(Modifier.align(Alignment.Center).padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally){Text("你的留册，妥善留存",fontSize=23.sp);Text("解锁后查看私人档案",Modifier.padding(20.dp),color=Muted);Button(onClick=unlock){Text("解锁留册")}}
 
                     route=="frame" && !editing && zoomPhoto.isEmpty()->{
                         val active=remember(s.library.archives){s.library.active}
@@ -298,6 +298,7 @@ private val Muted: Color
         item {SettingButton("从备份恢复","选择 ZIP 备份，校验完成后切换资料",!s.busy,restore);Text("备份含私人资料，应用锁不会加密导出的备份。",fontSize=11.sp,color=Muted)}
         item {SettingButton("撤销最近一次恢复","切回恢复前保留的资料副本",!s.busy,model::undoRestore)}
         item {SettingButton("回收站","恢复档案与移除的照片"){navigate("bin")}}
+        item {RecentTasksPreference()}
         item {HorizontalDivider();Text("存储与隐私",Modifier.padding(top=16.dp),fontSize=17.sp,fontWeight=FontWeight.Medium)}
         item {
             s.space.forEach { (name,size) ->
@@ -309,7 +310,7 @@ private val Muted: Color
         }
         item {OutlinedButton(onClick={model.clearCache();coil3.SingletonImageLoader.get(model.getApplication()).memoryCache?.clear()},enabled=!s.busy){Text("只清理图片缓存")}}
         item {Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("应用锁");Text("指纹或手机系统锁屏验证",fontSize=11.sp,color=Muted)};Switch(checked=model.store.isLocked,onCheckedChange=setLock,enabled=!s.busy)}}
-        item {HorizontalDivider();SettingButton("关于与检查更新","拾藏 v${BuildConfig.VERSION_NAME} · 本地离线档案"){navigate("updates")}}
+        item {HorizontalDivider();SettingButton("关于与检查更新","留册 v${BuildConfig.VERSION_NAME} · 本地离线档案"){navigate("updates")}}
     }
 }
 @Composable private fun Choice(title:String,choices:List<String>,selected:String,onSelect:(String)->Unit) {Column {Text(title,fontSize=12.sp,color=Muted);Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){choices.forEach{FilterChip(selected=it==selected,onClick={onSelect(it)},label={Text(it)})}}}}
