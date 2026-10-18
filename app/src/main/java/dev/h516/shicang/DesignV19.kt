@@ -102,33 +102,40 @@ import kotlinx.coroutines.withContext
             Surface(shape=RoundedCornerShape(24.dp),color=c.primaryContainer){Box(Modifier.size(72.dp),contentAlignment=Alignment.Center){FrameGlyph("我的",c.onPrimaryContainer)}}
             Text(if(s.library.active.isEmpty()) "把值得记住的，留在这里" else "没有匹配的档案",Modifier.padding(top=20.dp,bottom=6.dp),style=MaterialTheme.typography.titleMedium)
             TextButton(onClick={if(query.isNotBlank()||category.isNotBlank()||tags.isNotEmpty()){query="";category="";tags=emptyList()}else model.edit()}){Text(if(s.library.active.isEmpty()) "新建第一份档案" else "清除搜索与筛选")}
-        } else if(covers) LazyVerticalGrid(GridCells.Fixed(2),verticalArrangement=Arrangement.spacedBy(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
+        } else if(covers) LazyVerticalGrid(GridCells.Adaptive(148.dp),verticalArrangement=Arrangement.spacedBy(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
             items(results,key={it.id}){a->
-                Box(Modifier.aspectRatio(.78f).clip(RoundedCornerShape(16.dp)).background(c.surface).clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)}) {
-                    if(a.photos.isNotEmpty()) IdentityCover(a,model,Modifier.fillMaxSize())
-                    else Box(Modifier.fillMaxSize().background(c.primaryContainer),contentAlignment=Alignment.Center){Text(a.name.take(1),style=MaterialTheme.typography.headlineLarge,color=c.onPrimaryContainer)}
-                    Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().then(if(a.photos.isNotEmpty()) Modifier.background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.78f)))) else Modifier.background(c.surface)).padding(14.dp)) {
-                        Text(a.name,style=MaterialTheme.typography.titleMedium,color=if(a.photos.isEmpty()) c.onSurface else Color.White,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(if(a.photos.isEmpty()) "私人档案" else "${a.photos.size} 项照片与视频",style=MaterialTheme.typography.bodySmall,color=if(a.photos.isEmpty()) c.onSurfaceVariant else Color.White.copy(alpha=.9f))
+                Column(Modifier.clickable{open(a.id)}) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)).background(c.primaryContainer).clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)},contentAlignment=Alignment.Center) {
+                        if(a.photos.isNotEmpty()) IdentityCover(a,model,Modifier.fillMaxSize())
+                        else Text(a.name.take(1),style=MaterialTheme.typography.headlineLarge,color=c.onPrimaryContainer)
                     }
-                    TextButton(onClick={open(a.id)},modifier=Modifier.align(Alignment.TopEnd).padding(4.dp).heightIn(min=48.dp),colors=ButtonDefaults.textButtonColors(containerColor=if(a.photos.isEmpty()) c.surface else Color.Black.copy(alpha=.5f),contentColor=if(a.photos.isEmpty()) c.primary else Color.White)){Text("资料",style=MaterialTheme.typography.labelMedium)}
+                    Text(a.name,Modifier.fillMaxWidth().padding(top=12.dp,bottom=4.dp),style=MaterialTheme.typography.titleMedium,color=c.onSurface,minLines=2,maxLines=2,overflow=TextOverflow.Ellipsis)
+                    val categoryName=s.library.labelName(a.category)
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Text(listOfNotNull(categoryName.takeIf{it.isNotBlank()},if(a.photos.isNotEmpty()) "${a.photos.size} 项" else null).joinToString(" · ").ifBlank{"私人档案"},Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        TextButton(onClick={open(a.id)},modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=4.dp)){
+                            Text("资料",style=MaterialTheme.typography.labelMedium)
+                            Spacer(Modifier.width(2.dp));FrameGlyph("展开",c.primary)
+                        }
+                    }
                 }
             }
-        } else LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(bottom=24.dp)) {
+        } else LazyColumn(contentPadding=PaddingValues(bottom=24.dp)) {
             items(results,key={it.id}){a->
-                Surface(shape=RoundedCornerShape(16.dp),color=c.surface) {
-                    Row(Modifier.fillMaxWidth().clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)}.padding(start=12.dp,top=12.dp,bottom=12.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically) {
+                Column {
+                    Row(Modifier.fillMaxWidth().clickable{if(a.photos.isNotEmpty()) view(a) else open(a.id)}.padding(top=16.dp,bottom=16.dp),verticalAlignment=Alignment.CenterVertically) {
                         if(a.photos.isEmpty()) Surface(shape=RoundedCornerShape(16.dp),color=c.primaryContainer){Box(Modifier.size(60.dp),contentAlignment=Alignment.Center){Text(a.name.take(1),style=MaterialTheme.typography.headlineMedium,color=c.onPrimaryContainer)}}
-                        else IdentityCover(a,model,Modifier.width(80.dp).height(100.dp))
+                        else IdentityCover(a,model,Modifier.size(72.dp))
                         Column(Modifier.weight(1f).padding(start=14.dp,end=4.dp)) {
                             Text(a.name,style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
                             val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
                             if(labels.isNotEmpty()) Text(labels.take(3).joinToString(" · "),Modifier.padding(top=5.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
                             a.fields.firstOrNull{it.value.isNotBlank() && Links.normalize(it.value)==null}?.let{Text(it.value,Modifier.padding(top=5.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)}
-                            if(a.photos.isNotEmpty()) Text("${a.photos.size} 项照片与视频",Modifier.padding(top=7.dp),style=MaterialTheme.typography.labelMedium,color=c.primary)
+                            if(a.photos.isNotEmpty()) Text("${a.photos.size} 项照片与视频",Modifier.padding(top=5.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                         }
                         TextButton(onClick={open(a.id)},contentPadding=PaddingValues(horizontal=10.dp),modifier=Modifier.heightIn(min=48.dp)){Text("资料",style=MaterialTheme.typography.labelMedium)}
                     }
+                    HorizontalDivider(color=c.outlineVariant.copy(alpha=.45f))
                 }
             }
         }

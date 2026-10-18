@@ -7,6 +7,6 @@
 - 资料结构、媒体原件和备份兼容是发布约束。不能通过卸载或清数据解决升级问题；覆盖升级必须同签名且 versionCode 递增。
 - 使用现有 Kotlin、Compose、SQLite、Coil、Media3 和 Telephoto，避免重复引入框架。
 - `testDebugUnitTest` 覆盖逻辑。原生测试使用 `tools/verification.init.gradle` 的 `.verification` 隔离包，只用合成资料；不能让破坏性测试指向正式包。
-- `PublicUpdateNetworkTest` 是显式启用的发行验收，需要已安装官方 v0.5 和已公开的 v0.6。它不属于普通离线测试；未来版本应同步调整前置条件。
+- `PublicUpdateNetworkTest` 是显式启用的发行验收，需要已安装官方 v0.6 和已公开的当前构建版本。它不属于普通离线测试；未来版本应同步调整前置条件。
 - 公开更新全程匿名，只认官方仓库和 GitHub 资产域名；保留大小、摘要、包名、版本、签名和架构校验，失败时旧版继续可用。
 - 已发布资产不覆盖。源码、安装包哈希、测试环境与真实入口证据必须对应；模拟器证据不能替代目标手机验收。

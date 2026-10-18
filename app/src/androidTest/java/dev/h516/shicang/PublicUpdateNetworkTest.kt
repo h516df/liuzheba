@@ -10,7 +10,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 手动启用的发行验收：正式 v0.5 已安装，公开 v0.6 已发布。普通测试不联网。 */
+/** 手动启用的发行验收：正式 v0.6 已安装，当前构建版本已公开。普通测试不联网。 */
 @RunWith(AndroidJUnit4::class)
 class PublicUpdateNetworkTest {
     @Test fun anonymousDownloadValidatesAgainstInstalledOfficialVersion() {
@@ -20,7 +20,7 @@ class PublicUpdateNetworkTest {
         check(context.packageName.endsWith(".verification"))
         lateinit var updater: Updater
         instrumentation.runOnMainSync { updater = Updater(context) }
-        assertEquals(6, updater.installedVersionCode())
+        assertEquals(7, updater.installedVersionCode())
         fun waitFor(done: (UpdateState) -> Boolean): UpdateState {
             // Direct release-asset downloads can be slow; retain a bounded ten-minute acceptance window.
             val deadline = SystemClock.uptimeMillis() + 600_000

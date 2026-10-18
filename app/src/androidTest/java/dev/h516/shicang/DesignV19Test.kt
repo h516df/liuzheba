@@ -28,8 +28,9 @@ class DesignV19Test {
         val prefs=c.getSharedPreferences("device",Context.MODE_PRIVATE)
         val previous=prefs.getString("generation","initial")!!
         val previousLock=prefs.getBoolean("appLock",false)
+        val previousCovers=prefs.getBoolean("libraryCovers",false)
         val temporary=uid()
-        prefs.edit().putString("generation",temporary).putBoolean("appLock",false).putBoolean("frameHintV2",true).commit()
+        prefs.edit().putString("generation",temporary).putBoolean("appLock",false).putBoolean("libraryCovers",false).putBoolean("frameHintV2",true).commit()
         val store=Store(c)
         val picture=File(c.cacheDir,"v03-demo.png")
         instrumentation.context.assets.open("v03-demo.png").use{input->picture.outputStream().use{input.copyTo(it)}}
@@ -76,6 +77,21 @@ class DesignV19Test {
                 check(nodes().any{it.stateDescription?.toString()=="照片已显示"}) {"Photo did not finish loading"}
             }
             if(node("更多")==null){val size=c.resources.displayMetrics;tap(size.widthPixels/2,size.heightPixels/2)};waitNode("更多")
+        }
+        fun reveal(text:String) {
+            repeat(5) {
+                val settled=SystemClock.uptimeMillis()+1000
+                while(SystemClock.uptimeMillis()<settled) {
+                    if(node(text)!=null) return
+                    Thread.sleep(80)
+                }
+                // The archive list/grid follows the horizontal draft strip.
+                if(nodes().lastOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)!=true) {
+                    waitNode(text);return
+                }
+                automation.waitForIdle(300,5000)
+            }
+            waitNode(text)
         }
         fun editorFields()=nodes().filter{it.className?.toString()=="android.widget.EditText"}
         fun waitEditorFields(count:Int) {
@@ -124,6 +140,18 @@ class DesignV19Test {
             click("我的");waitNode("搜索名称、标签、资料");fill(0,"杭州");waitNode("妈妈");screenshot("search")
             assertNull(node("林雨（示例）"));click("妈妈");waitNode("档案");waitNode("杭州")
             assertNull(node("照片与视频"));screenshot("reopened-no-photo")
+            if(InstrumentationRegistry.getArguments().getString("visualDensity")=="true") {
+                store.save(Archive(name="周末的城市散步",category=category,photos=photos.take(1),fields=listOf(Field(name="地点",value="老街与河岸"))))
+                store.save(Archive(name="外婆的手写食谱与节日记忆",photos=photos.take(2)))
+                instrumentation.runOnMainSync{activity?.finish()};Thread.sleep(250);activity=start()
+                if(node("我的")==null) controls()
+                click("我的");waitNode("搜索名称、标签、资料");waitNode("4 份档案")
+                screenshot("populated-list")
+                click("封面");waitNode("列表");screenshot("populated-covers")
+                reveal("妈妈");click("妈妈");waitNode("档案");waitNode("杭州")
+                click("返回");waitNode("列表")
+                click("列表");waitNode("封面");reveal("妈妈");click("妈妈");waitNode("杭州")
+            }
             // Copy last: Android's transient clipboard overlay otherwise covers viewer navigation.
             click("返回");waitNode("搜索名称、标签、资料");fill(0,"林雨");waitNode("林雨（示例）")
             click("资料");waitNode("抖音");click("复制")
@@ -131,13 +159,14 @@ class DesignV19Test {
             val copyEnd=SystemClock.uptimeMillis()+3000
             while(clipboard.primaryClip?.getItemAt(0)?.text?.toString()!="https://www.douyin.com/" && SystemClock.uptimeMillis()<copyEnd) Thread.sleep(80)
             assertEquals("https://www.douyin.com/",clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+
                 } catch(e:Throwable) {
             screenshot("failure")
             File(out,"failure.txt").writeText(nodes().joinToString("\n"){"${it.className}: ${it.text} | ${it.contentDescription} | ${it.stateDescription}"})
             throw e
         } finally {
             instrumentation.runOnMainSync{activity?.finish()}
-            prefs.edit().putString("generation",previous).putBoolean("appLock",previousLock).commit()
+            prefs.edit().putString("generation",previous).putBoolean("appLock",previousLock).putBoolean("libraryCovers",previousCovers).commit()
             picture.delete()
         }
     }
