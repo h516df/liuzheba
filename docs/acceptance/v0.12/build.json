@@ -1,0 +1,14 @@
+{
+  "versionName": "0.12",
+  "versionCode": 13,
+  "applicationId": "dev.h516.shicang",
+  "sourceCommit": "58171a2b143ce633689a2caf9d9c49d1ca4e2cea",
+  "apkSha256": "3ca05fc449509757914e6e5bd588a5b7794967b0e1443ec7da51a8a5d0044d24",
+  "apkBytes": 3282399,
+  "certificateSha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26",
+  "unitTests": 36,
+  "nativePathsPassed": 8,
+  "smallDarkPathsPassed": 2,
+  "uiAcceptanceDevice": "emulator-5588 Android 16 API36 x86_64",
+  "phoneAcceptance": false
+}

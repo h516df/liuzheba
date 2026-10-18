@@ -14,12 +14,12 @@ object GrowthJourney {
   val previous=prefs.all.toMap();val today=LocalDate.now()
   fun nodes():List<AccessibilityNodeInfo>{i.uiAutomation.clearCache();val all=mutableListOf<AccessibilityNodeInfo>();fun walk(n:AccessibilityNodeInfo?){if(n==null)return;if(n.isVisibleToUser)all+=n;repeat(n.childCount){walk(n.getChild(it))}};walk(i.uiAutomation.rootInActiveWindow);return all}
   fun find(text:String):AccessibilityNodeInfo? {val matches=nodes().filter{it.text?.toString()==text || it.contentDescription?.toString()==text};return matches.firstOrNull{it.isClickable} ?: matches.firstOrNull()}
-  fun wait(text:String):AccessibilityNodeInfo{val until=SystemClock.uptimeMillis()+18000;while(SystemClock.uptimeMillis()<until){find("Got it")?.performAction(AccessibilityNodeInfo.ACTION_CLICK);find(text)?.let{return it};if(text=="本周小目标" || text=="最近 28 天" || text==goalLabel || text=="从最近任务中隐藏" || text=="查看成长记录" || text=="初来相伴") nodes().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);Thread.sleep(150)};error("Missing $text: "+nodes().mapNotNull{it.text}.take(25))}
+  fun wait(text:String):AccessibilityNodeInfo{val until=SystemClock.uptimeMillis()+18000;while(SystemClock.uptimeMillis()<until){find("Got it")?.performAction(AccessibilityNodeInfo.ACTION_CLICK);find(text)?.let{return it};if(text==title || text=="本周小目标" || text=="最近 28 天" || text==goalLabel || text=="从最近任务中隐藏" || text=="查看成长记录" || text=="初来相伴") nodes().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);Thread.sleep(150)};error("Missing $text: "+nodes().mapNotNull{it.text}.take(25))}
   fun tap(text:String){var n:AccessibilityNodeInfo?=wait(text);while(n!=null && !n.isClickable)n=n.parent;check(n?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true);Thread.sleep(250)}
   try {
    prefs.edit().putStringSet("days",setOf(today.toString(),today.minusDays(1).toString(),today.minusDays(2).toString())).putInt("goal",7).commit()
    if(find(title)==null){if(find(navigation)==null && find("我的档案")!=null)tap("我的档案") else tap(navigation)}
-   tap(title);wait("本周小目标");tap(goalLabel)
+   tap(title);tap("本周小目标");tap(goalLabel)
    check(prefs.getInt("goal",0)==3){"Weekly goal was not persisted"}
    // Visit metrics refresh when opening the page; awards do not fabricate historical dates.
    val deadline=SystemClock.uptimeMillis()+5000
@@ -32,7 +32,7 @@ object GrowthJourney {
    tap("说明");wait("成长说明");tap("知道了")
    tap("查看成长记录");wait("最近 28 天")
    tap("返回")
-   tap("设置")
+   repeat(3){nodes().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);Thread.sleep(150)}
    val hidden=prefs.getBoolean("hide_recents",false)
    tap("从最近任务中隐藏")
    check(prefs.getBoolean("hide_recents",false)!=hidden)

@@ -104,20 +104,21 @@ class DesignV19Test {
         fun screenshot(name:String){Thread.sleep(250);val image=automation.takeScreenshot() ?: error("No screenshot");try{File(out,"$name.png").outputStream().use{image.compress(Bitmap.CompressFormat.PNG,100,it)}}finally{image.recycle()}}
         fun start():Activity=instrumentation.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         try {
-            activity=start();waitNode("完整照片，双击或双指缩放");controls();screenshot("home")
-            click("我的");waitNode("搜索名称、标签、资料");Thread.sleep(500);screenshot("mine")
+            activity=start();waitNode("搜索档案");screenshot("home");click("发现");waitNode("完整照片，双击或双指缩放");controls()
+            click("我的");waitNode("搜索档案");Thread.sleep(500);screenshot("mine")
             click("筛选");waitNode("完成");click("朋友");click("完成");waitNode("资料")
             click("筛选 · 1");click("清除");click("完成");waitNode("筛选")
             click("封面");waitNode("列表");assertTrue(prefs.getBoolean("libraryCovers",false));screenshot("covers");click("列表");waitNode("封面")
             assertNull(node("全部标签"));assertNull(node("全部"))
-            click("资料");waitNode("档案");waitNode("居住地");waitNode("抖音");screenshot("details")
+            click("资料");waitNode("档案");screenshot("details");reveal("抖音");waitNode("居住地");waitNode("抖音")
+            nodes().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);Thread.sleep(300)
             click("查看全部");waitNode("查看第2项照片或视频");screenshot("album")
             click("查看第2项照片或视频");waitNode("完整照片，双击或双指缩放");controls();screenshot("viewer")
             click("返回档案");waitNode("查看第2项照片或视频");click("返回");waitNode("档案")
             click("编辑");waitNode("编辑档案");screenshot("editor")
             fill(0,"未保存的改名");click("返回");waitNode("林雨（示例）")
             assertEquals("林雨（示例）",store.load().active.single().name)
-            click("返回");waitNode("搜索名称、标签、资料");click("＋ 新建");waitNode("编辑档案")
+            click("返回");waitNode("搜索档案");click("＋ 新建");waitNode("编辑档案")
             waitEditorFields(3);assertTrue(editorFields().all{it.text.isNullOrBlank()});screenshot("blank")
             click("删除");waitNode("撤销");waitEditorFields(1);click("撤销");waitEditorFields(3)
             fill(1,"居住地");fill(2,"不会复制的城市")
@@ -125,7 +126,7 @@ class DesignV19Test {
             val timeout=SystemClock.uptimeMillis()+5000
             while(store.load().templates.isEmpty() && SystemClock.uptimeMillis()<timeout) Thread.sleep(100)
             assertEquals("居住地",store.load().templates.single().fields.single().name)
-            click("返回");waitNode("搜索名称、标签、资料");click("＋ 新建");waitNode("编辑档案")
+            click("返回");waitNode("搜索档案");click("＋ 新建");waitNode("编辑档案")
             waitEditorFields(3)
             assertTrue(editorFields().all{it.text.isNullOrBlank()})
             click("选择模板");waitNode("亲友资料");click("亲友资料");waitNode("编辑档案")
@@ -143,7 +144,7 @@ class DesignV19Test {
             instrumentation.runOnMainSync{activity?.finish()};Thread.sleep(200);activity=start()
             // The saved record survives an Activity/model reopen. Find it through the library.
             if(node("我的")==null) controls()
-            click("我的");waitNode("搜索名称、标签、资料");fill(0,"杭州");waitNode("妈妈");screenshot("search")
+            click("我的");waitNode("搜索档案");fill(0,"杭州");waitNode("妈妈");screenshot("search")
             val searchDeadline=SystemClock.uptimeMillis()+5000
             while(node("林雨（示例）")!=null && SystemClock.uptimeMillis()<searchDeadline) Thread.sleep(80)
             assertNull(node("林雨（示例）"));click("妈妈");waitNode("档案");waitNode("杭州")
@@ -153,7 +154,7 @@ class DesignV19Test {
                 store.save(Archive(name="外婆的手写食谱与节日记忆",photos=photos.take(2)))
                 instrumentation.runOnMainSync{activity?.finish()};Thread.sleep(250);activity=start()
                 if(node("我的")==null) controls()
-                click("我的");waitNode("搜索名称、标签、资料");waitNode("4 份档案")
+                click("我的");waitNode("搜索档案");waitNode("4 份档案")
                 screenshot("populated-list")
                 click("封面");waitNode("列表");screenshot("populated-covers")
                 reveal("妈妈");click("妈妈");waitNode("档案");waitNode("杭州")
@@ -161,8 +162,8 @@ class DesignV19Test {
                 click("列表");waitNode("封面");reveal("妈妈");click("妈妈");waitNode("杭州")
             }
             // Copy last: Android's transient clipboard overlay otherwise covers viewer navigation.
-            click("返回");waitNode("搜索名称、标签、资料");fill(0,"林雨");waitNode("林雨（示例）")
-            click("资料");waitNode("抖音");click("复制")
+            click("返回");waitNode("搜索档案");fill(0,"林雨");waitNode("林雨（示例）")
+            click("资料");reveal("抖音");click("复制")
             val clipboard=c.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             val copyEnd=SystemClock.uptimeMillis()+3000
             while(clipboard.primaryClip?.getItemAt(0)?.text?.toString()!="https://www.douyin.com/" && SystemClock.uptimeMillis()<copyEnd) Thread.sleep(80)

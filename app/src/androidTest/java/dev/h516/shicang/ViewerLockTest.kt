@@ -70,7 +70,7 @@ class ViewerLockTest {
         fun click(text:String) {val r=Rect();waitNode(text).getBoundsInScreen(r);tap(r.centerX(),r.centerY())}
         try {
             activity=instrumentation.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            waitNode("完整照片，双击或双指缩放")
+            click("发现");waitNode("完整照片，双击或双指缩放")
             Thread.sleep(500)
             val rendered=automation.takeScreenshot() ?: error("No native screenshot")
             try {
@@ -81,7 +81,7 @@ class ViewerLockTest {
             } finally {rendered.recycle()}
             val metrics=context.resources.displayMetrics
             if(node("资料")==null) tap(metrics.widthPixels/2,metrics.heightPixels/2)
-            click("资料");waitNode("档案");click("查看照片")
+            click("资料");waitNode("档案");click("浏览${archive.name}的照片与视频")
             waitNode("完整照片，双击或双指缩放")
             preferences.edit().putBoolean("appLock",true).commit()
             assertTrue(automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME))

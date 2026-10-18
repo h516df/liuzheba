@@ -27,7 +27,7 @@ class ShareSwipeTest {
   fun shot(name:String){val image=ui.takeScreenshot()!!;File(c.getExternalFilesDir(null),"$name.png").outputStream().use{image.compress(Bitmap.CompressFormat.PNG,100,it)};image.recycle()}
   try {
    activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-   wait("我的");click("我的");wait("左滑回收测试")
+   wait("搜索档案");wait("左滑回收测试")
    val rect=Rect();wait("左滑回收测试").getBoundsInScreen(rect)
    val screen=Rect();ui.rootInActiveWindow.getBoundsInScreen(screen)
    val start=screen.width()*.85f;val y=rect.centerY().toFloat();var time=SystemClock.uptimeMillis()

@@ -39,6 +39,8 @@ object SharedLinks {
     }
     fun resolve(text:String):SharedLink? {
         val local=parse(text) ?: return null
+        // A complete URL already identifies its destination; keep this path offline and immediate.
+        if(parse(local.url)?.kind != "分享链接") return local
         return runCatching {
             var url=local.url
             repeat(4) {

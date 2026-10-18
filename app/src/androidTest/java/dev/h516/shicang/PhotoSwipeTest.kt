@@ -29,6 +29,20 @@ class PhotoSwipeTest {
    Thread.sleep(2500)
    ui.rootInActiveWindow?.findAccessibilityNodeInfosByText("Got it")?.firstOrNull()?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
    Thread.sleep(300)
+   fun discoveryNode():android.view.accessibility.AccessibilityNodeInfo? {
+    fun visit(n:android.view.accessibility.AccessibilityNodeInfo?):android.view.accessibility.AccessibilityNodeInfo? {
+     if(n==null)return null
+     if(n.isVisibleToUser && n.text?.toString()=="发现")return n
+     repeat(n.childCount){visit(n.getChild(it))?.let{return it}};return null
+    }
+    ui.clearCache();return visit(ui.rootInActiveWindow)
+   }
+   val deadline=SystemClock.uptimeMillis()+10000
+   while(discoveryNode()==null && SystemClock.uptimeMillis()<deadline)Thread.sleep(100)
+   val target=checkNotNull(discoveryNode());val bounds=android.graphics.Rect();target.getBoundsInScreen(bounds)
+   val tapTime=SystemClock.uptimeMillis()
+   listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP).forEach{action->val e=MotionEvent.obtain(tapTime,SystemClock.uptimeMillis(),action,bounds.centerX().toFloat(),bounds.centerY().toFloat(),0);ui.injectInputEvent(e,true);e.recycle()}
+   Thread.sleep(1800)
    var minimum=1.0;var frames=0
    fun sample(){val b=ui.takeScreenshot()?:error("No screenshot");var light=0;var total=0
     for(y in b.height*42/100 until b.height*56/100 step 8)for(x in b.width/10 until b.width*9/10 step 8){val p=b.getPixel(x,y);if(Color.red(p)+Color.green(p)+Color.blue(p)>180)light++;total++}
