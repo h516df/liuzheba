@@ -31,6 +31,14 @@
 
 UI截图与其余未受影响路径先在31f2a0e运行；58171a2仅改上述分享逻辑与探针，未改变UI、播放器或数据格式，因此复用对应未变化路径证据。最终正式包哈希已从旧d52426…变为build.json中的3ca05f…，不得发布旧包。
 
+## 正式发布与覆盖升级
+
+[v0.12 正式发布](https://github.com/h516df/shicang/releases/tag/v0.12) 固定目标为 `501973a6299fe3cc196a86efdd9ce3140ee1d748`；合并后的 tree 与已验分支 `34b6b61f161c435e9c03df4e3578115265051279` 一致（`dec40a07d31361da2b08b4418027989ca6248e18`）。发布前 release 分支干净。后续文档提交不改变发布目标或资产。
+
+发布回执见 [publication.json](release/publication.json)。安装包、中文说明和 SHA256 清单均已通过无身份授权的下载回读，逐项核对大小与摘要，见 [anonymous-readback.json](release/anonymous-readback.json)。正式 APK 为 3,282,399 字节，SHA256：`3ca05fc449509757914e6e5bd588a5b7794967b0e1443ec7da51a8a5d0044d24`。
+
+在同一 API36 模拟器安装已发布的正式 0.11/code12，用真实界面建立匿名档案 `Upgrade-v012-fixture` 和 `Note: Anonymous-kept-value`，再对匿名下载的 0.12/code13 正式包执行 `adb install -r`，没有卸载或清数据。启动后档案数量为 1，打开详情确认名称、字段名与值保留；版本信息核对为 0.12/code13。证据见 [official-upgrade.json](release/official-upgrade.json)、[实际详情截图](release/upgrade-after.png) 和 [界面层级](release/upgrade-preserved.xml)。这项覆盖升级补充正式 release 包的启动与数据保留证据；上述完整交互套件仍来自隔离 debug 包。验后留册已停止，模拟器保持运行，其他应用数据未动。
+
 ## 限制与回退
 
 实体手机未连接，真实手机升级、系统安装确认及设备特有行为未验收；未声称用户审美认可。正式release包已签名构建/验证，交互证据来自同源码隔离debug包。未更改备份格式、包名、签名、更新协议和媒体原件。版本回退须保留资料，不能卸载/清数据；安卓降级限制可能需要以更高versionCode重新构建旧源码。

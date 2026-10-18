@@ -1,0 +1,25 @@
+{
+  "tag": "v0.12",
+  "target": "501973a6299fe3cc196a86efdd9ce3140ee1d748",
+  "anonymousReadbackVerified": true,
+  "assets": [
+    {
+      "name": "shicang-v0.12-release-notes.json",
+      "size": 678,
+      "sha256": "5bc13d3cba6e3e66363f1d1c3308954025c84394bee172bb07a5259ac1633dc8",
+      "anonymousReadback": true
+    },
+    {
+      "name": "shicang-v0.12-SHA256.txt",
+      "size": 195,
+      "sha256": "c6590cac5fc0290b3c53bfaae46aeedb80640323d28496d0a926f0b343fb9d0a",
+      "anonymousReadback": true
+    },
+    {
+      "name": "shicang-v0.12-universal.apk",
+      "size": 3282399,
+      "sha256": "3ca05fc449509757914e6e5bd588a5b7794967b0e1443ec7da51a8a5d0044d24",
+      "anonymousReadback": true
+    }
+  ]
+}
