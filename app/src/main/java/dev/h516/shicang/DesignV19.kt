@@ -271,29 +271,48 @@ private fun openLink(context:Context,url:String,model:AppModel) {
         }
     }
     if(addMedia) AlertDialog(onDismissRequest={addMedia=false},title={Text("添加照片与视频")},text={Text("选入后保留原文件副本；视频默认静音，轻触播放。")},confirmButton={TextButton(onClick={addMedia=false;choose(a.id)}){Text("从相册选择")}},dismissButton={TextButton(onClick={addMedia=false;take(a.id)}){Text("拍照")}})
-    if(labels) LabelPicker(s.library,a.category,a.tags,{change(a.copy(category=it.first,tags=it.second));labels=false},{labels=false},"分类与标签",{kind,name->model.label(kind,name,false)})
+    if(labels) LabelPicker(s.library,a.category,a.tags,{change(a.copy(category=it.first,tags=it.second));labels=false},{labels=false},"分类与标签",{kind,name->model.label(kind,name,false)},busy=s.busy)
     if(saveTemplate) {
         val existing=s.library.templates.firstOrNull{normalizedLabel(it.name)==normalizedLabel(templateName)}
         AlertDialog(onDismissRequest={saveTemplate=false},title={Text(if(existing==null) "存为模板" else "更新同名模板")},text={Column{Text("只保存字段名称、类型和顺序，不包含任何资料内容。",fontSize=12.sp);QuietInput(templateName,{templateName=it},"模板名称",Modifier.fillMaxWidth());if(existing!=null) Text("将更新「${existing.name}」。已建档案不受影响。",fontSize=12.sp)}},confirmButton={TextButton(onClick={model.saveTemplate(templateName,existing?.id);saveTemplate=false},enabled=templateName.isNotBlank()&&!s.busy){Text(if(existing==null) "保存模板" else "确认更新")}},dismissButton={TextButton(onClick={saveTemplate=false}){Text("取消")}})
     }
 }
 
-@Composable internal fun LabelPicker(library:Library,initialCategory:String,initialTags:List<String>,apply:(Pair<String,List<String>>)->Unit,close:()->Unit,title:String,create:((String,String)->Unit)?=null) {
+@Composable internal fun LabelPicker(library:Library,initialCategory:String,initialTags:List<String>,apply:(Pair<String,List<String>>)->Unit,close:()->Unit,title:String,create:((String,String)->Unit)?=null,busy:Boolean=false) {
     var category by rememberSaveable{mutableStateOf(initialCategory)}
     var tags by rememberSaveable{mutableStateOf(initialTags)}
     var query by rememberSaveable{mutableStateOf("")}
     var kind by rememberSaveable{mutableStateOf("category")}
     var pending by remember{mutableStateOf<Pair<String,String>?>(null)}
-    LaunchedEffect(library.labels){pending?.let{p->library.labels.firstOrNull{it.kind==p.first && normalizedLabel(it.name)==normalizedLabel(p.second)}?.let{l->if(l.kind=="category") category=l.id else tags=(tags+l.id).distinct();pending=null}}}
+    var createError by remember{mutableStateOf("")}
+    LaunchedEffect(library.labels,busy){
+        val requested=pending
+        if(requested!=null && !busy) {
+            val label=library.labels.firstOrNull{it.kind==requested.first && normalizedLabel(it.name)==normalizedLabel(requested.second)}
+            if(label!=null) {
+                if(label.kind=="category") category=label.id else tags=(tags+label.id).distinct()
+                query="";createError=""
+            } else createError="未能添加，请重试。已选标签仍保留。"
+            pending=null
+        }
+    }
     val c=MaterialTheme.colorScheme
     ModalBottomSheet(onDismissRequest=close,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=c.background){
         Column(Modifier.fillMaxWidth().fillMaxHeight(.86f).padding(horizontal=24.dp).imePadding()) {
-            Row(verticalAlignment=Alignment.CenterVertically){Text(title,Modifier.weight(1f),fontSize=20.sp,fontWeight=FontWeight.SemiBold);TextButton(onClick={category="";tags=emptyList()}){Text("清除")};Button(onClick={apply(category to tags)},enabled=pending==null,shape=RoundedCornerShape(12.dp)){Text("完成")}}
+            Row(verticalAlignment=Alignment.CenterVertically){Text(title,Modifier.weight(1f),fontSize=20.sp,fontWeight=FontWeight.SemiBold);TextButton(onClick={category="";tags=emptyList()}){Text("清除")};Button(onClick={apply(category to tags)},enabled=pending==null && !busy,shape=RoundedCornerShape(12.dp)){Text("完成")}}
             Row{FilterChip(kind=="category",{kind="category"},label={Text("分类")});Spacer(Modifier.width(10.dp));FilterChip(kind=="tag",{kind="tag"},label={Text("标签 · ${tags.size}")})}
+            if(tags.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                library.labels.filter{it.id in tags}.forEach{label->
+                    InputChip(selected=true,onClick={tags=tags-label.id},label={Text(label.name)},
+                        trailingIcon={Text("×",modifier=Modifier.semantics{contentDescription="移除标签 ${label.name}"})})
+                }
+            }
             QuietInput(query,{query=it},"搜索${if(kind=="category") "分类" else "标签"}",Modifier.fillMaxWidth())
+            if(createError.isNotEmpty()) Text(createError,color=c.error,style=MaterialTheme.typography.bodySmall)
+
             LazyColumn(Modifier.weight(1f)) {
                 items(library.labels.filter{it.kind==kind && it.name.contains(query,true)},key={it.id}){l->Row(Modifier.fillMaxWidth().clickable{if(kind=="category") category=if(category==l.id) "" else l.id else tags=if(l.id in tags) tags-l.id else tags+l.id}.padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Text(l.name,Modifier.weight(1f),fontSize=15.sp);Checkbox(if(kind=="category") category==l.id else l.id in tags,null)}}
-                if(create!=null && query.isNotBlank()) item{TextButton(enabled=pending==null,onClick={pending=kind to query.trim();create(kind,query.trim());query=""}){Text("新建${if(kind=="category") "分类" else "标签"}「$query」")}}
+                if(create!=null && query.isNotBlank() && library.labels.none{it.kind==kind && normalizedLabel(it.name)==normalizedLabel(query)}) item{TextButton(enabled=pending==null && !busy,onClick={createError="";pending=kind to query.trim();create(kind,query.trim())}){Text("新建${if(kind=="category") "分类" else "标签"}「$query」")}}
             }
             Text(if(kind=="category") "每份档案选择一个分类。" else "可以选择多个标签，筛选时同时匹配。",fontSize=11.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=14.dp))
         }

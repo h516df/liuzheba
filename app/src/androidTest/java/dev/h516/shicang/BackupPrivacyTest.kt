@@ -40,7 +40,7 @@ class BackupPrivacyTest {
                 repeat(n.childCount) {visit(n.getChild(it))?.let { found -> return found }}
                 return null
             }
-            return visit(ui.rootInActiveWindow)
+            ui.clearCache();return visit(ui.rootInActiveWindow)
         }
         fun waitFor(text:String):AccessibilityNodeInfo {
             val end=SystemClock.uptimeMillis()+10000

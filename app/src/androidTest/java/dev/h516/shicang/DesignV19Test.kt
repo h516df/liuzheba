@@ -43,12 +43,12 @@ class DesignV19Test {
         var activity:Activity?=null
         fun nodes():List<AccessibilityNodeInfo> {
             fun visit(n:AccessibilityNodeInfo?,out:MutableList<AccessibilityNodeInfo>){if(n==null)return;if(n.isVisibleToUser)out.add(n);repeat(n.childCount){visit(n.getChild(it),out)}}
-            return mutableListOf<AccessibilityNodeInfo>().also{visit(automation.rootInActiveWindow,it)}
+            automation.clearCache();return mutableListOf<AccessibilityNodeInfo>().also{visit(automation.rootInActiveWindow,it)}
         }
         fun node(text:String)=nodes().firstOrNull{it.text?.toString()?.lineSequence()?.firstOrNull()==text || it.contentDescription?.toString()==text}
         fun waitNode(text:String):AccessibilityNodeInfo {
             val end=SystemClock.uptimeMillis()+10000
-            while(SystemClock.uptimeMillis()<end){node(text)?.let{return it};Thread.sleep(80)}
+            while(SystemClock.uptimeMillis()<end){node("Got it")?.performAction(AccessibilityNodeInfo.ACTION_CLICK);node(text)?.let{return it};Thread.sleep(80)}
             error("Missing v19 UI: $text")
         }
         fun tap(x:Int,y:Int){val now=SystemClock.uptimeMillis();val down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,x.toFloat(),y.toFloat(),0);val up=MotionEvent.obtain(now,now+70,MotionEvent.ACTION_UP,x.toFloat(),y.toFloat(),0);automation.injectInputEvent(down,true);automation.injectInputEvent(up,true);down.recycle();up.recycle();Thread.sleep(130)}
@@ -132,12 +132,20 @@ class DesignV19Test {
             waitEditorFields(3)
             assertEquals("居住地",editorFields()[1].text.toString());assertTrue(editorFields()[2].text.isNullOrBlank())
             fill(0,"妈妈");fill(2,"杭州")
+            reveal("分类与标签");click("分类与标签");waitNode("完成");click("标签 · 0")
+            fill(0,"常联系");click("新建标签「常联系」");waitNode("移除标签 常联系")
+            click("移除标签 常联系");waitNode("标签 · 0");assertNull(node("移除标签 常联系"))
+            click("常联系");waitNode("移除标签 常联系")
+            screenshot("tag-selected");click("完成");waitNode("编辑档案")
             click("保存");waitNode("档案");waitNode("杭州");screenshot("no-photo")
             val saved=Store(c).load().active.single{it.name=="妈妈"};assertTrue(saved.photos.isEmpty());assertEquals("杭州",saved.fields.single().value)
+            assertEquals("常联系",store.load().labels.single{it.id==saved.tags.single()}.name)
             instrumentation.runOnMainSync{activity?.finish()};Thread.sleep(200);activity=start()
             // The saved record survives an Activity/model reopen. Find it through the library.
             if(node("我的")==null) controls()
             click("我的");waitNode("搜索名称、标签、资料");fill(0,"杭州");waitNode("妈妈");screenshot("search")
+            val searchDeadline=SystemClock.uptimeMillis()+5000
+            while(node("林雨（示例）")!=null && SystemClock.uptimeMillis()<searchDeadline) Thread.sleep(80)
             assertNull(node("林雨（示例）"));click("妈妈");waitNode("档案");waitNode("杭州")
             assertNull(node("照片与视频"));screenshot("reopened-no-photo")
             if(InstrumentationRegistry.getArguments().getString("visualDensity")=="true") {

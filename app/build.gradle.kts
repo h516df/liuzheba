@@ -15,8 +15,8 @@ android {
         applicationId = "dev.h516.shicang"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.7"
+        versionCode = 9
+        versionName = "0.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {

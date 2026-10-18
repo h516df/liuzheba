@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -87,29 +88,69 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
 /** A player exists only for the visible, explicitly started video. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,tap:()->Unit) {
-    var started by remember(p.id,active){mutableStateOf(false)}
-    var muted by remember(p.id){mutableStateOf(true)}
+    var started by rememberSaveable(p.id){mutableStateOf(false)}
+    var muted by rememberSaveable(p.id){mutableStateOf(true)}
+    var position by rememberSaveable(p.id){mutableLongStateOf(0L)}
+    var speed by rememberSaveable(p.id){mutableFloatStateOf(1f)}
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if(!active || !started) {
             MediaThumb(p,model,Modifier.fillMaxSize().clickable{tap()},scale=if(fit) ContentScale.Fit else ContentScale.Crop)
-            if(active) FilledTonalButton(onClick={muted=true;started=true},modifier=Modifier.align(Alignment.Center)){Text("播放视频")}
+            if(active) FilledTonalButton(onClick={started=true},modifier=Modifier.align(Alignment.Center)){
+                Text(if(position>0) "继续播放 · ${durationLabel(position)}" else "播放视频")
+            }
         } else {
-            val player=remember(p.id){ExoPlayer.Builder(context).build().apply{volume=0f;setMediaItem(MediaItem.fromUri(Uri.fromFile(model.photoFile(p))));prepare();playWhenReady=true}}
-            var failure by remember{mutableStateOf(false)}
+            val player=remember(p.id){ExoPlayer.Builder(context).build().apply{
+                volume=if(muted) 0f else 1f
+                setMediaItem(MediaItem.fromUri(Uri.fromFile(model.photoFile(p))))
+                seekTo(position);setPlaybackSpeed(speed);prepare();playWhenReady=true
+            }}
+            var failure by remember(p.id){mutableStateOf(false)}
+            var buffering by remember(p.id){mutableStateOf(true)}
+            var playing by remember(p.id){mutableStateOf(false)}
             DisposableEffect(player,lifecycle) {
-                val observer=LifecycleEventObserver{_,event->if(event==Lifecycle.Event.ON_PAUSE || event==Lifecycle.Event.ON_STOP){player.pause();muted=true;started=false}}
-                val listener=object:Player.Listener {override fun onPlayerError(error:androidx.media3.common.PlaybackException){failure=true}}
+                var resume=false
+                val observer=LifecycleEventObserver{_,event->
+                    when(event) {
+                        Lifecycle.Event.ON_PAUSE -> {resume=player.playWhenReady;position=player.currentPosition;player.pause()}
+                        Lifecycle.Event.ON_RESUME -> if(resume && !failure) {player.play();resume=false}
+                        else -> Unit
+                    }
+                }
+                val listener=object:Player.Listener {
+                    override fun onPlayerError(error:androidx.media3.common.PlaybackException){failure=true;buffering=false}
+                    override fun onIsPlayingChanged(value:Boolean){playing=value}
+                    override fun onPlaybackStateChanged(state:Int){
+                        buffering=state==Player.STATE_BUFFERING
+                        if(state==Player.STATE_ENDED) position=0L
+                    }
+                }
                 lifecycle.lifecycle.addObserver(observer);player.addListener(listener)
-                onDispose {lifecycle.lifecycle.removeObserver(observer);player.removeListener(listener);player.release()}
+                onDispose {
+                    position=if(player.playbackState==Player.STATE_ENDED) 0L else player.currentPosition
+                    lifecycle.lifecycle.removeObserver(observer);player.removeListener(listener);player.release()
+                }
             }
-            AndroidView(factory={PlayerView(it).apply{this.player=player;useController=true;resizeMode=if(fit) AspectRatioFrameLayout.RESIZE_MODE_FIT else AspectRatioFrameLayout.RESIZE_MODE_ZOOM}},modifier=Modifier.fillMaxSize(),onRelease={it.player=null})
-            Row(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)) {
+            AndroidView(factory={PlayerView(it).apply{useController=true}},
+                update={view->view.player=player;view.keepScreenOn=playing
+                    view.resizeMode=if(fit) AspectRatioFrameLayout.RESIZE_MODE_FIT else AspectRatioFrameLayout.RESIZE_MODE_ZOOM},
+                modifier=Modifier.fillMaxSize(),onRelease={it.player=null;it.keepScreenOn=false})
+            Row(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp).background(Color.Black.copy(alpha=.65f))) {
+                TextButton(onClick={speed=when(speed){1f->1.5f;1.5f->2f;else->1f};player.setPlaybackSpeed(speed)}){Text("${speed}×",color=Color.White)}
                 TextButton(onClick={muted=!muted;player.volume=if(muted) 0f else 1f}){Text(if(muted) "开启声音" else "静音",color=Color.White)}
-                TextButton(onClick={started=false;tap()}){Text("收起播放",color=Color.White)}
+                TextButton(onClick={position=player.currentPosition;started=false}){Text("收起播放",color=Color.White)}
             }
-            if(failure) Surface(Modifier.align(Alignment.Center),color=Color.Black.copy(alpha=.8f)){TextButton(onClick={started=false}){Text("此视频无法播放 · 返回预览",color=Color.White)}}
+            if(buffering && !failure) CircularProgressIndicator(Modifier.align(Alignment.Center),color=Color.White)
+            if(failure) Surface(Modifier.align(Alignment.Center),color=Color.Black.copy(alpha=.85f)){
+                Column(Modifier.padding(16.dp),horizontalAlignment=Alignment.CenterHorizontally){
+                    Text("视频暂时无法播放，原文件仍保留",color=Color.White)
+                    Row {
+                        TextButton(onClick={failure=false;buffering=true;player.prepare();player.play()}){Text("重试",color=Color.White)}
+                        TextButton(onClick={started=false}){Text("返回预览",color=Color.White)}
+                    }
+                }
+            }
         }
     }
 }
