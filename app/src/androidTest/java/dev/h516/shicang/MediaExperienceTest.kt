@@ -80,7 +80,7 @@ class MediaExperienceTest {
             exported.forEach{c.contentResolver.delete(it,null,null)}
             // DownloadManager is recreated to prove jobs survive leaving the app/recreating repository.
             val downloads=MediaDownloads(c)
-            val base="https://raw.githubusercontent.com/h516df/shicang/feat/smooth-browse-media-downloads/app/src/androidTest/assets/"
+            val base="https://raw.githubusercontent.com/h516df/shicang/20133b369db4c2a7e74f04fee2ed4331b897cb16/app/src/androidTest/assets/"
             val files=listOf("v03-demo.png" to "image","sample-video.mp4" to "video")
             val ids=mutableListOf<String>()
             for((name,kind) in files) {

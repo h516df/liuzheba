@@ -1,0 +1,23 @@
+{
+  "versionName": "0.13",
+  "versionCode": 14,
+  "applicationId": "dev.h516.shicang",
+  "productionSourceCommit": "f3946b5949009a7d5a9d082dccb413bf7fbae694",
+  "nativeVerificationCommit": "c267c17ec355964fd412e6bc98ceb0c007b080c6",
+  "settledScreenshotTestCommit": "98568f370685f6c4167bd4c74822b6e8ecc52913",
+  "apkSha256": "6bf79a70c828eff0de218c6c31ff25f8abffe9ab887abdbe86a6a02ed49e64a9",
+  "apkBytes": 45254052,
+  "certificateSha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "minSdk": 24,
+  "jvmTests": 40,
+  "pythonTests": 3,
+  "nativeTests": 7,
+  "nativeDevice": "Android 16 API36 x86_64 emulator-5560",
+  "officialUpgradeDevice": "LiuceUpgrade_API36_v013 emulator-5564",
+  "phoneAcceptance": false,
+  "minifiedReleaseEngineVerified": true
+}
