@@ -43,6 +43,9 @@ import androidx.compose.ui.semantics.contentDescription
 import coil3.compose.AsyncImage
 import dev.h516.update.UpdateScreen
 import dev.h516.update.Updater
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -67,6 +70,7 @@ private val Muted: Color
         labelMedium=androidx.compose.ui.text.TextStyle(fontFamily=FontFamily.SansSerif,fontSize=12.sp,lineHeight=18.sp,fontWeight=FontWeight.Medium),
         titleLarge=androidx.compose.ui.text.TextStyle(fontFamily=FontFamily.SansSerif,fontSize=20.sp,fontWeight=FontWeight.Medium)
     )) {
+        val libraryState=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
         var lastEditor by rememberSaveable {mutableStateOf("")}
         var route by rememberSaveable{mutableStateOf("library")}
         var detailReturn by rememberSaveable {mutableStateOf("library")}
@@ -79,9 +83,21 @@ private val Muted: Color
         val snackbar=remember{SnackbarHostState()}
         var confirm by remember{mutableStateOf<Pair<String,()->Unit>?>(null)}
         val context=LocalContext.current
+        val updater=model.updater
+        val owner=LocalLifecycleOwner.current
+        DisposableEffect(owner,unlocked,s.ready) {
+            val observer=LifecycleEventObserver { _,event ->
+                if(event==Lifecycle.Event.ON_RESUME && unlocked && s.ready)updater.onForeground()
+                if(event==Lifecycle.Event.ON_PAUSE)updater.onBackground()
+            }
+            owner.lifecycle.addObserver(observer)
+            if(unlocked && s.ready && owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))updater.onForeground()
+            onDispose{owner.lifecycle.removeObserver(observer);updater.onBackground()}
+        }
         LaunchedEffect(s.message,unlocked,s.editor) {if(unlocked && s.editor==null && s.message.isNotEmpty()){snackbar.showSnackbar(s.message);model.dismissMessage()}}
         LaunchedEffect(route,s.ready) {if(route=="settings" && s.ready) model.refreshSpace()}
         val editing=s.editor!=null
+        val compactHeader=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp<360 || androidx.compose.ui.platform.LocalDensity.current.fontScale>1.4f
         var frameArchive by rememberSaveable {mutableStateOf("")}
         var positions by rememberSaveable {mutableStateOf(hashMapOf<String,String>())}
         val immersive=unlocked && s.ready && !editing && (route=="frame" || zoomPhoto.isNotEmpty())
@@ -132,7 +148,7 @@ private val Muted: Color
         BackHandler(enabled=editing || route !in listOf("frame","library") || zoomPhoto.isNotEmpty()) {backPage()}
         Scaffold(containerColor=scheme.background,contentWindowInsets=if(immersive) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets,snackbarHost={if(unlocked) Box(Modifier.padding(bottom=if(immersive) 96.dp else 0.dp)){SnackbarHost(snackbar)}},
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
-                Row(Modifier.fillMaxWidth().height(76.dp).padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
                     Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"留册";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留册"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
                         if(route=="frame" && !editing) Text("留册 · 私人档案",fontSize=11.sp,color=Muted)}
@@ -141,8 +157,20 @@ private val Muted: Color
                         FilledTonalIconButton(onClick={openSettings()},modifier=Modifier.size(48.dp).semantics{contentDescription="设置"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("设置",scheme.onSurfaceVariant)}
                         Spacer(Modifier.width(8.dp))
                         if(!s.busy) Button(onClick={model.edit()},shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="＋ 新建"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)){
-                            FrameGlyph("新建",scheme.onPrimary);Spacer(Modifier.width(5.dp));Text("新建",style=MaterialTheme.typography.labelLarge)
+                            FrameGlyph("新建",scheme.onPrimary);if(!compactHeader){Spacer(Modifier.width(5.dp));Text("新建",style=MaterialTheme.typography.labelLarge)}
                         }
+                    }
+                }
+                if(unlocked && s.ready && !editing && route=="library" && updater.canOfferReminder()) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal=20.dp)){
+                        Text("开启新版本提醒？仅在前台匿名检查版本，不发送档案，每天至多一次。",style=MaterialTheme.typography.bodySmall,color=scheme.onSurfaceVariant)
+                        Row {TextButton(onClick={updater.changeAutoCheckEnabled(true)}){Text("开启提醒")};TextButton(onClick=updater::dismissReminder){Text("以后再说")}}
+                    }
+                }
+                if(unlocked && s.ready && !editing && route=="library" && !updater.promptDismissed) updater.hint()?.let { hint ->
+                    Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically){
+                        TextButton(onClick={route="updates"},modifier=Modifier.weight(1f)){Text(hint,style=MaterialTheme.typography.labelLarge)}
+                        TextButton(onClick=updater::dismissPrompt){Text("稍后")}
                     }
                 }
                 if(s.busy){LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(horizontal=24.dp,vertical=4.dp),fontSize=12.sp);if(s.progress.contains("备份")||s.progress.contains("恢复")||s.progress.contains("导入")||s.progress.contains("打包")||s.progress.contains("写入")) TextButton(onClick=model::cancelOperation){Text("取消")}}}
@@ -168,12 +196,12 @@ private val Muted: Color
                         if(a!=null) AllPhotos(a,model){rememberPhoto(a.id,it);zoomPhoto=it}
                         else Empty("照片集已不存在","返回档案"){route="library"}}
 
-                    route=="library"->LibraryV19(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})
+                    route=="library"->libraryState.SaveableStateProvider("library") {LibraryV19(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})}
                     route=="detail"->{val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}})}
                     route=="settings"->Settings(model,s,setLock,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{route=it},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
                     route=="labels"->LabelsScreen(model,s){title,action->confirm=title to action}
-                    route=="updates"->UpdateScreen(remember {Updater(context)},PaddingValues(0.dp))
+                    route=="updates"->UpdateScreen(updater,PaddingValues(0.dp))
                 }
                 if(unlocked && s.ready && !editing && zoomPhoto.isNotEmpty()) {
 
@@ -289,7 +317,8 @@ private val Muted: Color
     var templates by rememberSaveable{mutableStateOf(false)}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
         item {
-            Column(Modifier.clip(RoundedCornerShape(16.dp)).background(c.surface).animateContentSize(tween(220)).padding(horizontal=16.dp)) {
+            Text("整理与外观",Modifier.padding(start=4.dp,bottom=10.dp),style=MaterialTheme.typography.titleSmall,color=c.onSurfaceVariant)
+            Column(Modifier.clip(RoundedCornerShape(20.dp)).background(c.surface).animateContentSize(tween(220)).padding(horizontal=16.dp)) {
                 SettingButton("外观","${s.appearance.theme} · ${s.appearance.skin}"){appearance=!appearance}
                 AnimatedVisibility(appearance){AppearanceV5(model,s,{}, {},showActions=false)}
                 SettingButton("分类与标签"," "){navigate("labels")}
@@ -297,7 +326,8 @@ private val Muted: Color
             }
         }
         item {
-            Column(Modifier.clip(RoundedCornerShape(16.dp)).background(c.surface).animateContentSize(tween(220)).padding(horizontal=16.dp)) {
+            Text("资料与备份",Modifier.padding(start=4.dp,bottom=10.dp),style=MaterialTheme.typography.titleSmall,color=c.onSurfaceVariant)
+            Column(Modifier.clip(RoundedCornerShape(20.dp)).background(c.surface).animateContentSize(tween(220)).padding(horizontal=16.dp)) {
                 SettingButton("备份与恢复",if(model.store.lastBackup()>0) "上次备份 ${java.text.DateFormat.getDateInstance().format(java.util.Date(model.store.lastBackup()))}" else "还没有备份"){backups=!backups}
                 AnimatedVisibility(backups){Column {
                     SettingButton("完整备份","保存全部档案与原始媒体",!s.busy) {
@@ -327,14 +357,15 @@ private val Muted: Color
             }
         }
         item {
-            Column(Modifier.clip(RoundedCornerShape(16.dp)).background(c.surface).padding(horizontal=16.dp)) {
+            Text("隐私",Modifier.padding(start=4.dp,bottom=10.dp),style=MaterialTheme.typography.titleSmall,color=c.onSurfaceVariant)
+            Column(Modifier.clip(RoundedCornerShape(20.dp)).background(c.surface).padding(horizontal=16.dp)) {
                 Row(Modifier.fillMaxWidth().heightIn(min=68.dp),verticalAlignment=Alignment.CenterVertically){Text("应用锁",Modifier.weight(1f));Switch(checked=model.store.isLocked,onCheckedChange=setLock,enabled=!s.busy)}
                 HorizontalDivider(color=c.outlineVariant.copy(alpha=.35f))
                 RecentTasksPreference()
             }
         }
         item {GrowthEntry(collectionGrowth(s.library))}
-        item {SettingButton("关于与检查更新","留册 v${BuildConfig.VERSION_NAME}"){navigate("updates")}}
+        item {SettingButton("关于与检查更新",model.updater.hint() ?: "留册 v${BuildConfig.VERSION_NAME}"){navigate("updates")}}
     }
 }
 @Composable private fun Choice(title:String,choices:List<String>,selected:String,onSelect:(String)->Unit) {Column {Text(title,fontSize=12.sp,color=Muted);Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){choices.forEach{FilterChip(selected=it==selected,onClick={onSelect(it)},label={Text(it)})}}}}

@@ -1,145 +1,180 @@
 package dev.h516.update
 
 import android.content.Context
-import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.FileProvider
 import java.io.File
 import java.util.concurrent.Executors
 
-/** 更新界面要显示的状态。 */
 sealed class UpdateState {
-    object Idle : UpdateState()
-    object Checking : UpdateState()
-    class Latest(val notes: ReleaseNotes?) : UpdateState()
-    class Available(val candidate: UpdateCandidate) : UpdateState()
-    class Downloading(val percent: Int) : UpdateState()
-    class ReadyToInstall(val file: File) : UpdateState()
-    class Failed(val message: String) : UpdateState()
+    object Idle:UpdateState()
+    object Unsupported:UpdateState()
+    object Checking:UpdateState()
+    object Verifying:UpdateState()
+    class Latest(val notes:ReleaseNotes?):UpdateState()
+    class Available(val candidate:UpdateCandidate):UpdateState()
+    class Downloading(val percent:Int):UpdateState()
+    class ReadyToInstall(val file:File):UpdateState()
+    object NeedsInstallPermission:UpdateState()
+    class Failed(val message:String):UpdateState()
 }
 
-/**
- * 检查更新 → 下载 → 校验 → 交给系统安装。
- *
- * 联网、下载都在后台线程，状态回主线程；任何一步失败都只影响这次更新，旧版本继续用。
- */
-class Updater(private val context: Context) {
+/** Application-owned session. Only a verified APK receipt survives process death. */
+class Updater internal constructor(context:Context,private val environment:UpdateEnvironment,private val httpFactory:()->UpdateHttp) {
+    constructor(context:Context):this(context.applicationContext,AndroidUpdateEnvironment(context.applicationContext),{UpdateHttp()})
+    private val context=context.applicationContext
+    private val prefs=this.context.getSharedPreferences("public_update_session",Context.MODE_PRIVATE)
+    private val directory=File(this.context.cacheDir,"updates")
+    private val io=Executors.newSingleThreadExecutor{r->Thread(r,"shicang-update").apply{isDaemon=true}}
+    private val main=Handler(Looper.getMainLooper())
+    private var http=httpFactory()
+    @Volatile private var generation=0L
+    @Volatile private var closed=false
+    private var candidate:UpdateCandidate?=null
+    private var verified:VerifiedUpdate?=null
+    private var foreground=false
+    private var quietChecking=false
+    private var returningFromPermission=false
+    var state by mutableStateOf<UpdateState>(UpdateState.Idle);private set
+    var promptDismissed by mutableStateOf(false);private set
+    var autoCheckEnabled by mutableStateOf(prefs.getBoolean("auto_check",false));private set
+    var reminderAsked by mutableStateOf(prefs.getBoolean("reminder_asked",false));private set
+    fun changeAutoCheckEnabled(enabled:Boolean){if(!enabled && quietChecking)cancel();autoCheckEnabled=enabled;reminderAsked=true;prefs.edit().putBoolean("auto_check",enabled).putBoolean("reminder_asked",true).apply();if(enabled && foreground)checkIfDue()}
+    fun dismissReminder(){reminderAsked=true;prefs.edit().putBoolean("reminder_asked",true).apply()}
+    fun canOfferReminder()=state!=UpdateState.Unsupported && !reminderAsked
 
-    private var http = UpdateHttp()
-    private val io = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "shicang-update").apply { isDaemon = true }
-    }
-    private val main = Handler(Looper.getMainLooper())
-
-    var state by mutableStateOf<UpdateState>(UpdateState.Idle)
-        private set
-
-    private var candidate: UpdateCandidate? = null
-    @Volatile private var cancelled = false
-
-    /** 当前版本的更新说明，打进 App 里，没网也能看。 */
-    fun currentNotes(): ReleaseNotes? = runCatching {
-        context.assets.open("release-notes.json").use {
-            ReleaseNotes.decode(String(it.readBytes(), Charsets.UTF_8))
+    init {
+        if(!environment.official()) state=UpdateState.Unsupported
+        else if(prefs.contains("verified")) {
+            state=UpdateState.Verifying
+            val token=generation
+            io.execute {
+                val record=runCatching{VerifiedUpdate.decode(prefs.getString("verified","").orEmpty())}.getOrNull()
+                try {
+                    requireUpdate(record!=null,"之前的安装包已失效，请重新检查")
+                    environment.verify(file(record!!),record)
+                    emit(token){verified=record;state=UpdateState.ReadyToInstall(file(record))}
+                } catch(_:Exception) {
+                    emit(token){prefs.edit().remove("verified").apply();state=UpdateState.Idle;if(foreground)checkIfDue()}
+                }
+            }
         }
-    }.getOrNull()
-
-    fun installedVersionName(): String = runCatching {
-        context.packageManager.getPackageInfo(UpdateConfig.PACKAGE, 0).versionName.orEmpty()
-    }.getOrDefault("")
-
-    fun installedVersionCode(): Int = runCatching { UpdateVerify.installedVersionCode(context) }.getOrDefault(0)
-
-    fun check() {
-        if (state is UpdateState.Checking || state is UpdateState.Downloading) return
-        cancelled = false
-        http = UpdateHttp()
-        candidate = null
-        set(UpdateState.Checking)
+    }
+    fun currentNotes():ReleaseNotes?=runCatching{context.assets.open("release-notes.json").use{ReleaseNotes.decode(String(it.readBytes(),Charsets.UTF_8))}}.getOrNull()
+    fun installedVersionName():String=runCatching{environment.version()}.getOrDefault("")
+    fun installedVersionCode():Int=runCatching{environment.code()}.getOrDefault(0)
+    fun hint():String?=when(val s=state) {
+        is UpdateState.Available->"发现新版本 ${s.candidate.notes.version}"
+        is UpdateState.Downloading->"更新下载中 ${s.percent}%"
+        is UpdateState.ReadyToInstall,UpdateState.NeedsInstallPermission->"更新已准备好，继续安装"
+        else->null
+    }
+    fun dismissPrompt(){promptDismissed=true}
+    fun onForeground() {
+        foreground=true
+        if(returningFromPermission) {
+            returningFromPermission=false
+            if(environment.installAllowed())install()
+            return
+        }
+        checkIfDue()
+    }
+    fun onBackground(){foreground=false;if(quietChecking){quietChecking=false;cancel()}}
+    private fun checkIfDue() {
+        if(state!=UpdateState.Idle && state !is UpdateState.Latest && state !is UpdateState.Failed)return
+        val now=System.currentTimeMillis()
+        if(autoCheckEnabled && environment.official() && updateCheckDue(prefs.getLong("last_attempt",0),now))check(quiet=true)
+    }
+    fun check(quiet:Boolean=false) {
+        if(closed || busy())return
+        if(!environment.official()){state=UpdateState.Unsupported;return}
+        prefs.edit().putLong("last_attempt",System.currentTimeMillis()).apply()
+        val token=++generation;val client=httpFactory();http=client;candidate=null;quietChecking=quiet;state=UpdateState.Checking
         io.execute {
             try {
+                ensureCurrent(token)
                 clearLegacyUpdateAuthorization(context)
-                val releases = http.json("/releases?per_page=20")
-                val published = UpdateCatalog.parse(releases)
-                val newest = UpdateCatalog.newest(published)
+                val newest=UpdateCatalog.newest(UpdateCatalog.parse(client.json("/releases?per_page=20")))
                     ?: throw UpdateFailure("还没发布过带更新说明的版本，请稍后再试")
-                val notes = ReleaseNotes.decode(http.assetText(newest.notesAsset.id))
-                val installed = UpdateVerify.installedVersionCode(context)
-                when (val result = UpdateCatalog.decide(notes, newest.assets, installed, UpdateVerify.deviceAbis())) {
-                    is UpdateCatalog.Result.Latest -> set(UpdateState.Latest(result.notes))
-                    is UpdateCatalog.Result.Available -> {
-                        candidate = result.candidate
-                        set(UpdateState.Available(result.candidate))
-                    }
-                }
-            } catch (e: UpdateFailure) {
-                set(UpdateState.Failed(e.userMessage))
-            } catch (e: InterruptedException) {
-                set(UpdateState.Idle)
-            } catch (e: Exception) {
-                set(if (cancelled) UpdateState.Idle else UpdateState.Failed("检查更新失败，请稍后重试"))
-            }
+                ensureCurrent(token)
+                val notes=ReleaseNotes.decode(client.assetText(newest.notesAsset.id))
+                requireUpdate(notes.version==newest.version,"新版说明与发行版本不一致，已停止更新")
+                val result=UpdateCatalog.decide(notes,newest.assets,environment.code(),UpdateVerify.deviceAbis())
+                emit(token){quietChecking=false;when(result){
+                    is UpdateCatalog.Result.Latest->state=UpdateState.Latest(result.notes)
+                    is UpdateCatalog.Result.Available->{candidate=result.candidate;promptDismissed=false;state=UpdateState.Available(result.candidate)}
+                }}
+            }catch(e:Exception){emit(token){quietChecking=false;state=if(quiet)UpdateState.Idle else UpdateState.Failed(message(e,"检查更新失败，请稍后重试"))}}
         }
     }
-
     fun download() {
-        val target = candidate ?: return
-        if (state is UpdateState.Downloading) return
-        cancelled = false
-        http = UpdateHttp()
-        set(UpdateState.Downloading(0))
+        val target=candidate ?: return
+        if(closed || busy() || !environment.official())return
+        val token=++generation;val client=httpFactory();http=client;state=UpdateState.Downloading(0)
+        io.execute {
+            directory.mkdirs()
+            val partial=File(directory,"download-$token.part")
+            try {
+                ensureCurrent(token)
+                client.downloadApk(target.apk.id,target.apk.size,partial){percent->emit(token){state=UpdateState.Downloading(percent)}}
+                ensureCurrent(token)
+                val sha=target.shaFile?.let{UpdateVerify.parseShaFile(client.assetText(it.id),target.apk.name)}
+                    ?:target.apk.apiDigest ?:throw UpdateFailure("发布资料里缺校验值，请稍后再试")
+                val record=VerifiedUpdate.decode(VerifiedUpdate(target.apk.name,target.apk.size,sha,target.apk.apiDigest,target.notes.code,target.notes.version).encode())
+                environment.verify(partial,record)
+                if(token!=generation || closed)return@execute
+                val dest=file(record)
+                requireUpdate(partial.renameTo(dest),"无法保存安装包，请重新下载")
+                // Check again immediately before publishing a durable receipt.
+                environment.verify(dest,record)
+                emit(token){
+                    verified=record;prefs.edit().putString("verified",record.encode()).apply()
+                    state=UpdateState.ReadyToInstall(dest)
+                }
+            }catch(e:Exception){emit(token){state=UpdateState.Failed(message(e,"下载或校验失败，请重试"))}}
+            finally{partial.delete()}
+        }
+    }
+    fun install() {
+        val record=verified ?: return
+        if(closed || busy())return
+        val token=++generation;state=UpdateState.Verifying
         io.execute {
             try {
-                val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-                dir.listFiles()?.forEach { it.delete() }
-                val dest = File(dir, target.apk.name)
-                http.downloadApk(target.apk.id, target.apk.size, dest) { percent ->
-                    set(UpdateState.Downloading(percent))
+                environment.verify(file(record),record)
+                emit(token){
+                    if(!foreground)state=UpdateState.ReadyToInstall(file(record))
+                    else if(!environment.installAllowed())state=UpdateState.NeedsInstallPermission
+                    else try{environment.install(file(record));state=UpdateState.ReadyToInstall(file(record))}
+                    catch(_:Exception){state=UpdateState.Failed("未能打开系统安装，请重试安装；原资料不受影响")}
                 }
-                val expectedSha = target.shaFile?.let { UpdateVerify.parseShaFile(http.assetText(it.id)) }
-                    ?: target.apk.apiDigest
-                    ?: throw UpdateFailure("发布资料里缺校验值，请稍后再试")
-                UpdateVerify.verifyHash(dest, target.apk.size, expectedSha, target.apk.apiDigest)
-                UpdateVerify.verifyArchive(context, dest, target.notes.code)
-                set(UpdateState.ReadyToInstall(dest))
-            } catch (e: UpdateFailure) {
-                set(UpdateState.Failed(e.userMessage))
-            } catch (e: InterruptedException) {
-                set(UpdateState.Idle)
-            } catch (e: Exception) {
-                set(if (cancelled) UpdateState.Idle else UpdateState.Failed("下载或校验失败，请稍后重试"))
-            }
+            }catch(e:Exception){emit(token){verified=null;prefs.edit().remove("verified").apply();state=UpdateState.Failed(message(e,"安装包已失效，请重新检查"))}}
         }
     }
-
-    /** 交给系统安装器；装不装由你在系统界面上确认，App 不会偷偷装。 */
-    fun install() {
-        val ready = state as? UpdateState.ReadyToInstall ?: return
-        try {
-            val uri = FileProvider.getUriForFile(context, "${UpdateConfig.PACKAGE}.updates", ready.file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            set(UpdateState.Failed("打不开系统安装界面，请稍后重试"))
-        }
+    fun openInstallPermission() {
+        if(state!=UpdateState.NeedsInstallPermission)return
+        try{returningFromPermission=true;environment.permissionSettings()}
+        catch(_:Exception){returningFromPermission=false;state=UpdateState.Failed("打不开安装来源设置，请稍后重试安装")}
     }
-
+    fun retry(){if(verified!=null)install() else if(candidate!=null)download() else check()}
     fun cancel() {
-        cancelled = true
-        http.cancel()
-        candidate = null
-        if (state !is UpdateState.Checking && state !is UpdateState.Downloading) set(UpdateState.Idle)
+        generation++;quietChecking=false;http.cancel();candidate=null;returningFromPermission=false
+        state=verified?.let{UpdateState.ReadyToInstall(file(it))} ?: UpdateState.Idle
+        promptDismissed=true
     }
-
-    private fun set(value: UpdateState) {
-        main.post { state = value }
+    fun close(){closed=true;generation++;http.cancel();io.shutdownNow()}
+    private fun ensureCurrent(token:Long){if(closed || token!=generation)throw InterruptedException()}
+    private fun busy()=state==UpdateState.Checking || state==UpdateState.Verifying || state is UpdateState.Downloading
+    private fun file(record:VerifiedUpdate):File {
+        // Decode enforces the exact public asset basename; canonical containment is defense in depth.
+        VerifiedUpdate.decode(record.encode())
+        val f=File(directory,record.name)
+        requireUpdate(f.canonicalFile.parentFile==directory.canonicalFile)
+        return f
     }
-
+    private fun emit(token:Long,change:()->Unit){main.post{if(!closed && token==generation)change()}}
+    private fun message(e:Exception,fallback:String)=(e as? UpdateFailure)?.userMessage ?: fallback
 }

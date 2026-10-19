@@ -13,6 +13,8 @@ internal fun requireUpdate(value: Boolean, message: String = "更新资料不完
 object UpdateConfig {
     const val REPO = "h516df/shicang"
     const val PACKAGE = "dev.h516.shicang"
+    // Public production certificate, recorded in docs/acceptance/v0.13/build.json.
+    const val CERTIFICATE_SHA256 = "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26"
     const val APK_PREFIX = "shicang"
     const val API = "https://api.github.com/repos/" + REPO
     const val MAX_APK = 120L * 1024 * 1024

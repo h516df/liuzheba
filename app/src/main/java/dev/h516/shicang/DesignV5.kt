@@ -21,15 +21,19 @@ import androidx.compose.ui.unit.sp
 @Composable internal fun appearanceScheme(a:Appearance):ColorScheme {
     val dark=a.theme=="曜石" || (a.theme=="跟随系统" && isSystemInDarkTheme())
     val sea=a.theme=="海盐"
-    return if(dark) darkColorScheme(primary=Color(0xFFBBC5FF),onPrimary=Color(0xFF15246B),
-        background=Color(0xFF111318),surface=Color(0xFF1C1F27),surfaceVariant=Color(0xFF292D38),
-        onSurface=Color(0xFFF0F1F7),onBackground=Color(0xFFF0F1F7),onSurfaceVariant=Color(0xFFB7BDCB),
-        outline=Color(0xFF777E90),outlineVariant=Color(0xFF343947),secondary=Color(0xFFC6CCDF),primaryContainer=Color(0xFF293969),onPrimaryContainer=Color(0xFFE1E6FF),secondaryContainer=Color(0xFF303646),onSecondaryContainer=Color(0xFFE2E6F5),surfaceContainer=Color(0xFF232731))
-    else lightColorScheme(primary=if(sea) Color(0xFF216578) else Color(0xFF4058D8),onPrimary=Color.White,
-        background=if(sea) Color(0xFFF0F6F7) else Color(0xFFF7F7F8),
-        surface=Color.White,surfaceVariant=if(sea) Color(0xFFE4EFF1) else Color(0xFFEFF0F2),
-        onSurface=Color(0xFF1B2030),onBackground=Color(0xFF1B2030),onSurfaceVariant=Color(0xFF626B80),
-        outline=Color(0xFF848DA1),outlineVariant=Color(0xFFE0E4EE),secondary=Color(0xFF545F7D),primaryContainer=if(sea) Color(0xFFDCEFF2) else Color(0xFFE8ECFF),onPrimaryContainer=if(sea) Color(0xFF144958) else Color(0xFF283C9C),secondaryContainer=Color(0xFFEBEEF6),onSecondaryContainer=Color(0xFF3D4860),surfaceContainer=if(sea) Color(0xFFE4EFF1) else Color(0xFFEFF0F2))
+    return if(dark) darkColorScheme(primary=Color(0xFFB5CDBF),onPrimary=Color(0xFF17382C),
+        background=Color(0xFF141715),surface=Color(0xFF1D221F),surfaceVariant=Color(0xFF2A312C),
+        onSurface=Color(0xFFE9EDE7),onBackground=Color(0xFFE9EDE7),onSurfaceVariant=Color(0xFFADB9B0),
+        outline=Color(0xFF7E8D83),outlineVariant=Color(0xFF38423B),secondary=Color(0xFFC5C9BC),
+        primaryContainer=Color(0xFF304B3D),onPrimaryContainer=Color(0xFFD8E9DD),secondaryContainer=Color(0xFF333B33),
+        onSecondaryContainer=Color(0xFFE0E6D9),surfaceContainer=Color(0xFF252C27))
+    else lightColorScheme(primary=if(sea) Color(0xFF396877) else Color(0xFF46685B),onPrimary=Color.White,
+        background=if(sea) Color(0xFFF2F6F7) else Color(0xFFF6F5F1),surface=Color(0xFFFFFEFA),
+        surfaceVariant=if(sea) Color(0xFFE5EEF0) else Color(0xFFEAEDE5),
+        onSurface=Color(0xFF252E28),onBackground=Color(0xFF252E28),onSurfaceVariant=Color(0xFF647066),
+        outline=Color(0xFF8B958C),outlineVariant=Color(0xFFDCE1D8),secondary=Color(0xFF66705E),
+        primaryContainer=if(sea) Color(0xFFDCECF0) else Color(0xFFE0EADD),onPrimaryContainer=Color(0xFF2D493A),
+        secondaryContainer=Color(0xFFEDEEE5),onSecondaryContainer=Color(0xFF424D3C),surfaceContainer=Color(0xFFEEEFE8))
 }
 
 @Composable internal fun QuietInput(value:String,onChange:(String)->Unit,placeholder:String,modifier:Modifier=Modifier,singleLine:Boolean=true,enabled:Boolean=true,keyboard:KeyboardType=KeyboardType.Text) {

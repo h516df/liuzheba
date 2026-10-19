@@ -1,6 +1,7 @@
 package dev.h516.shicang
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import android.os.Bundle
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -12,10 +13,14 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /** A normal local browser session supplies site cookies to the on-device extractor. No JS bridge. */
-class MediaBrowserActivity:Activity() {
+class MediaBrowserActivity:ComponentActivity() {
     private var web:WebView?=null
+    private val browserBack=object:OnBackPressedCallback(false) {
+        override fun handleOnBackPressed(){web?.goBack()}
+    }
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this,browserBack)
         val url=runCatching{MediaLinks.validUrl(intent.getStringExtra("url").orEmpty())}.getOrNull()
         if(url==null){finish();return}
         if(getSharedPreferences("device",0).getBoolean("appLock",false))window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -29,12 +34,12 @@ class MediaBrowserActivity:Activity() {
             CookieManager.getInstance().setAcceptThirdPartyCookies(this,false)
             webViewClient=object:WebViewClient(){
                 override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest):Boolean= request.url.scheme !in listOf("https")
-                override fun onPageFinished(view:WebView,url:String){label.text=Links.host(url);CookieManager.getInstance().flush()}
+                override fun onPageFinished(view:WebView,url:String){label.text=Links.host(url);CookieManager.getInstance().flush();browserBack.isEnabled=view.canGoBack()}
+                override fun doUpdateVisitedHistory(view:WebView,url:String?,isReload:Boolean){browserBack.isEnabled=view.canGoBack()}
             }
             loadUrl(url)
         }
         root.addView(web,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
     }
-    @Deprecated("Deprecated in Java") override fun onBackPressed(){if(web?.canGoBack()==true)web?.goBack() else super.onBackPressed()}
     override fun onDestroy(){web?.destroy();web=null;super.onDestroy()}
 }

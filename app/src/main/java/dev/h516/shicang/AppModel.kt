@@ -20,6 +20,9 @@ data class AppState(val library: Library = Library(),val editor: Archive?=null,v
     val exportRequest:MediaExportRequest?=null,val downloadsOpen:Boolean=false,val downloadInput:String="",
     val resolving:Boolean=false,val downloadError:String="",val mediaPlan:MediaPlan?=null,val downloads:List<MediaDownload> = emptyList())
 class AppModel(app: Application): AndroidViewModel(app) {
+    private val updateSession=lazy {dev.h516.update.Updater(app)}
+    val updater get()=updateSession.value
+    override fun onCleared(){if(updateSession.isInitialized())updateSession.value.close();super.onCleared()}
     private val mutable=MutableStateFlow(AppState())
     val state=mutable.asStateFlow()
     lateinit var store: Store; private set
