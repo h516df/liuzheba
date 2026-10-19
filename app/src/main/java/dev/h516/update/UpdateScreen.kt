@@ -37,7 +37,7 @@ import dev.h516.update.Updater
 
 /**
  * 「检查更新」页。能看当前版本和中文更新说明，能检查、下载、交给系统安装。
- * 不静默下载、不静默安装，每次都是你点一下才联网。
+ * 前台限频匿名检查版本；下载和系统安装都由用户明确发起。
  */
 @Composable
 fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
@@ -63,6 +63,14 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
         )
 
         when (state) {
+            UpdateState.Unsupported -> Text("当前是测试版或非官方签名版本，公开更新已停用。正式版资料不会被替换。",color=MaterialTheme.colorScheme.onSurfaceVariant)
+            UpdateState.Verifying -> Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp);Spacer(Modifier.width(10.dp));Text("正在重新校验安装包…")}
+            UpdateState.NeedsInstallPermission -> Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("安装已验证的新版，需要你在系统设置里允许留册安装应用。返回后会继续打开系统安装确认。")
+                Text("此许可用于打开更新安装，可随时在系统设置关闭；不会读取或上传档案。你也可以取消，继续使用当前版本。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick=updater::openInstallPermission){Text("前往系统设置")}
+                TextButton(onClick=updater::cancel){Text("暂不安装")}
+            }
             is UpdateState.Idle -> Button(onClick = { updater.check() }) { Text("检查更新") }
 
             is UpdateState.Checking -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -91,6 +99,7 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
 
             is UpdateState.Downloading -> {
                 Text("正在下载 ${state.percent}%", fontSize = 15.sp)
+                TextButton(onClick=updater::cancel){Text("取消下载")}
                 LinearProgressIndicator(
                     progress = { state.percent / 100f },
                     modifier = Modifier.fillMaxWidth(),
@@ -104,16 +113,21 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
 
             is UpdateState.Failed -> {
                 Text(state.message, fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
-                Button(onClick = { updater.check() }) { Text("重试") }
+                Button(onClick = { updater.retry() }) { Text("重试") }
             }
         }
 
         if (state is UpdateState.Available) {
             NotesBlock("新版说明 ${state.candidate.notes.version}", state.candidate.notes)
         }
+        Text("更新采用覆盖安装，下载失败不修改现有档案。系统安装需要你确认，请不要卸载旧版。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         currentNotes?.let { NotesBlock("本版说明 ${it.version}", it) }
 
-        Text("公开更新，无需登录 GitHub", fontSize = 12.sp,
+        if(state!=UpdateState.Unsupported) Row(verticalAlignment=Alignment.CenterVertically) {
+            Text("新版本提醒",Modifier.weight(1f))
+            androidx.compose.material3.Switch(checked=updater.autoCheckEnabled,onCheckedChange=updater::setAutoCheckEnabled)
+        }
+        Text("开启提醒后，解锁并回到前台时至多每天匿名检查一次。只访问更新源，不发送档案、照片或账号；下载由你决定。关闭后仅手动检查，无需登录 GitHub。", fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = { openBrowser(context, "https://github.com/" + UpdateConfig.REPO) }) {
             Text("查看开源项目")

@@ -43,6 +43,9 @@ import androidx.compose.ui.semantics.contentDescription
 import coil3.compose.AsyncImage
 import dev.h516.update.UpdateScreen
 import dev.h516.update.Updater
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -80,6 +83,17 @@ private val Muted: Color
         val snackbar=remember{SnackbarHostState()}
         var confirm by remember{mutableStateOf<Pair<String,()->Unit>?>(null)}
         val context=LocalContext.current
+        val updater=model.updater
+        val owner=LocalLifecycleOwner.current
+        DisposableEffect(owner,unlocked,s.ready) {
+            val observer=LifecycleEventObserver { _,event ->
+                if(event==Lifecycle.Event.ON_RESUME && unlocked && s.ready)updater.onForeground()
+                if(event==Lifecycle.Event.ON_PAUSE)updater.onBackground()
+            }
+            owner.lifecycle.addObserver(observer)
+            if(unlocked && s.ready && owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))updater.onForeground()
+            onDispose{owner.lifecycle.removeObserver(observer);updater.onBackground()}
+        }
         LaunchedEffect(s.message,unlocked,s.editor) {if(unlocked && s.editor==null && s.message.isNotEmpty()){snackbar.showSnackbar(s.message);model.dismissMessage()}}
         LaunchedEffect(route,s.ready) {if(route=="settings" && s.ready) model.refreshSpace()}
         val editing=s.editor!=null
@@ -147,6 +161,18 @@ private val Muted: Color
                         }
                     }
                 }
+                if(unlocked && s.ready && !editing && route=="library" && updater.canOfferReminder()) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal=20.dp)){
+                        Text("开启新版本提醒？仅在前台匿名检查版本，不发送档案，每天至多一次。",style=MaterialTheme.typography.bodySmall,color=scheme.onSurfaceVariant)
+                        Row {TextButton(onClick={updater.setAutoCheckEnabled(true)}){Text("开启提醒")};TextButton(onClick=updater::dismissReminder){Text("以后再说")}}
+                    }
+                }
+                if(unlocked && s.ready && !editing && route=="library" && !updater.promptDismissed) updater.hint()?.let { hint ->
+                    Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically){
+                        TextButton(onClick={route="updates"},modifier=Modifier.weight(1f)){Text(hint,style=MaterialTheme.typography.labelLarge)}
+                        TextButton(onClick=updater::dismissPrompt){Text("稍后")}
+                    }
+                }
                 if(s.busy){LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(horizontal=24.dp,vertical=4.dp),fontSize=12.sp);if(s.progress.contains("备份")||s.progress.contains("恢复")||s.progress.contains("导入")||s.progress.contains("打包")||s.progress.contains("写入")) TextButton(onClick=model::cancelOperation){Text("取消")}}}
             }},bottomBar={if(!immersive && !editing && route=="library" && unlocked) NavigationBar(containerColor=scheme.background,tonalElevation=0.dp) {
                 NavigationBarItem(selected=false,onClick={route="frame"},icon={FrameGlyph("发现",scheme.onSurfaceVariant)},label={Text("发现")})
@@ -175,7 +201,7 @@ private val Muted: Color
                     route=="settings"->Settings(model,s,setLock,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{route=it},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
                     route=="labels"->LabelsScreen(model,s){title,action->confirm=title to action}
-                    route=="updates"->UpdateScreen(remember {Updater(context)},PaddingValues(0.dp))
+                    route=="updates"->UpdateScreen(updater,PaddingValues(0.dp))
                 }
                 if(unlocked && s.ready && !editing && zoomPhoto.isNotEmpty()) {
 
@@ -339,7 +365,7 @@ private val Muted: Color
             }
         }
         item {GrowthEntry(collectionGrowth(s.library))}
-        item {SettingButton("关于与检查更新","留册 v${BuildConfig.VERSION_NAME}"){navigate("updates")}}
+        item {SettingButton("关于与检查更新",model.updater.hint() ?: "留册 v${BuildConfig.VERSION_NAME}"){navigate("updates")}}
     }
 }
 @Composable private fun Choice(title:String,choices:List<String>,selected:String,onSelect:(String)->Unit) {Column {Text(title,fontSize=12.sp,color=Muted);Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){choices.forEach{FilterChip(selected=it==selected,onClick={onSelect(it)},label={Text(it)})}}}}

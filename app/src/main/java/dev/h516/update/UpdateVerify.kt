@@ -25,9 +25,17 @@ internal object UpdateVerify {
     fun installedSigners(context: Context): Set<String> =
         signersOf(packageInfo(context, UpdateConfig.PACKAGE, context.packageManager))
 
+    fun installedCertificateHashes(context:Context):Set<String> = installedSigners(context).map { hex ->
+        val bytes=hex.chunked(2).map{it.toInt(16).toByte()}.toByteArray()
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)}
+    }.toSet()
+
     /** 发布时写的 SHA256 文件：`<64位十六进制>  <文件名>`。 */
-    fun parseShaFile(text: String): String {
-        val hash = Regex("[a-fA-F0-9]{64}").find(text)?.value?.lowercase()
+    fun parseShaFile(text: String, fileName: String? = null): String {
+        val lines=text.lineSequence().filter{it.isNotBlank()}.toList()
+        val selected=if(fileName==null) text else lines.firstOrNull{it.trim().split(Regex("\\s+"),limit=2).getOrNull(1)?.removePrefix("*")==fileName}
+            ?: throw UpdateFailure("发布资料里没找到这个安装包的校验值")
+        val hash = Regex("^[a-fA-F0-9]{64}(?=\\s|$)").find(selected.trim())?.value?.lowercase()
         requireUpdate(hash != null, "发布资料里没找到校验值，请稍后再试")
         return hash!!
     }
@@ -51,10 +59,11 @@ internal object UpdateVerify {
     }
 
     /** 用系统的包解析器看这个 APK：包名、版本号、签名、CPU 架构。 */
-    fun verifyArchive(context: Context, file: File, expectedCode: Int) {
+    fun verifyArchive(context: Context, file: File, expectedCode: Int, expectedVersion: String? = null) {
         val pm = context.packageManager
         val info = packageInfo(context, file.absolutePath, pm)
         requireUpdate(info.packageName == UpdateConfig.PACKAGE, "安装包不属于留册，已停止更新")
+        requireUpdate(expectedVersion==null || info.versionName==expectedVersion,"安装包版本说明不一致，已停止更新")
 
         val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
         requireUpdate(code == expectedCode.toLong(), "安装包版本对不上，已停止更新")
