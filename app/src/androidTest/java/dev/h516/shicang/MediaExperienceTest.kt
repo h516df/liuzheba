@@ -52,6 +52,9 @@ class MediaExperienceTest {
         try {
             activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             wait("搜索档案");click("发现");wait("全幅照片，双击或双指缩放");Thread.sleep(1400)
+            find("Got it")?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            Thread.sleep(600)
+            assertNull("System fullscreen tutorial must not cover sampled frames",find("Got it"))
             val before=screenshot("before");val w=before.width.toFloat();val h=before.height.toFloat()
             val beforePixel=before.getPixel((w*.5f).toInt(),(h*.72f).toInt());before.recycle()
             var minimum=1.0;var frames=0
