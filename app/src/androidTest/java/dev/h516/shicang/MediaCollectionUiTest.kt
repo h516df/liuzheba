@@ -26,7 +26,7 @@ class MediaCollectionUiTest {
         fun find(text:String)=nodes().firstOrNull{it.text?.toString()==text || it.contentDescription?.toString()==text}
         fun wait(text:String):AccessibilityNodeInfo{val end=SystemClock.uptimeMillis()+18000;while(SystemClock.uptimeMillis()<end){find(text)?.let{return it};Thread.sleep(100)};error("Missing $text: "+nodes().mapNotNull{it.text}.take(30))}
         fun click(text:String){var n:AccessibilityNodeInfo?=wait(text);while(n!=null && !n.isClickable)n=n.parent;check(n?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true);Thread.sleep(300)}
-        fun shot(name:String){val b=checkNotNull(ui.takeScreenshot());val folder=File(c.getExternalFilesDir(null),"v013-collection").apply{mkdirs()};File(folder,"$name.png").outputStream().use{b.compress(Bitmap.CompressFormat.PNG,100,it)};b.recycle()}
+        fun shot(name:String){Thread.sleep(800);val b=checkNotNull(ui.takeScreenshot());val folder=File(c.getExternalFilesDir(null),"v013-collection").apply{mkdirs()};File(folder,"$name.png").outputStream().use{b.compress(Bitmap.CompressFormat.PNG,100,it)};b.recycle()}
         val exported=mutableListOf<Uri>()
         try {
             activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
