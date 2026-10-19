@@ -25,7 +25,7 @@ object MediaLinks {
         return when(ext){in images->RemoteMedia(url,"image",ext);in videos->RemoteMedia(url,"video",ext);else->null}
     }
     fun validUrl(input:String):String {
-        val url=Links.normalize(input) ?: error("请填写图片、视频或作品分享链接")
+        val url=requireNotNull(Links.normalize(input)) {"请填写图片、视频或作品分享链接"}
         require(URI(url).scheme=="https") {"请使用 HTTPS 链接"}
         return url
     }
