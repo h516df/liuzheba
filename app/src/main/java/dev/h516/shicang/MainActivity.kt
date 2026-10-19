@@ -57,7 +57,18 @@ class MainActivity: FragmentActivity() {
             {restore.launch(arrayOf("application/zip","application/octet-stream"))})}
     }
     override fun onNewIntent(intent:Intent) {super.onNewIntent(intent);setIntent(intent);receiveShare(intent)}
-    private fun receiveShare(intent:Intent) {if(intent.action==Intent.ACTION_SEND && intent.type?.startsWith("text/")==true) model.receiveShare(intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty())}
+    @Suppress("DEPRECATION")
+    private fun receiveShare(intent:Intent) {
+        if(intent.action !in listOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE))return
+        if(intent.type?.startsWith("text/")==true) {model.receiveShare(intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty());return}
+        if(intent.type?.startsWith("image/")!=true && intent.type?.startsWith("video/")!=true)return
+        val uris=buildList<Uri> {
+            if(intent.action==Intent.ACTION_SEND) intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let{add(it)}
+            else addAll(intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty())
+            intent.clipData?.let{clip->repeat(clip.itemCount){clip.getItemAt(it).uri?.let{uri->add(uri)}}}
+        }.distinct().filter{it.scheme=="content"}.take(100)
+        model.receiveMedia(uris)
+    }
     override fun onSaveInstanceState(out: Bundle) {out.putString("targetDraft",targetDraft);out.putString("cameraUri",cameraUri?.toString());super.onSaveInstanceState(out)}
     override fun onStop() {super.onStop();if(getSharedPreferences("device",MODE_PRIVATE).getBoolean("appLock",false)) unlocked.value=false}
     private fun securePreview() {if(getSharedPreferences("device",MODE_PRIVATE).getBoolean("appLock",false)) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)}

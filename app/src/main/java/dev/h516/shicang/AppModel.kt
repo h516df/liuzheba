@@ -16,22 +16,27 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-data class AppState(val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList())
+data class AppState(val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
+    val exportRequest:MediaExportRequest?=null,val downloadsOpen:Boolean=false,val downloadInput:String="",
+    val resolving:Boolean=false,val downloadError:String="",val mediaPlan:MediaPlan?=null,val downloads:List<MediaDownload> = emptyList())
 class AppModel(app: Application): AndroidViewModel(app) {
     private val mutable=MutableStateFlow(AppState())
     val state=mutable.asStateFlow()
     lateinit var store: Store; private set
     private var draftJob: Job?=null
     private var operation: Job?=null
+    private var resolution:Job?=null
+    private val mediaDownloads=MediaDownloads(app)
     init {viewModelScope.launch {
-        try { store=withContext(Dispatchers.IO) {Store(app)};reload();mutable.value=mutable.value.copy(ready=true) }
+        try { store=withContext(Dispatchers.IO) {Store(app)};reload();mutable.value=mutable.value.copy(ready=true)
+            launch {while(true) {runCatching{withContext(Dispatchers.IO){mediaDownloads.list()}}.onSuccess{jobs->mutable.value=mutable.value.copy(downloads=jobs)};delay(1200)}} }
         catch(e:Exception) {mutable.value=mutable.value.copy(message="资料打开失败：${e.message}")}
     }}
     private suspend fun reload() {val l=store.load();val a=store.appearance();mutable.value=mutable.value.copy(library=l,appearance=a)}
     fun receiveShare(text:String) {
         if(text.isBlank()) return
         if(text.length>32000){message("分享内容过长，请只分享链接");return}
-        if(SharedLinks.parse(text)==null){message("暂未识别到抖音、小红书或快手链接");return}
+        if(SharedLinks.parse(text)==null){if(Links.normalize(text)!=null) openDownloads(text) else message("未找到有效链接");return}
         mutable.value=mutable.value.copy(shares=mutable.value.shares+text)
     }
     fun dismissShare(){mutable.value=mutable.value.copy(shares=mutable.value.shares.drop(1))}
@@ -44,6 +49,79 @@ class AppModel(app: Application): AndroidViewModel(app) {
             val link=withContext(Dispatchers.IO){SharedLinks.resolve(text)} ?: error("链接无法识别")
             val draft=link.archive();store.draft(draft)
             mutable.value=mutable.value.copy(editor=draft,shares=mutable.value.shares.drop(1),draftStatus="草稿已保存 · 请核对识别结果")
+        }
+    }
+    fun requestExport(a:Archive,photos:List<Photo>) {if(photos.isNotEmpty() && !mutable.value.busy) mutable.value=mutable.value.copy(exportRequest=MediaExportRequest(a,photos))}
+    fun cancelExport(){mutable.value=mutable.value.copy(exportRequest=null)}
+    fun exportMedia() {
+        val request=mutable.value.exportRequest ?: return
+        cancelExport()
+        work("正在保存到相册") {
+            val n=MediaExport.save(getApplication(),request,::photoFile){text->mutable.value=mutable.value.copy(progress=text)}
+            message("已保存 $n 项到系统相册 · 留册")
+        }
+    }
+    fun shareMedia(a:Archive,photos:List<Photo>) {
+        runCatching{MediaExport.share(getApplication(),MediaExportRequest(a,photos),::photoFile)}.onFailure{message("暂时无法分享原件")}
+    }
+    fun receiveMedia(uris:List<Uri>) {
+        if(uris.isNotEmpty()) mutable.value=mutable.value.copy(incomingMedia=(mutable.value.incomingMedia+uris).distinct().take(100))
+    }
+    fun dismissMedia(){mutable.value=mutable.value.copy(incomingMedia=emptyList())}
+    fun importIncoming(targetId:String?=null) {
+        val uris=mutable.value.incomingMedia;if(uris.isEmpty())return
+        draftJob?.cancel()
+        work("正在收录分享媒体") {
+            mutable.value.editor?.let{store.draft(it)}
+            val l=store.load()
+            val a=if(targetId==null)Archive(name="分享收录") else l.drafts.firstOrNull{it.id==targetId} ?: l.active.firstOrNull{it.id==targetId} ?: error("档案已不存在")
+            val result=store.importPhotos(uris)
+            require(result.photos.isNotEmpty()) {result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
+            val draft=a.copy(photos=a.photos+result.photos)
+            store.draft(draft)
+            mutable.value=mutable.value.copy(editor=draft,incomingMedia=emptyList(),draftStatus="已收录 ${result.photos.size} 项 · 请保存")
+            if(result.errors.isNotEmpty())message("部分媒体未收录：${result.errors.joinToString("；")}")
+        }
+    }
+    fun openDownloads(input:String="") {mutable.value=mutable.value.copy(downloadsOpen=true,downloadInput=input.ifBlank{mutable.value.downloadInput})}
+    fun closeDownloads() {resolution?.cancel();mutable.value=mutable.value.copy(downloadsOpen=false,resolving=false)}
+    fun downloadInput(input:String) {mutable.value=mutable.value.copy(downloadInput=input.take(32000),mediaPlan=null,downloadError="")}
+    fun resolveMedia() {
+        if(mutable.value.resolving)return
+        val input=mutable.value.downloadInput
+        mutable.value=mutable.value.copy(resolving=true,downloadError="",mediaPlan=null)
+        resolution=viewModelScope.launch {
+            try {
+                val plan=MediaLinks.resolve(getApplication(),input)
+                if(mutable.value.downloadInput==input)mutable.value=mutable.value.copy(mediaPlan=plan)
+            } catch(e:CancellationException){throw e}
+              catch(e:Exception){mutable.value=mutable.value.copy(downloadError=e.message ?: "暂时无法解析此链接")}
+            finally {mutable.value=mutable.value.copy(resolving=false)}
+        }
+    }
+    fun enqueueMedia(indices:Set<Int>) {
+        val plan=mutable.value.mediaPlan ?: return
+        runCatching{mediaDownloads.enqueue(plan,plan.items.filterIndexed{index,_->index in indices})}
+            .onSuccess{mutable.value=mutable.value.copy(mediaPlan=null,downloadInput="");message("已加入下载，离开页面仍可继续")}
+            .onFailure{mutable.value=mutable.value.copy(downloadError=it.message.orEmpty())}
+    }
+    fun removeDownload(id:String){mediaDownloads.remove(id)}
+    fun retryDownload(job:MediaDownload) {downloadInput(job.source);resolveMedia()}
+    fun importDownload(job:MediaDownload,targetId:String?=null) {
+        if(job.state!="待收录")return
+        draftJob?.cancel()
+        work("正在收录下载媒体") {
+            mutable.value.editor?.let{store.draft(it)}
+            val l=store.load()
+            val a=if(targetId==null) Archive(name=job.title,fields=listOf(Field(name="来源链接",type="链接",value=job.source)))
+                else l.drafts.firstOrNull{it.id==targetId} ?: l.active.firstOrNull{it.id==targetId} ?: error("档案已不存在")
+            val result=store.importPhotos(listOf(Uri.fromFile(mediaDownloads.file(job))))
+            require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"媒体读取失败"}}
+            val draft=a.copy(photos=a.photos+result.photos)
+            store.draft(draft)
+            // The media is now a durable draft; editing/saving uses the existing archive pipeline.
+            mediaDownloads.imported(job.id,draft.id)
+            mutable.value=mutable.value.copy(editor=draft,downloadsOpen=false,draftStatus="已收录 · 请保存")
         }
     }
     fun refreshSpace() {viewModelScope.launch {try {val value=store.space();mutable.value=mutable.value.copy(space=value)} catch(e:Exception){message("空间统计暂不可用")}}}

@@ -55,7 +55,7 @@ import java.io.File
     a:Archive,model:AppModel,appearance:Appearance,initialPhoto:String,
     position:(String)->Unit, next:(()->Unit)?, previous:(()->Unit)?,
     library:()->Unit, details:()->Unit, allPhotos:()->Unit, settings:()->Unit, edit:()->Unit, create:()->Unit,
-    busy:Boolean=false, close:(()->Unit)?=null
+    busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={}
 ) {
     val pager=rememberPagerState(initialPage=photoIndex(a,initialPhoto),pageCount={a.photos.size.coerceAtLeast(1)})
     var videoPlaying by remember {mutableStateOf(false)}
@@ -74,8 +74,12 @@ import java.io.File
     LaunchedEffect(pager.settledPage,a.photos) {
         a.photos.getOrNull(pager.settledPage)?.let {position(it.id)}
     }
-    LaunchedEffect(controls,menu,information,activity) {
-        if(controls && !menu && !information && !accessibility.isTouchExplorationEnabled) {
+    LaunchedEffect(active) {if(active) {controls=true;activity++}}
+    LaunchedEffect(zoomed,videoPlaying,menu,information,pager.isScrollInProgress) {
+        onPagingAllowed(!zoomed && !videoPlaying && !menu && !information && !pager.isScrollInProgress)
+    }
+    LaunchedEffect(controls,menu,information,activity,active) {
+        if(active && controls && !menu && !information && !accessibility.isTouchExplorationEnabled) {
             delay(4000);controls=false
         }
     }
@@ -83,10 +87,7 @@ import java.io.File
     var hint by remember {mutableStateOf(!preferences.getBoolean("frameHintV2",false))}
     fun touch() {activity++;hint=false;preferences.edit().putBoolean("frameHintV2",true).apply()}
     BackHandler(menu) {menu=false}
-    Box(Modifier.fillMaxSize().background(background).archiveSwipe(
-        enabled=!videoPlaying && !zoomed && !menu && !information && (next!=null || previous!=null),
-        onNext={touch();next?.invoke()},onPrevious={touch();previous?.invoke()}
-    )) {
+    Box(Modifier.fillMaxSize().background(background)) {
         val framed=appearance.skin=="留白"
         HorizontalPager(pager,Modifier.fillMaxSize(),
             key={a.photos.getOrNull(it)?.id ?: a.id},userScrollEnabled=!videoPlaying && !zoomed,
@@ -108,7 +109,7 @@ import java.io.File
                     val width=minOf((maxWidth-40.dp).coerceAtLeast(1.dp),(maxHeight-140.dp).coerceAtLeast(1.dp)*ratio)
                     val canvas=if(framed) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
-                if(p.isVideo) VideoMedia(p,model,page==pager.currentPage && !menu && !information && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
+                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
                 else {
                     // Keep the renderer and its decoded image stable across the pager midpoint.
                     val imageState=rememberZoomableImageState()
@@ -119,17 +120,17 @@ import java.io.File
                     LaunchedEffect(page==pager.settledPage) {
                         if(page!=pager.settledPage) imageState.zoomableState.resetZoom()
                     }
-                    ZoomPhoto(p,model,{touch();controls=!controls},imageState,page==pager.currentPage && !menu && !information,imageScale)
+                    ZoomPhoto(p,model,{touch();controls=!controls},imageState,active && page==pager.currentPage && !menu && !information,imageScale)
                 }
                     }
                 }
             }
         }
-        if(hint && !videoPlaying) Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(24.dp)
+        if(active && hint && !videoPlaying) Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(24.dp)
             .clickable {touch()},color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(16.dp)) {
             Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
-        AnimatedVisibility(visible=controls && !videoPlaying,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
+        AnimatedVisibility(visible=active && controls && !videoPlaying,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             val ink=if(a.photos.isNotEmpty() && (appearance.skin=="全幅" || appearance.skin=="暗房")) Color.White else MaterialTheme.colorScheme.onSurface
             Column(Modifier.fillMaxWidth()
                 .then(if(a.photos.isNotEmpty() && appearance.skin!="留白") Modifier.background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.7f)))) else Modifier)
@@ -139,17 +140,20 @@ import java.io.File
                         Text(a.name,color=ink,fontSize=22.sp,fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Text(if(a.photos.isEmpty()) "私人档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.padding(top=5.dp),color=ink.copy(alpha=.7f),fontSize=12.sp)
                     }
+                    if(current!=null) GalleryIcon("保存到相册",ink){touch();model.requestExport(a,listOf(current))}
                     if(a.photos.isNotEmpty()) GalleryIcon("全部照片",ink){touch();allPhotos()}
                     Box {
                         GalleryIcon("更多",ink){touch();menu=true}
                         DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
+                            if(current!=null) {
+                                DropdownMenuItem(text={Text("保存到相册")},onClick={menu=false;model.requestExport(a,listOf(current))})
+                                DropdownMenuItem(text={Text("分享原件")},onClick={menu=false;model.shareMedia(a,listOf(current))})
+                            }
                             DropdownMenuItem(text={Text("主题与皮肤")},onClick={menu=false;settings()})
                             DropdownMenuItem(text={Text("新建档案")},onClick={menu=false;create()},enabled=!busy)
                             DropdownMenuItem(text={Text("编辑档案")},onClick={menu=false;edit()},enabled=!busy)
-                            if(next!=null) {
-                                DropdownMenuItem(text={Text("上一份")},onClick={menu=false;touch();previous?.invoke()})
-                                DropdownMenuItem(text={Text("下一份")},onClick={menu=false;touch();next()})
-                            }
+                            if(previous!=null) DropdownMenuItem(text={Text("上一份")},onClick={menu=false;touch();previous()})
+                            if(next!=null) DropdownMenuItem(text={Text("下一份")},onClick={menu=false;touch();next()})
                         }
                     }
                 }
@@ -185,6 +189,7 @@ import java.io.File
                 drawLine(ink,Offset(w*.12f,h*.74f),Offset(w*.39f,h*.44f),stroke)
                 drawLine(ink,Offset(w*.39f,h*.44f),Offset(w*.62f,h*.73f),stroke)
             }
+            "保存到相册" -> {line(.5f,.08f,.5f,.62f);line(.28f,.43f,.5f,.65f);line(.5f,.65f,.72f,.43f);line(.15f,.7f,.15f,.88f);line(.15f,.88f,.85f,.88f);line(.85f,.88f,.85f,.7f)}
             "档案" -> for(y in 0..1) for(x in 0..1) drawRoundRect(ink,Offset(w*(.10f+x*.46f),h*(.10f+y*.46f)),androidx.compose.ui.geometry.Size(w*.32f,h*.32f),androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),style=Stroke(stroke))
             "更多" -> for(x in 0..2) drawCircle(ink,1.3.dp.toPx(),Offset(w*(.2f+x*.3f),h*.5f))
             "新建" -> {drawLine(ink,Offset(w*.18f,h*.5f),Offset(w*.82f,h*.5f),stroke);drawLine(ink,Offset(w*.5f,h*.18f),Offset(w*.5f,h*.82f),stroke)}
@@ -200,27 +205,6 @@ import java.io.File
         }
     }
 }
-
-private fun Modifier.archiveSwipe(enabled:Boolean,onNext:()->Unit,onPrevious:()->Unit)=
-    pointerInput(enabled) {
-        val threshold=56.dp.toPx()
-        awaitEachGesture {
-            val first=awaitFirstDown(requireUnconsumed=false,pass=PointerEventPass.Initial)
-            val start=first.position;var axis=SwipeAxis.Undecided;var delta=Offset.Zero;var cancelled=false
-            do {
-                val event=awaitPointerEvent(PointerEventPass.Initial)
-                if(!enabled || event.changes.count {it.pressed}>1) {cancelled=true;break}
-                val change=event.changes.firstOrNull{it.id==first.id} ?: break
-                delta=change.position-start
-                if(axis==SwipeAxis.Undecided) axis=swipeAxis(delta.x,delta.y,viewConfiguration.touchSlop)
-                if(axis==SwipeAxis.Horizontal) break
-                if(axis==SwipeAxis.Vertical) event.changes.forEach {it.consume()}
-            } while(event.changes.any {it.pressed})
-            if(!cancelled && axis==SwipeAxis.Vertical) {
-                if(delta.y < -threshold) onNext() else if(delta.y>threshold) onPrevious()
-            }
-        }
-    }
 
 @Composable private fun ZoomPhoto(p:Photo,model:AppModel,tap:()->Unit,state:ZoomableImageState,backAllowed:Boolean,imageScale:ContentScale) {
     val scope=rememberCoroutineScope()
@@ -252,17 +236,30 @@ private fun Modifier.archiveSwipe(enabled:Boolean,onNext:()->Unit,onPrevious:()-
 
 @Composable fun AllPhotos(a:Archive,model:AppModel,select:(String)->Unit) {
     if(a.photos.isEmpty()) {
-        Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
-            Text("还没有照片，可在编辑资料中添加。",Modifier.padding(24.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {Text("还没有照片，可在编辑资料中添加。",Modifier.padding(24.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)}
         return
     }
-    LazyVerticalGrid(GridCells.Fixed(3),Modifier.fillMaxSize(),contentPadding=PaddingValues(8.dp),
-        horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-        itemsIndexed(a.photos,key={_,p->p.id}) {i,p->
-            Box(Modifier.aspectRatio(.75f).clip(RoundedCornerShape(4.dp)).clickable {select(p.id)}) {
-                MediaThumb(p,model,Modifier.fillMaxSize(),"查看第${i+1}项照片或视频")
-                Text("${i+1}",Modifier.align(Alignment.BottomEnd).background(Color.Black.copy(alpha=.5f)).padding(horizontal=6.dp,vertical=2.dp),color=Color.White,fontSize=11.sp)
+    var choosing by rememberSaveable(a.id){mutableStateOf(false)}
+    var chosen by rememberSaveable(a.id){mutableStateOf(listOf<String>())}
+    val selected=a.photos.filter{it.id in chosen}
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
+            TextButton(onClick={choosing=!choosing;chosen=emptyList()}){Text(if(choosing)"完成" else "多选")}
+            if(choosing) TextButton(onClick={chosen=if(selected.size==a.photos.size)emptyList() else a.photos.map{it.id}}){Text(if(selected.size==a.photos.size)"取消全选" else "全选")}
+            Spacer(Modifier.weight(1f))
+            if(choosing) {
+                TextButton(onClick={model.shareMedia(a,selected)},enabled=selected.isNotEmpty()){Text("分享")}
+                TextButton(onClick={model.requestExport(a,selected)},enabled=selected.isNotEmpty()){Text("保存 ${selected.size} 项")}
+            } else TextButton(onClick={model.requestExport(a,a.photos)}){Text("全部保存")}
+        }
+        LazyVerticalGrid(GridCells.Fixed(3),Modifier.weight(1f),contentPadding=PaddingValues(8.dp),
+            horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            itemsIndexed(a.photos,key={_,p->p.id}) {i,p->
+                Box(Modifier.aspectRatio(.75f).clip(RoundedCornerShape(4.dp)).clickable {if(choosing)chosen=if(p.id in chosen)chosen-p.id else chosen+p.id else select(p.id)}) {
+                    MediaThumb(p,model,Modifier.fillMaxSize(),"查看第${i+1}项照片或视频")
+                    Text("${i+1}",Modifier.align(Alignment.BottomEnd).background(Color.Black.copy(alpha=.5f)).padding(horizontal=6.dp,vertical=2.dp),color=Color.White,fontSize=11.sp)
+                    if(choosing) Checkbox(p.id in chosen,{checked->chosen=if(checked)chosen+p.id else chosen-p.id},Modifier.align(Alignment.TopEnd))
+                }
             }
         }
     }

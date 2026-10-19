@@ -26,3 +26,19 @@ fun swipeAxis(x: Float, y: Float, slop: Float): SwipeAxis = when {
     abs(y) > slop && abs(y) > abs(x) * 1.2f -> SwipeAxis.Vertical
     else -> SwipeAxis.Undecided
 }
+
+/** A prepared random round doesn't consume the next archive when a drag is canceled. */
+class ArchiveQueue(ids:List<String>,initial:String="",private val random:kotlin.random.Random=kotlin.random.Random.Default) {
+    private val pool=ids.distinct()
+    val pages=mutableListOf<String>()
+    init {
+        if(initial in pool) pages+=initial
+        pages+=pool.filter{it!=initial}.shuffled(random)
+        if(pages.isNotEmpty()) extend()
+    }
+    fun extend() {
+        val round=pool.shuffled(random).toMutableList()
+        if(round.size>1 && round.first()==pages.lastOrNull()) {val first=round[0];round[0]=round[1];round[1]=first}
+        pages+=round
+    }
+}

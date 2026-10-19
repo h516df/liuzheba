@@ -220,4 +220,4 @@ class Store(private val context: Context) {
 fun ByteArray.hex()=joinToString("") {"%02x".format(it)}
 fun hashStream(input: java.io.InputStream): String {val d=MessageDigest.getInstance("SHA-256");val b=ByteArray(65536);while(true){val n=input.read(b);if(n<0) break;d.update(b,0,n)};return d.digest().hex()}
 fun sha(file: File)=FileInputStream(file).use(::hashStream)
-private fun copyChecked(input:java.io.InputStream,output:java.io.OutputStream,check:()->Unit) {val b=ByteArray(65536);while(true){check();val n=input.read(b);if(n<0)break;output.write(b,0,n)}}
+internal fun copyChecked(input:java.io.InputStream,output:java.io.OutputStream,check:()->Unit) {val b=ByteArray(65536);while(true){check();val n=input.read(b);if(n<0)break;output.write(b,0,n)}}
