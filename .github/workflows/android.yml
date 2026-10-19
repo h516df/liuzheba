@@ -26,4 +26,16 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - run: chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest assembleDebug
+      - run: chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
+      - name: Preserve UI verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: archive-ui-checks-${{ github.sha }}
+          path: |
+            app/build/outputs/archive-ui/
+            app/build/reports/tests/
+            app/build/test-results/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+          retention-days: 14
