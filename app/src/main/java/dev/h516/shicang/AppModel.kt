@@ -141,6 +141,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     }
     fun cancelOperation() {operation?.cancel()}
     fun edit(a: Archive?=null) {
+        if(!mutable.value.ready || mutable.value.busy) return
         val target=a?.let { formal -> mutable.value.library.drafts.firstOrNull{it.id==formal.id} ?: formal } ?: Archive(fields=listOf(Field()))
         mutable.value=mutable.value.copy(editor=target,draftStatus="正在保存草稿")
         change(target)
@@ -151,7 +152,13 @@ class AppModel(app: Application): AndroidViewModel(app) {
         draftJob?.cancel()
         draftJob=viewModelScope.launch {delay(200);try{store.draft(a);mutable.value=mutable.value.copy(draftStatus="草稿已保存");reload()}catch(e:CancellationException){throw e}catch(e:Exception){mutable.value=mutable.value.copy(draftStatus="草稿保存失败");message(e.message ?: "草稿保存失败")}}
     }
-    fun leaveEditor() {mutable.value=mutable.value.copy(editor=null)}
+    fun leaveEditor() {
+        if(!mutable.value.ready || mutable.value.busy) return
+        val a=mutable.value.editor ?: return
+        draftJob?.cancel()
+        // Keep the editor available on failure; leaving must not discard the debounce window.
+        work("保存编辑草稿") {store.draft(a);mutable.value=mutable.value.copy(editor=null,draftStatus="草稿已保存")}
+    }
     fun discardEditor() {val a=mutable.value.editor ?: return;draftJob?.cancel();work("放弃编辑") {store.discard(a.id);mutable.value=mutable.value.copy(editor=null)} }
     fun saveEditor() {val a=mutable.value.editor ?: return;draftJob?.cancel();work("保存资料") {store.save(a);mutable.value=mutable.value.copy(editor=null);message("已保存「${a.name.trim()}」")} }
     fun importPhotos(id: String,uris: List<Uri>) {
