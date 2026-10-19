@@ -1,0 +1,9 @@
+{
+  "from": "0.12/code13",
+  "to": "0.13/code14",
+  "device": "emulator-5564",
+  "method": "adb install -r, no uninstall or data clearing",
+  "fixture": "Upgrade-v013-fixture",
+  "archivePreserved": true,
+  "physicalPhone": false
+}

@@ -1,0 +1,10 @@
+
+dev.h516.shicang.MediaCollectionUiTest:.
+dev.h516.shicang.ContentFirstUiTest:.
+dev.h516.shicang.ViewerLockTest:.
+
+Time: 26.733
+
+OK (3 tests)
+
+

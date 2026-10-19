@@ -1,0 +1,10 @@
+
+dev.h516.shicang.MediaExperienceTest:..
+dev.h516.shicang.PhotoSwipeTest:.
+dev.h516.shicang.VideoUiTest:.
+
+Time: 163.397
+
+OK (4 tests)
+
+

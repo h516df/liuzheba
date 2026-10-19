@@ -18,3 +18,13 @@
 `app/src/androidTest/assets/v03-demo.png` 为几何测试数据，生成方法见 `tools/generate_test_image.py`。`sample-video.mp4` 为项目的合成视频测试夹具，不含真实用户媒体；二者只进入测试 APK。
 
 没有随本开源候选分发旧设计预览、旧截图或来源不明的原型图片。Android SDK 由使用者单独安装并接受其许可；它不是本源码许可的一部分。
+
+## 0.13 本地媒体解析
+
+- [Chaquopy 17.0.0](https://github.com/chaquo/chaquopy)：MIT；原文随 App 的 `chaquopy-LICENSE.txt` 保留。Python 3.12 运行时和其原有第三方声明由 Chaquopy 分发。
+- [yt-dlp 2026.8.19](https://github.com/yt-dlp/yt-dlp)：Unlicense；固定 PyPI 包，不在运行时下载可执行代码，不捆绑 FFmpeg。许可原文见 App 资产 `yt-dlp-LICENSE.txt`。
+- `liuce_media.py` 的小红书、抖音图集适配复用 yt-dlp 上游 extractor 的公开元数据结构；不以视频封面代替图集。Chaquopy 只在用户解析链接时启动。
+- Coil 网络模块及其 OkHttp 依赖沿用 Apache-2.0。后台文件传输使用系统 DownloadManager；相册写入使用 MediaStore。
+
+Seal、YTDLnis、XHS-Downloader、DouK、Ketch 只用于调研，没有复制其实现或将 GPL 下载器整体加入本项目。
+- certifi 2026.10.18：MPL-2.0；证书集合与许可由其固定 Python wheel 分发，用于保持 HTTPS 证书验证，未关闭 TLS 校验。

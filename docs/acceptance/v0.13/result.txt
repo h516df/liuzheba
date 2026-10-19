@@ -1,0 +1,1 @@
+verticalFrames=17 minimumVisible=1.0; fingerDownTransition=true; originalExport=true; systemImageVideoDownloads=2

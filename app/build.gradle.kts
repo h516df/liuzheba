@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.chaquo.python")
 }
 val signingProperties=Properties().apply {
     val source=rootProject.file(System.getenv("SHICANG_SIGNING_PROPERTIES") ?: "keystore.properties")
@@ -15,8 +16,9 @@ android {
         applicationId = "dev.h516.shicang"
         minSdk = 24
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.12"
+        versionCode = 14
+        versionName = "0.13"
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
@@ -35,6 +37,13 @@ android {
     buildTypes { release { isMinifyEnabled = true; isShrinkResources=true;proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"));signingConfig=signingConfigs.findByName("release") } }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
+chaquopy {
+    defaultConfig {
+        version = "3.12"
+        System.getenv("SHICANG_BUILD_PYTHON")?.let { buildPython(it) }
+        pip { install("yt-dlp==2026.8.19"); install("certifi==2026.10.18") }
+    }
+}
 dependencies {
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("androidx.media3:media3-ui:1.11.1")
@@ -46,6 +55,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.foundation:foundation")
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
     implementation("me.saket.telephoto:zoomable-image-coil3:0.19.0")
     implementation("androidx.exifinterface:exifinterface:1.4.2")
     implementation("androidx.fragment:fragment-ktx:1.8.9")

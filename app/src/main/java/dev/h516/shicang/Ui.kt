@@ -82,7 +82,6 @@ private val Muted: Color
         LaunchedEffect(s.message,unlocked,s.editor) {if(unlocked && s.editor==null && s.message.isNotEmpty()){snackbar.showSnackbar(s.message);model.dismissMessage()}}
         LaunchedEffect(route,s.ready) {if(route=="settings" && s.ready) model.refreshSpace()}
         val editing=s.editor!=null
-        val deck=remember {ShuffleDeck()}
         var frameArchive by rememberSaveable {mutableStateOf("")}
         var positions by rememberSaveable {mutableStateOf(hashMapOf<String,String>())}
         val immersive=unlocked && s.ready && !editing && (route=="frame" || zoomPhoto.isNotEmpty())
@@ -138,6 +137,7 @@ private val Muted: Color
                     Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"留册";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留册"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
                         if(route=="frame" && !editing) Text("留册 · 私人档案",fontSize=11.sp,color=Muted)}
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
+                        FilledTonalIconButton(onClick={model.openDownloads()},modifier=Modifier.size(48.dp).semantics{contentDescription="链接下载"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("保存到相册",scheme.onSurfaceVariant)}
                         FilledTonalIconButton(onClick={openSettings()},modifier=Modifier.size(48.dp).semantics{contentDescription="设置"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("设置",scheme.onSurfaceVariant)}
                         Spacer(Modifier.width(8.dp))
                         if(!s.busy) Button(onClick={model.edit()},shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="＋ 新建"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)){
@@ -159,15 +159,10 @@ private val Muted: Color
                     route=="frame" && !editing && zoomPhoto.isEmpty()->{
                         val active=remember(s.library.archives){s.library.active}
                         val ids=remember(active){active.map{it.id}}
-                        LaunchedEffect(ids) {deck.setIds(ids,frameArchive);if(frameArchive !in ids) frameArchive=deck.next().orEmpty()}
-                        val a=active.firstOrNull{it.id==frameArchive}
-                        if(a==null) Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("把值得记住的，留在这里",fontSize=23.sp);Text("人物、物品，照片、视频与点滴资料",Modifier.padding(vertical=16.dp),color=Muted);Button(onClick={model.edit()}){Text("新建档案")};TextButton(onClick={route="library"}){Text("我的档案")};TextButton(onClick={openSettings()}){Text("设置与恢复备份")}}
-                        else key(a.id) {FullPhotoFrame(a,model,s.appearance,positions[a.id].orEmpty(),
-                            {rememberPhoto(a.id,it)},
-                            if(ids.size>1) ({frameArchive=deck.next().orEmpty()}) else null,
-                            if(ids.size>1) ({frameArchive=deck.previous().orEmpty()}) else null,
-                            {route="library"},{openDetails(a.id)},{openPhotos(a.id)},
-                            {appearanceOpen=true},{model.edit(a)},{model.edit()},s.busy)}
+                        if(active.isEmpty()) Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("把值得记住的，留在这里",fontSize=23.sp);Text("人物、物品，照片、视频与点滴资料",Modifier.padding(vertical=16.dp),color=Muted);Button(onClick={model.edit()}){Text("新建档案")};TextButton(onClick={route="library"}){Text("我的档案")};TextButton(onClick={openSettings()}){Text("设置与恢复备份")}}
+                        else key(ids) {ArchiveFeed(active,frameArchive,model,s.appearance,positions,::rememberPhoto,
+                            {frameArchive=it},{route="library"},::openDetails,::openPhotos,
+                            {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy)}
                     }
                     route=="photos"->{val a=s.library.active.firstOrNull{it.id==selected}
                         if(a!=null) AllPhotos(a,model){rememberPhoto(a.id,it);zoomPhoto=it}
@@ -198,10 +193,11 @@ private val Muted: Color
             shape=RoundedCornerShape(topStart=26.dp,topEnd=26.dp)) {
             AppearanceV5(model,s,{appearanceOpen=false},{appearanceOpen=false;openSettings(settingsPhotoPosition(s.library,positions,zoomPhoto))})
         }
+        if(unlocked && s.ready) MediaCollectionUi(model,s)
         if(unlocked && s.ready && s.shares.isNotEmpty()) AlertDialog(onDismissRequest={if(!s.busy)model.dismissShare()},
             title={Text("拾取分享链接")},text={Column {Text(SharedLinks.parse(s.shares.first())?.let{"${it.platform} · ${it.kind}\n${it.name}"}.orEmpty());Text(if(s.editor!=null) "当前编辑会保留为草稿。新建后可核对名称、类型和链接。" else "自动填写平台、类型、名称与链接，保存前可修改。",Modifier.padding(top=12.dp))}},
             confirmButton={TextButton(onClick={model.importShare()},enabled=!s.busy){Text(if(s.busy) "识别中…" else "创建档案草稿")}},
-            dismissButton={TextButton(onClick={model.dismissShare()},enabled=!s.busy){Text("取消")}})
+            dismissButton={Row {TextButton(onClick={val text=s.shares.first();model.dismissShare();model.openDownloads(text)},enabled=!s.busy){Text("下载媒体")};TextButton(onClick=model::dismissShare,enabled=!s.busy){Text("取消")}}})
         if(unlocked) confirm?.let {(title,action)->AlertDialog(onDismissRequest={confirm=null},title={Text("确认操作")},text={Text(title)},confirmButton={TextButton(onClick={confirm=null;action()}){Text("确认")}},dismissButton={TextButton(onClick={confirm=null}){Text("取消")}})}
     }
 }

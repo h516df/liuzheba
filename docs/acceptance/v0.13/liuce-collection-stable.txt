@@ -1,0 +1,8 @@
+
+dev.h516.shicang.MediaCollectionUiTest:.
+
+Time: 10.408
+
+OK (1 test)
+
+
