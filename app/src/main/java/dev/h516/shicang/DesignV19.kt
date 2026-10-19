@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,7 +105,7 @@ import kotlinx.coroutines.withContext
             items(selection.tags,key={"tag-$it"}){id->ActiveArchiveFilter(s.library.labelName(id),"移除标签筛选 ${s.library.labelName(id)}"){tags=tags-id}}
         }
         FlowRow(Modifier.fillMaxWidth().padding(top=8.dp,bottom=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center,itemVerticalAlignment=Alignment.CenterVertically) {
-            Text(if(searching) "正在查找" else "${results.orEmpty().size} 份档案",Modifier.weight(1f).padding(end=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+            Text(if(searching) "正在查找" else "${results.orEmpty().size} 份档案",(if(LocalDensity.current.fontScale>1.4f) Modifier.fillMaxWidth() else Modifier.weight(1f)).padding(end=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
             TextButton(onClick={byName=!byName},contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.semantics{contentDescription=if(byName) "排序：按名称" else "排序：最近更新"}){
                 Text(if(byName) "按名称" else "最近更新",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)
             }

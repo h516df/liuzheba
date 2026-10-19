@@ -28,7 +28,7 @@ class ArchiveBookshelfTest {
         store.save(archive);store.save(Archive(name="一封旧信",category=category));store.save(Archive(name="周末散步",photos=photos));store.save(Archive(name="手写食谱"))
         store.appearance(Appearance(theme=InstrumentationRegistry.getArguments().getString("visualTheme","月白")))
         val ui=i.uiAutomation;val activity=i.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        fun nodes():List<AccessibilityNodeInfo>{ui.clearCache();val out=mutableListOf<AccessibilityNodeInfo>();fun visit(n:AccessibilityNodeInfo?){if(n==null)return;if(n.isVisibleToUser)out+=n;repeat(n.childCount){visit(n.getChild(it))}};visit(ui.rootInActiveWindow);return out}
+        fun nodes():List<AccessibilityNodeInfo>{if(android.os.Build.VERSION.SDK_INT>=34)ui.clearCache();val out=mutableListOf<AccessibilityNodeInfo>();fun visit(n:AccessibilityNodeInfo?){if(n==null)return;if(n.isVisibleToUser)out+=n;repeat(n.childCount){visit(n.getChild(it))}};visit(ui.rootInActiveWindow);return out}
         fun find(text:String)=nodes().firstOrNull{it.text?.toString()==text || it.contentDescription?.toString()==text}
         fun wait(text:String):AccessibilityNodeInfo{val end=SystemClock.uptimeMillis()+20000;while(SystemClock.uptimeMillis()<end){find("Got it")?.performAction(AccessibilityNodeInfo.ACTION_CLICK);find(text)?.let{return it};Thread.sleep(150)};error("Missing $text: "+nodes().mapNotNull{it.text}.take(35))}
         fun click(text:String){var n:AccessibilityNodeInfo?=wait(text);while(n!=null && !n.isClickable)n=n.parent;check(n?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true);Thread.sleep(600)}
