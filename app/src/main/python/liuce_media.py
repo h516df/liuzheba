@@ -85,10 +85,10 @@ def flatten_info(info, limit=100):
         return media
     # Choose a single self-contained HTTP video. No transcoding or silent audio loss.
     formats = [fmt for fmt in info.get('formats', [])
-               if fmt.get('url') and fmt.get('protocol', '').startswith('http')
+               if fmt.get('url') and fmt.get('protocol', urlparse(fmt.get('url', '')).scheme).startswith('http')
                and fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none'
                and fmt.get('ext') in ('mp4', 'webm', 'mov')]
-    selected = formats[-1] if formats else info
+    selected = max(formats, key=lambda f: (f.get('height') or 0, f.get('tbr') or 0, f.get('filesize') or 0)) if formats else info
     address = selected.get('url')
     protocol = selected.get('protocol', 'https')
     if not address or not protocol.startswith('http'):

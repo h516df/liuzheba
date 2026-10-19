@@ -75,7 +75,7 @@ import java.io.File
         a.photos.getOrNull(pager.settledPage)?.let {position(it.id)}
     }
     LaunchedEffect(active) {if(active) {controls=true;activity++}}
-    LaunchedEffect(zoomed,videoPlaying,menu,information,pager.isScrollInProgress) {
+    LaunchedEffect(active,zoomed,videoPlaying,menu,information,pager.isScrollInProgress) {
         onPagingAllowed(!zoomed && !videoPlaying && !menu && !information && !pager.isScrollInProgress)
     }
     LaunchedEffect(controls,menu,information,activity,active) {
