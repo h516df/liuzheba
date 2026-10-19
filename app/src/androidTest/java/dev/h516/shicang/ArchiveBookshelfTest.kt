@@ -35,7 +35,7 @@ class ArchiveBookshelfTest {
         fun search(text:String){val n=nodes().first{it.isEditable};assertTrue(n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,Bundle().apply{putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,text)}));Thread.sleep(700)}
         val out=File(c.getExternalFilesDir(null),"archive-bookshelf").apply{mkdirs()}
         fun shot(name:String){Thread.sleep(600);val bitmap=ui.takeScreenshot()!!;File(out,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
-        fun back(){ui.injectInputEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_BACK),true);ui.injectInputEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_BACK),true);Thread.sleep(500)}
+        fun back(){val at=SystemClock.uptimeMillis();check(ui.injectInputEvent(KeyEvent(at,at,KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_BACK,0),true));check(ui.injectInputEvent(KeyEvent(at,SystemClock.uptimeMillis(),KeyEvent.ACTION_UP,KeyEvent.KEYCODE_BACK,0),true));Thread.sleep(500)}
         try {
             wait("4 份档案");shot("wall")
             search("不存在");wait("没有匹配的档案");shot("no-results");click("清除搜索与筛选");wait("4 份档案")
