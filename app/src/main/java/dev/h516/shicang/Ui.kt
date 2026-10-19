@@ -197,7 +197,7 @@ private val Muted: Color
         if(unlocked && s.ready && s.shares.isNotEmpty()) AlertDialog(onDismissRequest={if(!s.busy)model.dismissShare()},
             title={Text("拾取分享链接")},text={Column {Text(SharedLinks.parse(s.shares.first())?.let{"${it.platform} · ${it.kind}\n${it.name}"}.orEmpty());Text(if(s.editor!=null) "当前编辑会保留为草稿。新建后可核对名称、类型和链接。" else "自动填写平台、类型、名称与链接，保存前可修改。",Modifier.padding(top=12.dp))}},
             confirmButton={TextButton(onClick={model.importShare()},enabled=!s.busy){Text(if(s.busy) "识别中…" else "创建档案草稿")}},
-            dismissButton={Row {TextButton(onClick={val text=s.shares.first();model.dismissShare();model.openDownloads(text)},enabled=!s.busy){Text("下载媒体")};TextButton(onClick={model.dismissShare},enabled=!s.busy){Text("取消")}}})
+            dismissButton={Row {TextButton(onClick={val text=s.shares.first();model.dismissShare();model.openDownloads(text)},enabled=!s.busy){Text("下载媒体")};TextButton(onClick=model::dismissShare,enabled=!s.busy){Text("取消")}}})
         if(unlocked) confirm?.let {(title,action)->AlertDialog(onDismissRequest={confirm=null},title={Text("确认操作")},text={Text(title)},confirmButton={TextButton(onClick={confirm=null;action()}){Text("确认")}},dismissButton={TextButton(onClick={confirm=null}){Text("取消")}})}
     }
 }
