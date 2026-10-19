@@ -18,6 +18,15 @@ import java.io.File
 
 /** Real rendered vertical drags, byte-preserving exports and system-managed background downloads. */
 class MediaExperienceTest {
+    @Test fun embeddedEngineResolvesPublicHtmlVideo()=runBlocking<Unit> {
+        val c=InstrumentationRegistry.getInstrumentation().targetContext
+        check(c.packageName.endsWith(".verification"))
+        val plan=MediaLinks.resolve(c,"https://www.w3schools.com/html/html5_video.asp")
+        assertTrue(plan.items.isNotEmpty())
+        assertTrue(plan.items.all{it.kind=="video" && it.url.startsWith("https://")})
+        assertTrue(plan.items.none{it.headers.keys.any{key->key.lowercase() in setOf("cookie","authorization")}})
+    }
+
     @Test fun verticalPagingExportAndDownloads()=runBlocking<Unit> {
         val i=InstrumentationRegistry.getInstrumentation();val c=i.targetContext
         check(c.packageName.endsWith(".verification"))

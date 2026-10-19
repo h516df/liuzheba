@@ -45,7 +45,10 @@ object MediaLinks {
         val url=validUrl(input)
         direct(url)?.let{return@withContext MediaPlan(Uri.parse(url).lastPathSegment?.take(100) ?: "链接收录",url,listOf(it))}
         synchronized(MediaLinks) {if(!Python.isStarted()) Python.start(AndroidPlatform(context.applicationContext))}
-        val cookies=withContext(Dispatchers.Main) {CookieManager.getInstance().getCookie(url).orEmpty()}
+        val cookies=withContext(Dispatchers.Main) {
+            val cookieUrl=when(SharedLinks.platform(url)){"抖音"->"https://www.douyin.com/";"小红书"->"https://www.xiaohongshu.com/";else->url}
+            CookieManager.getInstance().getCookie(cookieUrl).orEmpty()
+        }
         try {read(Python.getInstance().getModule("liuce_media").callAttr("resolve",url,cookies).toString())}
         catch(e:Exception) {throw IllegalStateException("暂时无法解析。可先打开网页完成验证后重试，或从其他 App 分享图片、视频到留册。",e)}
     }
@@ -108,9 +111,4 @@ class MediaDownloads(private val context:Context) {
     }
     @Synchronized fun imported(id:String,archive:String) {val jobs=read();write(jobs.map{if(it.id==id)it.copy(archiveId=archive) else it});jobs.firstOrNull{it.id==id}?.let{manager.remove(it.managerId)}}
     @Synchronized fun remove(id:String) {val jobs=read();jobs.firstOrNull{it.id==id}?.let{manager.remove(it.managerId);file(it).delete()};write(jobs.filter{it.id!=id})}
-    @Synchronized fun retry(id:String) {
-        val job=read().firstOrNull{it.id==id} ?: return
-        // URLs can expire. Resolve the source again rather than retrying a stale CDN URL.
-        remove(job.id)
-    }
 }

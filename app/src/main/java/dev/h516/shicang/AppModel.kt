@@ -26,7 +26,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private var draftJob: Job?=null
     private var operation: Job?=null
     private var resolution:Job?=null
-    private val mediaDownloads=MediaDownloads(app)
+    private val mediaDownloads by lazy {MediaDownloads(app)}
     init {viewModelScope.launch {
         try { store=withContext(Dispatchers.IO) {Store(app)};reload();mutable.value=mutable.value.copy(ready=true)
             launch {while(true) {runCatching{withContext(Dispatchers.IO){mediaDownloads.list()}}.onSuccess{jobs->mutable.value=mutable.value.copy(downloads=jobs)};delay(1200)}} }
@@ -111,6 +111,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         if(job.state!="待收录")return
         draftJob?.cancel()
         work("正在收录下载媒体") {
+            require(mediaDownloads.list().any{it.id==job.id && it.state=="待收录"}) {"下载记录已变化，请重新选择"}
             mutable.value.editor?.let{store.draft(it)}
             val l=store.load()
             val a=if(targetId==null) Archive(name=job.title,fields=listOf(Field(name="来源链接",type="链接",value=job.source)))

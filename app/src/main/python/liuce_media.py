@@ -105,10 +105,11 @@ def resolve(url, browser_cookies=''):
                'cachedir': False, 'playlistend': 100}
     with YoutubeDL(options) as ydl:
         host = urlparse(url).hostname or ''
+        cookie_host = 'www.douyin.com' if 'douyin.com' in host else 'www.xiaohongshu.com' if 'xhslink.com' in host else host
         for part in browser_cookies.split(';'):
             if '=' in part:
                 name, value = part.strip().split('=', 1)
-                ydl.cookiejar.set_cookie(Cookie(0, name, value, None, False, host, False,
+                ydl.cookiejar.set_cookie(Cookie(0, name, value, None, False, cookie_host, False,
                                                 False, '/', True, True, None, True, None, None, {}))
         if host in ('v.douyin.com', 'xhslink.com') or host.endswith('.xhslink.com'):
             with ydl.urlopen(url) as response:
