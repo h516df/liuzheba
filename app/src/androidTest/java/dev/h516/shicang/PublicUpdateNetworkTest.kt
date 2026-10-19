@@ -20,7 +20,7 @@ class PublicUpdateNetworkTest {
         instrumentation.runOnMainSync {
             val updater=Updater(context)
             try {
-                updater.setAutoCheckEnabled(true);updater.onForeground();updater.check();updater.download();updater.install()
+                updater.changeAutoCheckEnabled(true);updater.onForeground();updater.check();updater.download();updater.install()
                 assertEquals(UpdateState.Unsupported,updater.state)
                 assertNull(updater.hint())
             } finally {updater.close()}

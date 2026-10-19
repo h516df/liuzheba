@@ -125,7 +125,7 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
 
         if(state!=UpdateState.Unsupported) Row(verticalAlignment=Alignment.CenterVertically) {
             Text("新版本提醒",Modifier.weight(1f))
-            androidx.compose.material3.Switch(checked=updater.autoCheckEnabled,onCheckedChange=updater::setAutoCheckEnabled)
+            androidx.compose.material3.Switch(checked=updater.autoCheckEnabled,onCheckedChange=updater::changeAutoCheckEnabled)
         }
         Text("开启提醒后，解锁并回到前台时至多每天匿名检查一次。只访问更新源，不发送档案、照片或账号；下载由你决定。关闭后仅手动检查，无需登录 GitHub。", fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant)

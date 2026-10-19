@@ -49,12 +49,12 @@ class UpdaterSessionTest {
     private fun until(condition:()->Boolean){val deadline=System.nanoTime()+5_000_000_000L;while(!condition() && System.nanoTime()<deadline){shadowOf(Looper.getMainLooper()).idle();Thread.yield()};shadowOf(Looper.getMainLooper()).idle();assertTrue(condition())}
     @Test fun reminderRequiresOptInAndForegroundAndIsThrottled(){
         val u=session(Environment());u.onForeground();assertEquals(0,requests.get())
-        u.onBackground();u.setAutoCheckEnabled(true);assertEquals(0,requests.get())
+        u.onBackground();u.changeAutoCheckEnabled(true);assertEquals(0,requests.get())
         u.onForeground();until{requests.get()==1 && u.state==UpdateState.Idle}
         u.onForeground();assertEquals(1,requests.get());u.check();until{requests.get()==2 && u.state is UpdateState.Failed}
     }
     @Test fun nonOfficialBuildNeverRequestsOrInstalls(){
-        val env=Environment().apply{official=false};val u=session(env);u.setAutoCheckEnabled(true);u.onForeground();u.check();u.install()
+        val env=Environment().apply{official=false};val u=session(env);u.changeAutoCheckEnabled(true);u.onForeground();u.check();u.install()
         assertTrue(u.state is UpdateState.Unsupported);assertEquals(0,requests.get());assertEquals(0,env.installs)
     }
     @Test fun verifiedReceiptRestoresAndPermissionReturnReverifiesBeforeInstalling(){

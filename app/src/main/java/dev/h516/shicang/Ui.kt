@@ -164,7 +164,7 @@ private val Muted: Color
                 if(unlocked && s.ready && !editing && route=="library" && updater.canOfferReminder()) {
                     Column(Modifier.fillMaxWidth().padding(horizontal=20.dp)){
                         Text("开启新版本提醒？仅在前台匿名检查版本，不发送档案，每天至多一次。",style=MaterialTheme.typography.bodySmall,color=scheme.onSurfaceVariant)
-                        Row {TextButton(onClick={updater.setAutoCheckEnabled(true)}){Text("开启提醒")};TextButton(onClick=updater::dismissReminder){Text("以后再说")}}
+                        Row {TextButton(onClick={updater.changeAutoCheckEnabled(true)}){Text("开启提醒")};TextButton(onClick=updater::dismissReminder){Text("以后再说")}}
                     }
                 }
                 if(unlocked && s.ready && !editing && route=="library" && !updater.promptDismissed) updater.hint()?.let { hint ->

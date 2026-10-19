@@ -42,7 +42,7 @@ class Updater internal constructor(context:Context,private val environment:Updat
     var promptDismissed by mutableStateOf(false);private set
     var autoCheckEnabled by mutableStateOf(prefs.getBoolean("auto_check",false));private set
     var reminderAsked by mutableStateOf(prefs.getBoolean("reminder_asked",false));private set
-    fun setAutoCheckEnabled(enabled:Boolean){if(!enabled && quietChecking)cancel();autoCheckEnabled=enabled;reminderAsked=true;prefs.edit().putBoolean("auto_check",enabled).putBoolean("reminder_asked",true).apply();if(enabled && foreground)checkIfDue()}
+    fun changeAutoCheckEnabled(enabled:Boolean){if(!enabled && quietChecking)cancel();autoCheckEnabled=enabled;reminderAsked=true;prefs.edit().putBoolean("auto_check",enabled).putBoolean("reminder_asked",true).apply();if(enabled && foreground)checkIfDue()}
     fun dismissReminder(){reminderAsked=true;prefs.edit().putBoolean("reminder_asked",true).apply()}
     fun canOfferReminder()=state!=UpdateState.Unsupported && !reminderAsked
 
