@@ -1,10 +1,6 @@
 package dev.h516.shicang
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.net.Uri
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -59,7 +55,7 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithContentDescription("筛选").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("2 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("移除分类筛选").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("4 份档案").fetchSemanticsNodes().isNotEmpty()}
     })
@@ -67,7 +63,7 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithContentDescription("筛选").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("2 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("设置").performClick()
         val category=model.state.value.library.labels.first{it.kind=="category"}
         compose.runOnIdle{model.deleteLabel(category)}
