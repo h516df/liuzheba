@@ -99,6 +99,7 @@ class TagFirstJourneyUiTest:UnifiedNavigationFixture() {
         androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithText("多选").assertExists()
         first.assertExists().performClick()
+        compose.loadedPhotoWithControls()
         compose.onNodeWithText("1 / 3").assertExists()
         compose.onNodeWithText("返回").performClick()
         compose.onNodeWithText("多选").assertExists()

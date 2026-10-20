@@ -67,6 +67,7 @@ abstract class UnifiedNavigationFixture {
 class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
     @Test fun discoveryNoteDraftSaveAndReturnKeepsOriginalMedia()=fixture {model,a->
         compose.onNodeWithTag("nav-frame").performClick().assertIsSelected()
+        compose.loadedPhotoWithControls()
         val first=mediaNumber(3)
         compose.onNodeWithTag("nav-library").assertIsDisplayed();compose.onNodeWithTag("nav-settings").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").performClick();compose.onNodeWithText("查看资料").performClick();compose.onNodeWithText("打开完整档案").performClick()
@@ -84,8 +85,10 @@ class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
         screenshot("archive-note-reader")
         compose.onNodeWithText("返回").performClick()
         compose.onNodeWithContentDescription("返回").performClick()
+        compose.loadedPhotoWithControls()
         assertEquals(first,mediaNumber(3));compose.onNodeWithTag("nav-frame").assertIsSelected()
         compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithTag("nav-frame").performClick()
+        compose.loadedPhotoWithControls()
         assertEquals(first,mediaNumber(3))
         val saved=runBlocking{model.store.load()};assertEquals(a.authorIds,saved.active.single().authorIds);assertEquals(a.photos,saved.active.single().photos)
         screenshot("discovery-return")

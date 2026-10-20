@@ -200,6 +200,7 @@ class ArchiveUiSnapshotTest {
         compose.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText("山间的一个下午"))
         val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
         compose.onNodeWithText("返回").assertExists().performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("山间的一个下午").fetchSemanticsNodes().isNotEmpty()}
@@ -211,14 +212,14 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.loadedPhotoWithControls()
         compose.onNodeWithText("返回").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").assertIsDisplayed()
     })
     private fun verifyImmersiveViewer() {
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
         // Fixtures use the default 全幅/铺满 appearance, so the renderer exposes its crop-mode label.
-        val photo=compose.onNodeWithContentDescription("全幅照片，双击或双指缩放")
-        compose.waitUntil(10000){compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"照片已显示")).fetchSemanticsNodes().isNotEmpty()}
+        val photo=compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("更多").assertExists()
         compose.onNodeWithText("保存到相册").assertDoesNotExist()
         compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-tools.png").absolutePath)
@@ -285,6 +286,9 @@ class ArchiveUiSnapshotTest {
             check(model.state.value.message.isEmpty()){model.state.value.message}
             model.state.value.ready
         }
+        // Ready data is not yet a placed search result; await the rendered shelf before input.
+        compose.waitUntil(10000){compose.onAllNodesWithText(if(empty) "把值得记住的，留在这里" else if(longLibrary) "28 份档案" else "4 份档案").fetchSemanticsNodes().isNotEmpty()}
+        if(!empty && !longLibrary && fontScale<=1.4f) compose.waitUntil(10000){compose.onAllNodes(hasText("山间的一个下午") and hasClickAction()).fetchSemanticsNodes().size==1}
         compose.waitForIdle()
         if(detail){compose.onNodeWithText("山间的一个下午").performClick();compose.waitForIdle()}
         if(settings){compose.onNodeWithTag("nav-settings").performClick();compose.waitForIdle()}
