@@ -27,6 +27,9 @@ import java.util.concurrent.TimeUnit
 @Config(sdk=[28],application=Application::class)
 @SQLiteMode(SQLiteMode.Mode.LEGACY)
 class ProtectionStoreTest {
+    private val openedStores=mutableListOf<Store>()
+    private fun newStore()=Store(app).also{openedStores+=it}
+    @org.junit.After fun closeStores(){runBlocking{openedStores.forEach{it.close()}}}
     private lateinit var app:Application
     private lateinit var store:Store
     private lateinit var provider:LocalDocuments
@@ -34,7 +37,7 @@ class ProtectionStoreTest {
     @Before fun setup() {
         app=RuntimeEnvironment.getApplication()
         app.getSharedPreferences("device",0).edit().clear().putString("generation",uid()).commit()
-        store=Store(app)
+        store=newStore()
         provider=LocalDocuments(File(app.cacheDir,"external-${uid()}").apply{mkdirs()})
         provider.attachInfo(app,ProviderInfo().apply{authority="com.android.externalstorage.documents";exported=true;grantUriPermissions=true;readPermission="android.permission.MANAGE_DOCUMENTS";writePermission="android.permission.MANAGE_DOCUMENTS"})
         ShadowContentResolver.registerProviderInternal("com.android.externalstorage.documents",provider)
@@ -97,7 +100,7 @@ class ProtectionStoreTest {
     @Test fun newAppStateCanReselectRestorePortablePathsAndUndoWithoutDataLoss()=runBlocking {
         val a=protect();val choices=store.inspectProtectionFolder(tree);val bytes=File(store.photoDir,a.photos.single().file).readBytes()
         app.getSharedPreferences("device",0).edit().clear().putString("generation",uid()).commit()
-        val fresh=Store(app);assertEquals("未开启",fresh.protection.value.status)
+        val fresh=newStore();assertEquals("未开启",fresh.protection.value.status)
         fresh.save(Archive(name="恢复前新资料"))
         fresh.restoreProtectionFolder(tree,choices.single().name){}
         assertEquals(a,fresh.load().active.single());assertArrayEquals(bytes,File(fresh.photoDir,a.photos.single().file).readBytes())
@@ -115,7 +118,7 @@ class ProtectionStoreTest {
         assertEquals("保护失败",store.protection.value.status);assertTrue(provider.base.listFiles().orEmpty().isEmpty())
     }
     @Test fun reopeningIsPendingUntilVerifiedAgain()=runBlocking {
-        protect();val reopened=Store(app);assertEquals("待保护",reopened.protection.value.status)
+        protect();val reopened=newStore();assertEquals("待保护",reopened.protection.value.status)
         provider.revoked=true;reopened.protectNow(forceVerify=true);assertEquals("保护失败",reopened.protection.value.status)
     }
     @Test fun concurrentSaveCannotBeDroppedOrMistakenForProtectedSnapshot()=runBlocking {
@@ -137,7 +140,7 @@ class ProtectionStoreTest {
         val worker=launch{store.runAutomaticProtection()}
         withTimeout(10000){while(!store.protection.value.protected)delay(50)}
         worker.cancelAndJoin();assertEquals(1,snapshots().size)
-        val next=Store(app);val freshWorker=launch{next.runAutomaticProtection()}
+        val next=newStore();val freshWorker=launch{next.runAutomaticProtection()}
         withTimeout(10000){while(!next.protection.value.protected)delay(50)}
         freshWorker.cancelAndJoin();assertEquals(1,snapshots().size)
         val choice=next.inspectProtectionFolder(tree).single();next.restoreProtectionFolder(tree,choice.name){}
@@ -174,7 +177,7 @@ class ProtectionStoreTest {
         val bitmap=android.graphics.Bitmap.createBitmap(8,8,android.graphics.Bitmap.Config.ARGB_8888)
         file.outputStream().use{bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()
         val result=store.importPhotos(listOf(Uri.fromFile(file)));assertTrue(result.errors.isEmpty())
-        val reopened=Store(app);reopened.protectNow();assertEquals("待核对",reopened.protection.value.status)
+        val reopened=newStore();reopened.protectNow();assertEquals("待核对",reopened.protection.value.status)
         reopened.draft(Archive(name="durable draft",photos=result.photos));reopened.protectNow();assertTrue(reopened.protection.value.protected)
         assertEquals(1,reopened.protection.value.mediaCount)
     }
@@ -191,7 +194,7 @@ class ProtectionStoreTest {
         store.draft(Archive(name="partial import"));store.protectNow();assertEquals("待核对",store.protection.value.status)
         val choice=store.inspectProtectionFolder(tree).single()
         app.getSharedPreferences("device",0).edit().clear().putString("generation",uid()).commit()
-        val fresh=Store(app);fresh.restoreProtectionFolder(tree,choice.name){};fresh.selectProtectionFolder(tree);fresh.protectNow()
+        val fresh=newStore();fresh.restoreProtectionFolder(tree,choice.name){};fresh.selectProtectionFolder(tree);fresh.protectNow()
         assertEquals("待核对",fresh.protection.value.status)
         fresh.acknowledgeImportWarning();fresh.protectNow();assertTrue(fresh.protection.value.protected)
     }

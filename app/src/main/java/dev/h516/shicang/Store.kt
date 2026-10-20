@@ -52,6 +52,8 @@ class Store(private val context: Context) {
             execSQL("PRAGMA user_version=1")
         }
     }
+    /** Caller must cancel its jobs first; wait for any active transaction before releasing SQLite. */
+    suspend fun close()=withContext(Dispatchers.IO) {gate.withLock {if(db.isOpen)db.close()}}
     private fun rows(kind: String) = db.rawQuery("SELECT json FROM objects WHERE kind=?",arrayOf(kind)).use { c -> buildList { while(c.moveToNext()) add(JSONObject(c.getString(0))) } }
     private val protectionMutable=kotlinx.coroutines.flow.MutableStateFlow(readProtection())
     val protection: kotlinx.coroutines.flow.StateFlow<ProtectionState> = protectionMutable

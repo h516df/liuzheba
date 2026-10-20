@@ -21,11 +21,13 @@ import kotlin.math.sqrt
 internal class LocalTextModel(context:Context) {
     private val directory=File(context.filesDir,"local-text-model-bge-v1")
     private val mutex=Mutex()
+    private var closed=false // Guarded by mutex; a disposed owner must never reopen native resources.
     private var session:OrtSession?=null
     private var tokenizer:LocalWordPiece?=null
     private val vectors=object:LinkedHashMap<String,FloatArray>(256,.75f,true){override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,FloatArray>?)=size>256}
     val installed get()=File(directory,"model.onnx").length()==MODEL_BYTES && File(directory,"vocab.txt").length()==VOCAB_BYTES
     suspend fun download(progress:(String)->Unit)=withContext(Dispatchers.IO) {mutex.withLock {
+        check(!closed){"本机模型已关闭"}
         directory.mkdirs()
         fetch("onnx/model_int8.onnx","model.onnx",MODEL_BYTES,MODEL_SHA,progress)
         fetch("vocab.txt","vocab.txt",VOCAB_BYTES,VOCAB_SHA,progress)
@@ -59,6 +61,7 @@ internal class LocalTextModel(context:Context) {
         } finally {partial.delete()}
     }
     private suspend fun open() {
+        check(!closed){"本机模型已关闭"}
         if(session!=null)return
         require(installed && digest(File(directory,"model.onnx"))==MODEL_SHA && digest(File(directory,"vocab.txt"))==VOCAB_SHA){"本机模型未安装或校验失败"}
         coroutineContext.ensureActive()
@@ -84,6 +87,7 @@ internal class LocalTextModel(context:Context) {
         if(!query.semantic || query.text.isBlank() || !installed)return@withContext exact
         if(!mutex.tryLock())return@withContext exact
         try {
+        if(closed)return@withContext exact
         open();coroutineContext.ensureActive()
         val q=embed("为这个句子生成表示以用于检索相关文章："+query.text.take(2000))
         val candidates=library.active.filter{a->(query.category.isBlank() || a.category==query.category) && query.tags.all{it in a.tags} && a.updated>=query.updatedAfter}
@@ -98,6 +102,7 @@ internal class LocalTextModel(context:Context) {
         } finally {mutex.unlock()}
     }
     suspend fun suggest(library:Library,a:Archive):List<TagSuggestion> = withContext(Dispatchers.Default){mutex.withLock {
+        check(!closed){"本机模型已关闭"}
         require(installed){"先下载本机 AI 模型，文字规则候选仍可用"};open()
         val rule=library.searchPreferences.rule(a.category)
         val labels=library.labels.filter{it.kind=="tag" && it.id !in a.tags && it.id !in rule.excluded && TagRejection(a.id,it.id) !in library.searchPreferences.rejections}
@@ -107,7 +112,7 @@ internal class LocalTextModel(context:Context) {
             if(score>=.56f)TagSuggestion(tag,"本机 AI 语义相近，请核对") to score else null
         }.sortedWith(compareByDescending<Pair<TagSuggestion,Float>>{it.first.tag.id in rule.preferred}.thenByDescending{it.second}).take(rule.limit).map{it.first}
     }}
-    suspend fun close()=mutex.withLock{session?.close();session=null;tokenizer=null;vectors.clear()}
+    suspend fun close()=mutex.withLock{closed=true;try{session?.close()}finally{session=null;tokenizer=null;vectors.clear()}}
     companion object {
         const val BASE="https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/75c43b069aac4d136ba6bc1122f995fedcfd2781/"
         const val MODEL_BYTES=23903394L;const val VOCAB_BYTES=109540L

@@ -179,6 +179,6 @@ class ArchiveUiSnapshotTest {
         verify(model);compose.waitForIdle()
         val output=File("build/outputs/archive-ui/$name.png");output.parentFile?.mkdirs()
         compose.onRoot().captureRoboImage(output.absolutePath)
-        } finally {models.clear()}
+        } finally {models.clear();compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();model.resourcesClosed};runBlocking{store.close()}}
     }
 }

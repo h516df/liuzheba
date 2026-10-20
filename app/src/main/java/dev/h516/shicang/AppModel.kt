@@ -42,7 +42,19 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun cancelModelDownload(){modelDownload?.cancel()}
     private val updateSession=lazy {dev.h516.update.Updater(app)}
     val updater get()=updateSession.value
-    override fun onCleared(){if(localModelDelegate.isInitialized())kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch{localTextModel.close()};if(updateSession.isInitialized())updateSession.value.close();super.onCleared()}
+    private var resourceCleanup:Job?=null
+    @Volatile internal var resourcesClosed=false;private set
+    override fun onCleared(){
+        val owner=viewModelScope.coroutineContext[Job]
+        owner?.cancel()
+        resourceCleanup=kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            owner?.join() // Includes any NonCancellable restore/save finalization.
+            try{if(::store.isInitialized)store.close()}finally{localTextModel.close()}
+            resourcesClosed=true
+        }
+        if(updateSession.isInitialized())updateSession.value.close()
+        super.onCleared()
+    }
     private val mutable=MutableStateFlow(AppState())
     val state=mutable.asStateFlow()
     lateinit var store: Store; private set
@@ -51,10 +63,11 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private var resolution:Job?=null
     private val mediaDownloads by lazy {MediaDownloads(app)}
     init {viewModelScope.launch {
-        try { store=withContext(Dispatchers.IO) {Store(app)};reload();mutable.value=mutable.value.copy(ready=true,localModelStatus=if(localTextModel.installed)"本机 AI 已下载 · 不上传资料" else mutable.value.localModelStatus)
+        try { withContext(Dispatchers.IO) {store=Store(app)};reload();mutable.value=mutable.value.copy(ready=true,localModelStatus=if(localTextModel.installed)"本机 AI 已下载 · 不上传资料" else mutable.value.localModelStatus)
             launch {store.protection.collect {value->mutable.value=mutable.value.copy(protection=value)}}
             launch {store.runAutomaticProtection()}
             launch {while(true) {runCatching{withContext(Dispatchers.IO){mediaDownloads.list()}}.onSuccess{jobs->mutable.value=mutable.value.copy(downloads=jobs)};delay(1200)}} }
+        catch(e:CancellationException){throw e}
         catch(e:Exception) {mutable.value=mutable.value.copy(message="资料打开失败：${e.message}")}
     }}
     private suspend fun reload() {val l=store.load();val a=store.appearance();mutable.value=mutable.value.copy(library=l,appearance=a)}
