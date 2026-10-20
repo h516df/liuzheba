@@ -216,16 +216,17 @@ private val Muted: Color
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when {
                     editing && unlocked->Unit // The full-page editor owns navigation and accessibility while open.
+                    zoomPhoto.isNotEmpty() && unlocked->Unit // Save the underlying page before fullscreen changes its viewport; hidden pages must not remeasure or expose semantics.
                     !s.ready->Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally){CircularProgressIndicator();Text(if(s.message.isNotEmpty()) s.message else "正在打开资料",Modifier.padding(16.dp))}
                     !unlocked->Column(Modifier.align(Alignment.Center).padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally){Text("你的留着吧，妥善留存",fontSize=23.sp);Text("解锁后查看私人档案",Modifier.padding(20.dp),color=Muted);Button(onClick=unlock){Text("解锁留着吧")}}
 
                     route=="frame" && !editing && zoomPhoto.isEmpty()->{
-                        val active=remember(s.library.archives){s.library.active}
+                        val active=remember(s.library.archives){s.library.active.filter{it.photos.isNotEmpty()}}
                         val ids=remember(active){active.map{it.id}}
-                        if(active.isEmpty()) Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("把值得记住的，留在这里",fontSize=23.sp);Text("人物、物品，照片、视频与点滴资料",Modifier.padding(vertical=16.dp),color=Muted);Button(onClick={model.edit()}){Text("新建档案")};TextButton(onClick={route="library"}){Text("我的档案")};TextButton(onClick={openSettings()}){Text("设置与恢复备份")}}
+                        if(active.isEmpty()) Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("让照片成为主角",fontSize=23.sp);Text("添加照片或视频后，在这里全屏翻看。纯文字档案仍保留在档案页。",Modifier.padding(vertical=16.dp),color=Muted);Button(onClick={route="library"}){Text("去档案添加媒体")}}
                         else key(ids) {ArchiveFeed(active,frameArchive,model,s.appearance,positions,::rememberPhoto,
                             {frameArchive=it},{route="library"},::openDetails,::openPhotos,
-                            {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy)}
+                            {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy,enabled=!appearanceOpen && !s.authorsOpen)}
                     }
                     route=="photos"->{val a=s.library.active.firstOrNull{it.id==selected}
                         if(a!=null) AllPhotos(a,model){rememberPhoto(a.id,it);zoomPhoto=it}
@@ -240,11 +241,12 @@ private val Muted: Color
                 }
                 if(unlocked && s.ready && !editing && zoomPhoto.isNotEmpty()) {
 
-                    val a=s.library.active.firstOrNull {it.photos.any {p->p.id==zoomPhoto}}
+                    val a=s.library.active.firstOrNull {it.id==selected && it.photos.any {p->p.id==zoomPhoto}}
+                        ?: s.library.active.firstOrNull {it.photos.any {p->p.id==zoomPhoto}}
                     if(a!=null) key(a.id,"viewer") {FullPhotoFrame(a,model,s.appearance,zoomPhoto,
                         {rememberPhoto(a.id,it)},null,null,{zoomPhoto="";route="library"},
                         {openDetails(a.id)},{openPhotos(a.id)},
-                        {appearanceOpen=true},{zoomPhoto="";model.edit(a)},{zoomPhoto="";model.edit()},s.busy,{zoomPhoto=""})}
+                        {appearanceOpen=true},{zoomPhoto="";model.edit(a)},{zoomPhoto="";model.edit()},s.busy,{zoomPhoto=""},active=!appearanceOpen && !s.authorsOpen)}
                     else LaunchedEffect(Unit){zoomPhoto=""}
 
                 }

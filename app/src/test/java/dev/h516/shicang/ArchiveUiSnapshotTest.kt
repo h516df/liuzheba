@@ -165,10 +165,68 @@ class ArchiveUiSnapshotTest {
         org.junit.Assert.assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
         compose.onNodeWithText("一封旧信").assertExists()
     })
-    private fun render(name:String,dark:Boolean=false,detail:Boolean=false,settings:Boolean=false,empty:Boolean=false,fontScale:Float=1f,verify:(AppModel)->Unit={}) {
+    @Test fun mediaTapOpensViewerAndReturnsToSameFilteredCard()=render("viewer-return",verify={
+        compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        verifyImmersiveViewer()
+        compose.onNodeWithText("返回档案").performClick()
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("搜索档案").assertTextContains("山间")
+        compose.onNodeWithText("列表").assertExists()
+        org.junit.Assert.assertEquals(before,compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot)
+        // The title remains a separate entry into the complete archive, not the viewer.
+        compose.onNodeWithText("山间的一个下午").performClick()
+        compose.onNodeWithText("编辑").assertExists()
+    })
+    @Test fun mediaViewerPreservesScrolledWall()=render("viewer-scrolled-return",longLibrary=true,verify={
+        compose.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText("山间的一个下午"))
+        val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
+        compose.onNodeWithText("返回档案").assertExists().performClick()
+        compose.waitUntil(10000){compose.onAllNodesWithText("山间的一个下午").fetchSemanticsNodes().isNotEmpty()}
+        org.junit.Assert.assertEquals(before,compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("列表").assertExists()
+    })
+    @Test @Config(qualifiers="zh-rCN-w320dp-h900dp-xhdpi")
+    fun narrowImmersiveViewer()=render("viewer-320-font200",fontScale=2f,verify={
+        compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.onNodeWithText("返回档案").assertIsDisplayed()
+        compose.onNodeWithContentDescription("更多").assertIsDisplayed()
+    })
+    private fun verifyImmersiveViewer() {
+        compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
+        // Fixtures use the default 全幅/铺满 appearance, so the renderer exposes its crop-mode label.
+        val photo=compose.onNodeWithContentDescription("全幅照片，双击或双指缩放")
+        compose.waitUntil(10000){compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"照片已显示")).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithContentDescription("更多").assertExists()
+        compose.onNodeWithText("保存到相册").assertDoesNotExist()
+        compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-tools.png").absolutePath)
+        photo.performTouchInput{click(center)}
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithContentDescription("更多").assertDoesNotExist()
+        compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-clean.png").absolutePath)
+        photo.performTouchInput{click(center)}
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithContentDescription("资料").performClick()
+        compose.onNodeWithText("打开完整档案").assertExists()
+        compose.onNodeWithText("沿着山路慢慢走，天色刚刚好。").assertExists()
+        compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-information.png").absolutePath)
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNodeWithText("打开完整档案").assertDoesNotExist()
+        photo.assertExists()
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.onNodeWithText("保存到相册").assertExists()
+        androidx.test.espresso.Espresso.pressBack()
+    }
+    private fun render(name:String,dark:Boolean=false,detail:Boolean=false,settings:Boolean=false,empty:Boolean=false,fontScale:Float=1f,longLibrary:Boolean=false,verify:(AppModel)->Unit={}) {
         RuntimeEnvironment.setFontScale(fontScale)
         val app=RuntimeEnvironment.getApplication()
-        app.getSharedPreferences("device",0).edit().putString("generation",uid()).putBoolean("libraryCovers",true).apply()
+        app.getSharedPreferences("device",0).edit().putString("generation",uid()).putBoolean("libraryCovers",true).putBoolean("frameHintV2",true).apply()
         val store=Store(app)
         runBlocking {
             store.appearance(Appearance(theme=if(dark) "曜石" else "月白"))
@@ -190,6 +248,7 @@ class ArchiveUiSnapshotTest {
                 store.save(Archive(name="一封旧信",category=category,fields=listOf(Field(name="备注",value="那些被认真写下的话。")),updated=300))
                 store.save(Archive(name="周末散步",category=category,photos=photos,updated=200))
                 store.save(Archive(name="手写食谱",fields=listOf(Field(name="来源",value="合成测试资料")),updated=100))
+                if(longLibrary) repeat(24){index->store.save(Archive(name="合成收藏 ${index+1}",photos=photos))}
             }
         }
         // Robolectric cannot decode ImageDecoder sources; use Android BitmapFactory for these real PNG fixtures.

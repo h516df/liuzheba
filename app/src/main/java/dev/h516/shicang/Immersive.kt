@@ -130,39 +130,71 @@ import java.io.File
             .clickable {touch()},color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(16.dp)) {
             Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
-        AnimatedVisibility(visible=active && controls && !videoPlaying,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
-            val ink=if(a.photos.isNotEmpty() && (appearance.skin=="全幅" || appearance.skin=="暗房")) Color.White else MaterialTheme.colorScheme.onSurface
-            Column(Modifier.fillMaxWidth()
-                .then(if(a.photos.isNotEmpty() && appearance.skin!="留白") Modifier.background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.7f)))) else Modifier)
-                .navigationBarsPadding().padding(horizontal=22.dp)) {
-                Row(Modifier.fillMaxWidth().padding(top=36.dp,bottom=12.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).semantics{contentDescription="资料"}.clickable{touch();details()}.padding(vertical=10.dp)) {
-                        Text(a.name,color=ink,fontSize=22.sp,fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(if(a.photos.isEmpty()) "私人档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.padding(top=5.dp),color=ink.copy(alpha=.7f),fontSize=12.sp)
-                    }
-                    if(current!=null) GalleryIcon("保存到相册",ink){touch();model.requestExport(a,listOf(current))}
-                    if(a.photos.isNotEmpty()) GalleryIcon("全部照片",ink){touch();allPhotos()}
-                    Box {
-                        GalleryIcon("更多",ink){touch();menu=true}
-                        DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
-                            if(current!=null) {
-                                DropdownMenuItem(text={Text("保存到相册")},onClick={menu=false;model.requestExport(a,listOf(current))})
-                                DropdownMenuItem(text={Text("分享原件")},onClick={menu=false;model.shareMedia(a,listOf(current))})
-                            }
-                            DropdownMenuItem(text={Text("主题与皮肤")},onClick={menu=false;settings()})
-                            DropdownMenuItem(text={Text("新建档案")},onClick={menu=false;create()},enabled=!busy)
-                            DropdownMenuItem(text={Text("编辑档案")},onClick={menu=false;edit()},enabled=!busy)
-                            if(previous!=null) DropdownMenuItem(text={Text("上一份")},onClick={menu=false;touch();previous()})
-                            if(next!=null) DropdownMenuItem(text={Text("下一份")},onClick={menu=false;touch();next()})
+        // Navigation and actions sit on the edges; metadata never covers the media until requested.
+        AnimatedVisibility(visible=active && controls && !videoPlaying,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
+            Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.65f),Color.Transparent)))
+                .statusBarsPadding().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
+                TextButton(onClick={touch();if(close!=null)close() else library()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) {
+                    Text(if(close!=null) "返回档案" else "我的",maxLines=1)
+                }
+                Text(if(a.photos.isEmpty()) "档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.weight(1f),color=Color.White,
+                    style=MaterialTheme.typography.labelLarge,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                Box {
+                    GalleryIcon("更多",Color.White){touch();menu=true}
+                    DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
+                        DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
+                        if(a.photos.isNotEmpty()) DropdownMenuItem(text={Text("全部照片")},onClick={menu=false;allPhotos()})
+                        if(current!=null) {
+                            DropdownMenuItem(text={Text("保存到相册")},onClick={menu=false;model.requestExport(a,listOf(current))})
+                            DropdownMenuItem(text={Text("分享原件")},onClick={menu=false;model.shareMedia(a,listOf(current))})
                         }
+                        DropdownMenuItem(text={Text("主题与皮肤")},onClick={menu=false;settings()})
+                        DropdownMenuItem(text={Text("新建档案")},onClick={menu=false;create()},enabled=!busy)
+                        DropdownMenuItem(text={Text("编辑档案")},onClick={menu=false;edit()},enabled=!busy)
+                        if(previous!=null) DropdownMenuItem(text={Text("上一份")},onClick={menu=false;touch();previous()})
+                        if(next!=null) DropdownMenuItem(text={Text("下一份")},onClick={menu=false;touch();next()})
                     }
                 }
-                Row(Modifier.fillMaxWidth().height(60.dp),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
-                    if(close==null) {
-                        TextButton(onClick={touch()},colors=ButtonDefaults.textButtonColors(contentColor=ink)){Text("发现",fontSize=15.sp,fontWeight=FontWeight.SemiBold)}
-                        TextButton(onClick={touch();library()},colors=ButtonDefaults.textButtonColors(contentColor=ink.copy(alpha=.75f))){Text("我的",fontSize=15.sp)}
-                    } else TextButton(onClick={close()},colors=ButtonDefaults.textButtonColors(contentColor=ink)){Text("返回档案")}
+            }
+        }
+        AnimatedVisibility(visible=active && controls && !videoPlaying && !hint,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
+            Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.62f))))
+                .navigationBarsPadding().padding(start=16.dp,end=12.dp,top=20.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically) {
+                TextButton(onClick={touch();information=true},modifier=Modifier.weight(1f).semantics{contentDescription="资料"},
+                    colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) {
+                    Text(a.name,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
+                    Spacer(Modifier.width(8.dp));FrameGlyph("展开",Color.White)
                 }
+                if(close==null) Text("发现",Modifier.padding(horizontal=12.dp),color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelMedium)
+            }
+        }
+
+    }
+    if(information) {
+        val state by model.state.collectAsState()
+        ModalBottomSheet(onDismissRequest={information=false;touch()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+            Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()).padding(horizontal=24.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Text(a.name,Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall)
+                    TextButton(onClick={information=false;touch()}){Text("收起")}
+                }
+                val authors=state.library.authors.filter{it.id in a.authorIds}
+                if(authors.isNotEmpty()) {
+                    Text("作者",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(authors.joinToString(" · "){it.name.ifBlank{it.identities.firstOrNull()?.nickname.orEmpty()}},style=MaterialTheme.typography.bodyLarge)
+                }
+                val labels=(listOf(a.category)+a.tags).map(state.library::labelName).filter{it.isNotBlank()}
+                if(labels.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    labels.forEach{label->SuggestionChip(onClick={information=false;details()},label={Text(label)})}
+                }
+                a.fields.filter{it.value.isNotBlank()}.take(4).forEach{field->
+                    Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                        Text(field.name,style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(field.value,style=MaterialTheme.typography.bodyLarge,maxLines=3,overflow=TextOverflow.Ellipsis)
+                    }
+                }
+                FilledTonalButton(onClick={information=false;details()},modifier=Modifier.fillMaxWidth()){Text("打开完整档案")}
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
