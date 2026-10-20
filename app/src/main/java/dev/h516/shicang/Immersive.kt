@@ -51,11 +51,11 @@ import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.ZoomableImageState
 import java.io.File
 
-@Composable fun FullPhotoFrame(
+@Composable internal fun FullPhotoFrame(
     a:Archive,model:AppModel,appearance:Appearance,initialPhoto:String,
     position:(String)->Unit, next:(()->Unit)?, previous:(()->Unit)?,
     library:()->Unit, details:()->Unit, allPhotos:()->Unit, settings:()->Unit, edit:()->Unit, create:()->Unit,
-    busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={}
+    busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={}, discovery:DiscoveryActions?=null
 ) {
     val pager=rememberPagerState(initialPage=photoIndex(a,initialPhoto),pageCount={a.photos.size.coerceAtLeast(1)})
     var videoPlaying by remember {mutableStateOf(false)}
@@ -71,7 +71,7 @@ import java.io.File
     val complete=appearance.skin!="全幅" || appearance.fit=="完整"
     val imageScale=if(complete) ContentScale.Fit else ContentScale.Crop
     val background=if(appearance.skin!="留白") Color.Black else MaterialTheme.colorScheme.background
-    LaunchedEffect(pager.settledPage,a.photos) {
+    LaunchedEffect(pager.settledPage,a.photos,active) {
         a.photos.getOrNull(pager.settledPage)?.let {position(it.id)}
     }
     LaunchedEffect(active) {if(active) {controls=true;activity++}}
@@ -143,6 +143,10 @@ import java.io.File
                     GalleryIcon("更多",Color.White){touch();menu=true}
                     DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
                         DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
+                        discovery?.let { action ->
+                            DropdownMenuItem(text={Text(if(action.random) "随机预览 · 已开启" else "固定封面 · 已开启")},onClick={menu=false;action.toggle()})
+                            DropdownMenuItem(text={Text("换一轮")},onClick={menu=false;action.refresh()})
+                        }
                         if(a.photos.isNotEmpty()) DropdownMenuItem(text={Text("全部照片")},onClick={menu=false;allPhotos()})
                         if(current!=null) {
                             DropdownMenuItem(text={Text("保存到相册")},onClick={menu=false;model.requestExport(a,listOf(current))})
