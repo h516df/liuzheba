@@ -36,8 +36,8 @@ import androidx.compose.ui.unit.sp
 
 @Composable internal fun ArchiveShelfCard(a:Archive,library:Library,model:AppModel,open:()->Unit,view:()->Unit) {
     val c=MaterialTheme.colorScheme
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.surface).border(1.dp,c.outlineVariant.copy(alpha=.45f),RoundedCornerShape(20.dp)).clickable(onClickLabel="打开${a.name}的档案",onClick=open).padding(8.dp)) {
-        if(a.photos.isNotEmpty()) Box(Modifier.fillMaxWidth().aspectRatio(1.18f).clip(RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.surface).border(1.dp,c.outlineVariant.copy(alpha=.45f),RoundedCornerShape(20.dp)).padding(8.dp)) {
+        if(a.photos.isNotEmpty()) Box(Modifier.fillMaxWidth().aspectRatio(1.18f).clip(RoundedCornerShape(14.dp)).clickable(onClickLabel="全屏浏览${a.name}的照片与视频",onClick=view),contentAlignment=Alignment.Center) {
             MediaThumb(a.coverPhoto()!!,model,Modifier.fillMaxSize(),"${a.name}的封面")
             if(a.photos.isNotEmpty()) Surface(onClick=view,modifier=Modifier.align(Alignment.BottomEnd).padding(6.dp).semantics{contentDescription="浏览${a.name}的照片与视频"},
                 color=Color.Black.copy(alpha=.60f),contentColor=Color.White,shape=RoundedCornerShape(12.dp)) {
@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.sp
                 }
             }
         }
-        Column(Modifier.padding(horizontal=6.dp,vertical=if(a.photos.isEmpty()) 16.dp else 10.dp)) {
+        Column(Modifier.fillMaxWidth().clickable(onClickLabel="打开${a.name}的档案",onClick=open).padding(horizontal=6.dp,vertical=if(a.photos.isEmpty()) 16.dp else 10.dp)) {
             Text(a.name,style=MaterialTheme.typography.titleMedium,color=c.onSurface,maxLines=2,overflow=TextOverflow.Ellipsis)
             val caption=archiveCaption(a,library)
             if(caption.isNotBlank()) Text(caption,Modifier.padding(top=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)

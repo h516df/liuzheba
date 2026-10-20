@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
     archives:List<Archive>, initial:String, model:AppModel, appearance:Appearance,
     positions:Map<String,String>, rememberPhoto:(String,String)->Unit, selected:(String)->Unit,
     library:()->Unit, details:(String)->Unit, photos:(String)->Unit,
-    settings:()->Unit, edit:(Archive)->Unit, create:()->Unit, busy:Boolean
+    settings:()->Unit, edit:(Archive)->Unit, create:()->Unit, busy:Boolean, enabled:Boolean=true
 ) {
     val ids=archives.map {it.id}
     val queue=remember(ids) {ArchiveQueue(ids,initial)}
@@ -32,14 +32,14 @@ import kotlinx.coroutines.launch
     }
     VerticalPager(pager,Modifier.fillMaxSize().background(Color.Black),
         key={"$it:${pages[it]}"},beyondViewportPageCount=1,
-        userScrollEnabled=gestureEnabled && archives.size>1) { index ->
+        userScrollEnabled=enabled && gestureEnabled && archives.size>1) { index ->
         val archive=archives.firstOrNull{it.id==pages[index]} ?: return@VerticalPager
         FullPhotoFrame(archive,model,appearance,positions[archive.id].orEmpty(),
             {rememberPhoto(archive.id,it)},
             if(archives.size>1) ({scope.launch{if(pager.currentPage==pages.lastIndex){queue.extend();pages.clear();pages.addAll(queue.pages)};pager.animateScrollToPage((index+1).coerceAtMost(pages.lastIndex))};Unit}) else null,
             if(index>0) ({scope.launch{pager.animateScrollToPage(index-1)};Unit}) else null,
             library,{details(archive.id)},{photos(archive.id)},settings,{edit(archive)},create,busy,
-            active=index==pager.settledPage && !pager.isScrollInProgress,
+            active=enabled && index==pager.settledPage && !pager.isScrollInProgress,
             onPagingAllowed={if(index==pager.settledPage) gestureEnabled=it})
     }
 }
