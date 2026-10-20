@@ -49,6 +49,22 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          sudo udevadm settle --timeout=30
+          id -nG
+          ls -l /dev/kvm || true
+          if [ ! -c /dev/kvm ]; then
+            echo '::error::The disposable runner does not expose /dev/kvm; no device tests have run.'
+            exit 1
+          fi
+          # A triggered udev event need not finish before the next shell command.
+          # Only if needed, apply the same approved access to this ephemeral node.
+          if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            echo 'KVM is accessible after udev settle; no direct permission change needed.'
+          else
+            echo 'KVM exists but is not accessible; applying the approved temporary node permissions.'
+            sudo chmod 0666 /dev/kvm
+          fi
+          ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Exercise offline synthetic device flows
         # Official v2.37.0, including Node 24 and build-tools 36 support.
