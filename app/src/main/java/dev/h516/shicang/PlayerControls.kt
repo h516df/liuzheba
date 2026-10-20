@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -29,7 +28,7 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
 
 /** Controls share the same player; gestures never replace the saved playback preference. */
 @Composable internal fun PlayerControls(player:Player, speed:Float, muted:Boolean,
-    speedChange:(Float)->Unit, mute:()->Unit, onClose:()->Unit) {
+    speedChange:(Float)->Unit, mute:()->Unit, onClose:()->Unit, playIntentChange:(Boolean)->Unit={}) {
     var visible by remember {mutableStateOf(true)}
     var position by remember {mutableLongStateOf(0)}
     var duration by remember {mutableLongStateOf(0)}
@@ -46,21 +45,13 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
     LaunchedEffect(visible,touch,playing,scrubbing) {if(visible && playing && !scrubbing && !accessibility.isTouchExplorationEnabled){delay(4000);visible=false}}
     LaunchedEffect(feedback) {if(feedback.isNotEmpty()){delay(1200);feedback=""}}
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().semantics{contentDescription="视频手势区域：双击左右快退快进，长按倍速，左右拖动进度"}
+        Box(Modifier.fillMaxSize().semantics{contentDescription="视频手势区域：双击左右快退快进，长按倍速，下方进度条定位"}
             .pointerInput(player) {detectTapGestures(
                 onTap={visible=!visible;touch++},
                 onDoubleTap={seek(if(it.x<size.width/2) -10000 else 10000)},
                 onLongPress={holding=true;player.setPlaybackSpeed(2f)},
                 onPress={try{tryAwaitRelease()}finally{holding=false;player.setPlaybackSpeed(currentSpeed)}}
-            )}
-            .pointerInput(player) {
-                var start=0L;var distance=0f
-                detectDragGestures(onDragStart={start=player.currentPosition;distance=0f;preview=start.toFloat();scrubbing=true;visible=true},
-                    onDragCancel={scrubbing=false},onDragEnd={player.seekTo(preview.toLong());scrubbing=false;touch++}) {change,amount->
-                    change.consume();distance+=amount.x
-                    preview=seekPosition(start,(distance/size.width*60000).toLong(),player.duration).toFloat()
-                }
-            })
+            )})
         AnimatedVisibility(visible,enter=fadeIn(),exit=fadeOut()) {
             Box(Modifier.fillMaxSize()) {
                 Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.75f),Color.Transparent))).statusBarsPadding().padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -71,7 +62,7 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
                 }
                 Row(Modifier.align(Alignment.Center),horizontalArrangement=Arrangement.spacedBy(32.dp),verticalAlignment=Alignment.CenterVertically) {
                     SeekButton(false){seek(-10000)}
-                    FilledIconButton(onClick={if(player.playWhenReady) player.pause() else {if(player.playbackState==Player.STATE_ENDED)player.seekTo(0);player.play()};touch++},
+                    FilledIconButton(onClick={if(player.playWhenReady) {playIntentChange(false);player.pause()} else {playIntentChange(true);if(player.playbackState==Player.STATE_ENDED)player.seekTo(0);player.play()};touch++},
                         modifier=Modifier.size(72.dp).semantics{contentDescription=if(playing) "暂停" else "播放"},shape=CircleShape,
                         colors=IconButtonDefaults.filledIconButtonColors(containerColor=Color.White,contentColor=Color.Black)) {
                         Canvas(Modifier.size(28.dp)) {if(playing){drawRect(Color.Black,Offset(size.width*.2f,0f),androidx.compose.ui.geometry.Size(size.width*.2f,size.height));drawRect(Color.Black,Offset(size.width*.6f,0f),androidx.compose.ui.geometry.Size(size.width*.2f,size.height))}
@@ -85,7 +76,7 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
                         onValueChange={preview=it;scrubbing=true},onValueChangeFinished={player.seekTo(preview.toLong());scrubbing=false;touch++},
                         valueRange=0f..duration.coerceAtLeast(1).toFloat(),enabled=duration>0,modifier=Modifier.semantics{contentDescription="播放进度"},
                         colors=SliderDefaults.colors(thumbColor=Color.White,activeTrackColor=Color.White,inactiveTrackColor=Color.White.copy(alpha=.3f)))
-                    Text("双击快进快退 · 长按 2 倍速 · 左右拖动进度",color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelSmall)
+                    Text("双击快进快退 · 长按 2 倍速 · 拖动下方进度条定位",color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelSmall)
                 }
             }
         }
