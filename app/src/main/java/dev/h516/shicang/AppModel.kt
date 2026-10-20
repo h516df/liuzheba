@@ -58,6 +58,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private val mutable=MutableStateFlow(AppState())
     val state=mutable.asStateFlow()
     lateinit var store: Store; private set
+    val noteEditor=LongNoteEditor(viewModelScope,{store},{reload()},{message(it)})
     private var draftJob: Job?=null
     private var operation: Job?=null
     private var resolution:Job?=null
