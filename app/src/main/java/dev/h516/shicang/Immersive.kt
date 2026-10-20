@@ -51,17 +51,18 @@ import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.ZoomableImageState
 import java.io.File
 
-@Composable fun FullPhotoFrame(
+@Composable internal fun FullPhotoFrame(
     a:Archive,model:AppModel,appearance:Appearance,initialPhoto:String,
     position:(String)->Unit, next:(()->Unit)?, previous:(()->Unit)?,
     library:()->Unit, details:()->Unit, allPhotos:()->Unit, settings:()->Unit, edit:()->Unit, create:()->Unit,
-    busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={}
+    busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={}, discovery:DiscoveryActions?=null
 ) {
     val pager=rememberPagerState(initialPage=photoIndex(a,initialPhoto),pageCount={a.photos.size.coerceAtLeast(1)})
     var videoPlaying by remember {mutableStateOf(false)}
     var controls by rememberSaveable {mutableStateOf(true)}
     var menu by remember {mutableStateOf(false)}
     var information by remember {mutableStateOf(false)}
+    var editingVideo by remember {mutableStateOf<Photo?>(null)}
     var activity by remember {mutableIntStateOf(0)}
     val context=LocalContext.current
     val accessibility=remember {context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager}
@@ -71,12 +72,12 @@ import java.io.File
     val complete=appearance.skin!="全幅" || appearance.fit=="完整"
     val imageScale=if(complete) ContentScale.Fit else ContentScale.Crop
     val background=if(appearance.skin!="留白") Color.Black else MaterialTheme.colorScheme.background
-    LaunchedEffect(pager.settledPage,a.photos) {
+    LaunchedEffect(pager.settledPage,a.photos,active) {
         a.photos.getOrNull(pager.settledPage)?.let {position(it.id)}
     }
     LaunchedEffect(active) {if(active) {controls=true;activity++}}
-    LaunchedEffect(active,zoomed,videoPlaying,menu,information,pager.isScrollInProgress) {
-        onPagingAllowed(!zoomed && !videoPlaying && !menu && !information && !pager.isScrollInProgress)
+    LaunchedEffect(active,zoomed,videoPlaying,menu,information,editingVideo,pager.isScrollInProgress) {
+        onPagingAllowed(!zoomed && !videoPlaying && !menu && !information && editingVideo==null && !pager.isScrollInProgress)
     }
     LaunchedEffect(controls,menu,information,activity,active) {
         if(active && controls && !menu && !information && !accessibility.isTouchExplorationEnabled) {
@@ -109,7 +110,7 @@ import java.io.File
                     val width=minOf((maxWidth-40.dp).coerceAtLeast(1.dp),(maxHeight-140.dp).coerceAtLeast(1.dp)*ratio)
                     val canvas=if(framed) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
-                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
+                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && editingVideo==null && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
                 else {
                     // Keep the renderer and its decoded image stable across the pager midpoint.
                     val imageState=rememberZoomableImageState()
@@ -134,17 +135,24 @@ import java.io.File
         AnimatedVisibility(visible=active && controls && !videoPlaying,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.65f),Color.Transparent)))
                 .statusBarsPadding().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                TextButton(onClick={touch();if(close!=null)close() else library()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) {
-                    Text(if(close!=null) "返回档案" else "我的",maxLines=1)
+                if(close!=null) TextButton(onClick={touch();close()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) {
+                    Text("返回",maxLines=1)
                 }
                 Text(if(a.photos.isEmpty()) "档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.weight(1f),color=Color.White,
                     style=MaterialTheme.typography.labelLarge,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
                 Box {
                     GalleryIcon("更多",Color.White){touch();menu=true}
                     DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
+                        DropdownMenuItem(text={Text("写档案笔记")},onClick={menu=false;model.noteEditor.open("archive",a.id,a.name)})
+                        current?.let{p->DropdownMenuItem(text={Text("写这项媒体的笔记")},onClick={menu=false;model.noteEditor.open("media",p.id,"${a.name} · ${if(p.isVideo) "视频" else "照片"}")})}
                         DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
+                        discovery?.let { action ->
+                            DropdownMenuItem(text={Text(if(action.random) "随机预览 · 已开启" else "固定封面 · 已开启")},onClick={menu=false;action.toggle()})
+                            DropdownMenuItem(text={Text("换一轮")},onClick={menu=false;action.refresh()})
+                        }
                         if(a.photos.isNotEmpty()) DropdownMenuItem(text={Text("全部照片")},onClick={menu=false;allPhotos()})
                         if(current!=null) {
+                            if(current.isVideo) DropdownMenuItem(text={Text("编辑视频")},onClick={menu=false;editingVideo=current},enabled=!busy)
                             DropdownMenuItem(text={Text("保存到相册")},onClick={menu=false;model.requestExport(a,listOf(current))})
                             DropdownMenuItem(text={Text("分享原件")},onClick={menu=false;model.shareMedia(a,listOf(current))})
                         }
@@ -165,11 +173,11 @@ import java.io.File
                     Text(a.name,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
                     Spacer(Modifier.width(8.dp));FrameGlyph("展开",Color.White)
                 }
-                if(close==null) Text("发现",Modifier.padding(horizontal=12.dp),color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelMedium)
             }
         }
 
     }
+    editingVideo?.let { video -> VideoEditorDialog(a,video,model){editingVideo=null;touch()} }
     if(information) {
         val state by model.state.collectAsState()
         ModalBottomSheet(onDismissRequest={information=false;touch()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {

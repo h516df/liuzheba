@@ -102,9 +102,13 @@ internal class RecoveryFolder(private val context: Context, val tree: Uri) {
                 val name=if(candidates.isEmpty()) "${p.sha256}.original" else "${p.sha256}-${uid()}.original"
                 val uri=create(name,"application/octet-stream")
                 val hash=MessageDigest.getInstance("SHA-256");var count=0L
-                requireNotNull(resolver.openOutputStream(uri,"w")).use { out -> file.inputStream().use { stream -> val b=ByteArray(65536);while(true){operation.ensureActive();val n=stream.read(b);if(n<0)break;count+=n;require(count<=p.bytes);hash.update(b,0,n);out.write(b,0,n)} } }
-                require(count==p.bytes && hash.digest().hex()==p.sha256){"原件校验失败，保护尚未完成"}
-                require(digest(uri,p.bytes)==p.sha256){"外部原件回读校验失败"}
+                try {
+                    requireNotNull(resolver.openOutputStream(uri,"w")).use { out -> file.inputStream().use { stream ->
+                        count=LargeMediaIo.copy(stream,out,p.bytes,p.bytes,check={operation.ensureActive()},onBytes={b,n->hash.update(b,0,n)})
+                    } }
+                    require(count==p.bytes && hash.digest().hex()==p.sha256){"原件校验失败，保护尚未完成"}
+                    require(digest(uri,p.bytes)==p.sha256){"外部原件回读校验失败"}
+                } catch(e:Exception) {runCatching{Documents.deleteDocument(resolver,uri)};throw e}
                 found=document(uri);docs=docs+found;require(found.name==name){"系统更改了文件名，请重试"}
             }
             mapping.put(p.file,found.name)
@@ -128,12 +132,15 @@ internal class RecoveryFolder(private val context: Context, val tree: Uri) {
         val dir=requireNotNull(directory(false)){"保护文件夹不存在"}
         val docs=children(dir);val snapshot=readSnapshot(docs.single{it.name==snapshotName})
         val operation=currentCoroutineContext();val ps=allRecoveryPhotos(Codec.library(snapshot.library))
+        LargeMediaIo.requireSpace(destination.usableSpace,ps.sumOf{it.bytes})
         ps.forEachIndexed { index,p ->
             operation.ensureActive();val name=snapshot.blobs.getValue(p.file)
             val doc=docs.singleOrNull{it.name==name} ?: error("恢复原件缺失：第 ${index+1} 项，当前资料未变更")
             progress("校验恢复原件 ${index+1}/${ps.size}")
             val target=File(destination,p.file);val hash=MessageDigest.getInstance("SHA-256");var count=0L
-            input(doc.uri).use { stream ->target.outputStream().use {out -> val b=ByteArray(65536);while(true){operation.ensureActive();val n=stream.read(b);if(n<0)break;count+=n;require(count<=p.bytes){"恢复原件超出清单大小"};hash.update(b,0,n);out.write(b,0,n)} } }
+            input(doc.uri).use { stream ->target.outputStream().use {out ->
+                count=LargeMediaIo.copy(stream,out,p.bytes,p.bytes,{destination.usableSpace},{operation.ensureActive()},{b,n->hash.update(b,0,n)})
+            } }
             require(count==p.bytes && hash.digest().hex()==p.sha256){"恢复原件校验失败，当前资料未变更"}
         }
         return snapshot.library

@@ -73,14 +73,57 @@ class AuthorProfilesTest {
     @Test fun directProfileRedirectedToLoginKeepsVerifiedLinkAndEmptyMetadata() {
         val result=AuthorProfiles.resolveWithFetcher("https://weibo.com/u/123") { _,_->PublicProfileNetwork.Page("https://weibo.com/login","<meta property='og:title' content='登录'>") }
         assertNotNull(result);assertEquals("https://weibo.com/u/123",result!!.identity.profileUrl);assertEquals("",result.identity.nickname);assertFalse(result.metadataFetched)
-        assertNull(AuthorProfiles.resolveWithFetcher("https://t.cn/example") { _,_->PublicProfileNetwork.Page("https://weibo.com/login","") })
+        assertTrue(runCatching { AuthorProfiles.resolveWithFetcher("https://t.cn/example") { _,_->PublicProfileNetwork.Page("https://weibo.com/login","") } }.exceptionOrNull()!!.message!!.contains("未取得作者主页"))
+    }
+    @Test fun recognizesExactCnShortHostWithoutInventingAnIdentity() {
+        val url="https://xhslink.cn/o/AbCdFixture"
+        assertEquals("小红书",AuthorProfiles.platform(url))
+        assertEquals("小红书",Links.title(url))
+        assertEquals("分享链接",SharedLinks.parse(url)!!.kind)
+        assertNull(AuthorProfiles.parse(url))
+        assertNull(AuthorProfiles.parse("https://xhslink.cn/user/profile/fake"))
+        listOf("https://xhslink.cn.evil.test/o/a","https://evil.xhslink.cn/o/a","http://xhslink.cn/o/a","https://user@xhslink.cn/o/a","https://xhslink.cn:8443/o/a").forEach { assertNull(AuthorProfiles.sourceLink(it)) }
+    }
+    @Test fun fourPlatformShareTextPreservesCaseAndSeparatesExtractionFromResolution() {
+        val fixtures=listOf(
+            Triple("小红书","https://xhslink.cn/o/AbCdFixture","https://www.xiaohongshu.com/user/profile/fixtureXhs"),
+            Triple("抖音","https://v.douyin.com/AbCdFixture/","https://www.douyin.com/user/fixtureSecUid"),
+            Triple("快手","https://v.kuaishou.com/AbCdFixture","https://www.kuaishou.com/profile/fixtureEid"),
+            Triple("微博","https://t.cn/AbCdFixture","https://weibo.com/u/123456")
+        )
+        fixtures.forEach { (platform,short,profile) ->
+            val text="@合成作者 分享我的主页，复制打开\n“$short”\u200B"
+            assertEquals(short,AuthorProfiles.sourceLink(text))
+            assertNull(AuthorProfiles.parse(text))
+            val result=AuthorProfiles.resolveWithFetcher(text) {url,p->assertEquals(short,url);assertEquals(platform,p);PublicProfileNetwork.Page(profile,"")}
+            assertEquals(platform,result.identity.platform);assertEquals("",result.identity.nickname);assertEquals("",result.identity.publicAccount)
+            assertFalse(result.metadataFetched)
+            assertEquals(short,Links.normalize("查看（$short）。"))
+        }
+    }
+    @Test fun rootLoginAndNetworkFailuresDoNotBecomeAuthorsOrWorkAccusations() {
+        val short="https://xhslink.cn/o/Fixture"
+        for(destination in listOf("https://www.xiaohongshu.com", "https://www.xiaohongshu.com/login")) {
+            val failure=runCatching { AuthorProfiles.resolveWithFetcher(short) {_,_->PublicProfileNetwork.Page(destination,"<meta property='og:title' content='不能当作者'>")} }.exceptionOrNull()!!
+            assertTrue(failure.message!!.contains("已识别小红书"));assertTrue(failure.message!!.contains("未取得作者主页"));assertFalse(failure.message!!.contains("作品链接"))
+        }
+        val failure=runCatching { AuthorProfiles.resolveWithFetcher(short) {_,_->error("network")} }.exceptionOrNull()!!
+        assertTrue(failure.message!!.contains("公开跳转暂时无法完成"))
+        assertTrue(runCatching { AuthorProfiles.resolveWithFetcher(short) {_,_->PublicProfileNetwork.Page("https://weibo.com/u/123","")} }.exceptionOrNull()!!.message!!.contains("安全校验"))
+    }
+    @Test fun realWorkRoutesStayWorksRegardlessOfHomepageShareProse() {
+        listOf("https://www.xiaohongshu.com/explore/fixture", "https://www.douyin.com/video/123", "https://www.kuaishou.com/short-video/fixture", "https://weibo.com/detail/123").forEach { url ->
+            var fetched=false
+            val failure=runCatching { AuthorProfiles.resolveWithFetcher("这是主页 $url") {_,_->fetched=true;error("must not fetch")} }.exceptionOrNull()!!
+            assertFalse(fetched);assertTrue(failure.message!!.contains("作品链接"))
+        }
     }
     @Test fun formatFiveRoundTripPreservesStableRelationsAndSeparateFields() {
         val i=AuthorProfiles.parse("https://www.douyin.com/user/sec123")!!.copy(nickname="昵称",publicAccount="公开号")
         val author=Author(name="本地称呼",identities=listOf(i))
         val a=Archive(name="作品",authorIds=listOf(author.id))
         val l=Library(archives=listOf(a),drafts=listOf(a.copy(id=uid())),authors=listOf(author))
-        assertEquals(5,Codec.library(l).getInt("format"));assertEquals(l,Codec.library(Codec.library(l)))
+        assertEquals(6,Codec.library(l).getInt("format"));assertEquals(l,Codec.library(Codec.library(l)))
         val renamed=author.copy(name="改名",identities=listOf(i.copy(nickname="新昵称")))
         assertEquals(author.id,renamed.id);assertEquals(i.id,renamed.identities.single().id)
         assertEquals(author.copy(name=""),Codec.author(Codec.author(author.copy(name=""))))

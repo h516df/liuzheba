@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-data class AppState(val authorBase:Author?=null,val authorsOpen:Boolean=false,val authorTarget:String?=null,val authorInput:String="",val authorPreview:Author?=null,val authorNotice:String="",val aiTagSource:Archive?=null,val aiTagLabels:List<Label> = emptyList(),val aiTagPreferences:SearchPreferences?=null,val aiTagSuggestions:List<TagSuggestion> = emptyList(),val aiTagArchive:String="",val aiTagBusy:Boolean=false,val localModelStatus:String="本机 AI 未下载 · 当前仅文字与别名搜索",val modelDownloading:Boolean=false,val protection:ProtectionState=ProtectionState(),val recoveryChoices:List<RecoveryChoice> = emptyList(),val protectionSelection:Uri?=null,val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
+data class AppState(val authorBase:Author?=null,val authorsOpen:Boolean=false,val authorTarget:String?=null,val authorInput:String="",val authorPreview:Author?=null,val authorNotice:String="",val aiTagSource:Archive?=null,val aiTagLabels:List<Label> = emptyList(),val aiTagPreferences:SearchPreferences?=null,val aiTagSuggestions:List<TagSuggestion> = emptyList(),val aiTagArchive:String="",val aiTagBusy:Boolean=false,val localModelStatus:String="本机 AI 未下载 · 当前仅文字与别名搜索",val modelDownloading:Boolean=false,val protection:ProtectionState=ProtectionState(),val recoveryChoices:List<RecoveryChoice> = emptyList(),val protectionSelection:Uri?=null,val protectionRestoreOnly:Boolean=false,val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
     val exportRequest:MediaExportRequest?=null,val downloadsOpen:Boolean=false,val downloadInput:String="",
     val resolving:Boolean=false,val downloadError:String="",val mediaPlan:MediaPlan?=null,val downloads:List<MediaDownload> = emptyList())
 class AppModel(app: Application): AndroidViewModel(app) {
@@ -58,6 +58,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private val mutable=MutableStateFlow(AppState())
     val state=mutable.asStateFlow()
     lateinit var store: Store; private set
+    val noteEditor=LongNoteEditor(viewModelScope,{store},{reload()},{message(it)})
     private var draftJob: Job?=null
     private var operation: Job?=null
     private var resolution:Job?=null
@@ -103,7 +104,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun importAuthor() {
         val input=mutable.value.authorInput
         work("正在读取公开作者主页") {
-            val result=withContext(Dispatchers.IO){AuthorProfiles.resolve(input)} ?: error("未识别作者主页，请粘贴小红书、抖音、快手或微博主页链接，不是作品链接")
+            val result=withContext(Dispatchers.IO){AuthorProfiles.resolve(input)}
             mutable.update{it.copy(authorPreview=it.authorBase?.let{base->base.copy(identities=base.identities+result.identity)} ?: Author(name=result.identity.nickname,identities=listOf(result.identity)),authorNotice=result.message)}
         }
     }
@@ -215,7 +216,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun edit(a: Archive?=null) {
         if(!mutable.value.ready || mutable.value.busy) return
         val target=a?.let { formal -> mutable.value.library.drafts.firstOrNull{it.id==formal.id} ?: formal } ?: Archive(fields=listOf(Field()))
-        mutable.value=mutable.value.copy(editor=target,draftStatus="正在保存草稿")
+        mutable.value=mutable.value.copy(editor=target,draftStatus="正在保存草稿",message="")
         change(target)
     }
     fun change(a: Archive) {
@@ -262,7 +263,17 @@ class AppModel(app: Application): AndroidViewModel(app) {
     }
     }
     fun renameLabel(item: Label,name: String)=work("修改名称") {store.renameLabel(item.id,name)}
-    fun deleteLabel(item: Label) {if(mutable.value.busy) return;draftJob?.cancel();work("移除关联") {store.deleteLabel(item.id);mutable.value.editor?.let {a -> mutable.value=mutable.value.copy(editor=a.copy(category=if(a.category==item.id) "" else a.category,tags=a.tags-item.id))}}}
+    fun deleteLabel(item: Label) {
+        if(mutable.value.busy) return
+        draftJob?.cancel()
+        val draft=mutable.value.editor
+        work("移除关联") {
+            // Preserve edits still inside the debounce window before clearing associations.
+            if(draft!=null) store.draft(draft)
+            store.deleteLabel(item.id)
+            draft?.let {a->mutable.value=mutable.value.copy(editor=a.copy(category=if(a.category==item.id) "" else a.category,tags=a.tags-item.id),draftStatus="草稿已保存")}
+        }
+    }
     fun saveTemplate(name:String,replaceId:String?=null) {
         val a=mutable.value.editor ?: return
         val template=runCatching{Templates.create(name,a.fields)}.getOrElse{message(it.message ?: "模板未保存");return}
@@ -285,13 +296,27 @@ class AppModel(app: Application): AndroidViewModel(app) {
         searchPreferences(next)
     }
     fun appearance(a: Appearance)=work("保存外观") {store.appearance(a)}
-    fun chooseProtectionFolder(uri:Uri)=work("检查保护文件夹") {
-        val choices=store.inspectProtectionFolder(uri)
-        if(choices.isEmpty()) {store.selectProtectionFolder(uri);message("留着吧将自动创建保护文件夹并保存原件，请等待“已保护”")}
-        else mutable.value=mutable.value.copy(recoveryChoices=choices,protectionSelection=uri)
+    // Persist only the pending picker intent so a restored Activity cannot turn a recovery request into setup.
+    fun prepareProtectionSelection(restoreOnly:Boolean):Boolean {
+        val saved=getApplication<Application>().getSharedPreferences("device",0).edit().putBoolean("protectionRestoreOnly",restoreOnly).commit()
+        if(!saved)message("无法记录操作，请检查存储空间后重试")
+        return saved
     }
-    fun dismissProtectionSelection(){mutable.value=mutable.value.copy(recoveryChoices=emptyList(),protectionSelection=null)}
+    fun cancelProtectionSelectionRequest(){getApplication<Application>().getSharedPreferences("device",0).edit().remove("protectionRestoreOnly").apply()}
+    fun chooseProtectionFolder(uri:Uri)=work("检查保护文件夹") {
+        val prefs=getApplication<Application>().getSharedPreferences("device",0)
+        val restoreOnly=prefs.getBoolean("protectionRestoreOnly",true)
+        cancelProtectionSelectionRequest()
+        val choices=store.inspectProtectionFolder(uri)
+        when {
+            choices.isNotEmpty()->mutable.value=mutable.value.copy(recoveryChoices=choices,protectionSelection=uri,protectionRestoreOnly=restoreOnly)
+            restoreOnly->message("未找到可恢复版本；当前资料未改变，也未开启自动保护。请核对原保存位置。")
+            else->{store.selectProtectionFolder(uri);message("留着吧将自动创建保护文件夹并保存原件，请等待“已保护”")}
+        }
+    }
+    fun dismissProtectionSelection(){mutable.value=mutable.value.copy(recoveryChoices=emptyList(),protectionSelection=null,protectionRestoreOnly=false)}
     fun useProtectionFolder() {
+        if(mutable.value.protectionRestoreOnly)return
         val uri=mutable.value.protectionSelection ?: return
         work("启用自动保护") {store.selectProtectionFolder(uri);dismissProtectionSelection();message("开始保护当前资料，已有恢复版本仍保留")}
     }
@@ -301,14 +326,24 @@ class AppModel(app: Application): AndroidViewModel(app) {
         work("从保护文件夹恢复") {
             store.restoreProtectionFolder(uri,choice.name){text->mutable.value=mutable.value.copy(progress=text)}
             store.selectProtectionFolder(uri);dismissProtectionSelection();mutable.value=mutable.value.copy(editor=null)
-            message("已校验并恢复全部资料与原件，恢复前资料仍保留，可在设置撤销恢复")
+            message("已校验并恢复全部资料与原件，恢复前资料仍保留，可在“备份与恢复”撤销恢复")
         }
     }
     fun acknowledgeImportWarning()=work("确认已核对原件") {store.acknowledgeImportWarning()}
     fun retryProtection() {if(mutable.value.ready)viewModelScope.launch {store.protectNow(forceVerify=true)}}
+    fun prepareBackup(launch:()->Unit)=work("检查备份容量") {store.validateBackupCapacity();launch()}
     fun backup(uri: Uri)=work("准备备份") {store.backup(uri){s -> mutable.value=mutable.value.copy(progress=s)};message("完整备份已保存并校验，可在所选文件位置找到")}
     fun restoreBackup(uri: Uri)=work("准备恢复") {store.restore(uri){s -> mutable.value=mutable.value.copy(progress=s)};mutable.value=mutable.value.copy(editor=null);message("资料已恢复，恢复前副本保留，可撤销恢复")}
     fun undoRestore()=work("还原恢复前资料") {store.undoRestore();message("已切换回恢复前资料")}
     fun clearCache()=work("清理图片缓存") {store.clearCache();message("图片缓存已清理，原照片与资料保留")}
+    internal suspend fun saveEditedVideo(a:Archive,p:Photo,source:File,edited:File):Photo = withContext(NonCancellable) {
+        require(mutable.value.ready && !mutable.value.busy && mutable.value.editor==null){"请先结束当前资料编辑"}
+        mutable.update{it.copy(busy=true,progress="保存独立视频副本")}
+        try {
+            val result=store.appendEditedVideo(a.id,p,source,edited)
+            reload();message("已另存到原档案，原视频和作者关联保留")
+            result
+        } finally {mutable.update{it.copy(busy=false,progress="")}}
+    }
     fun photoFile(p: Photo)=File(store.photoDir,p.file)
 }

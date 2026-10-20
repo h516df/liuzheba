@@ -98,7 +98,7 @@ class MediaDownloads(private val context:Context) {
             val status=c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
             val bytes=c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
             val total=c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-            val percent=if(total>0)((bytes*100/total).toInt().coerceIn(0,100)) else 0
+            val percent=if(total>0)((bytes.toDouble()/total*100).toInt().coerceIn(0,100)) else 0
             val state=when(status) {
                 DownloadManager.STATUS_SUCCESSFUL->if(file(job).isFile) "待收录" else "文件已移除"
                 DownloadManager.STATUS_FAILED->"下载失败"

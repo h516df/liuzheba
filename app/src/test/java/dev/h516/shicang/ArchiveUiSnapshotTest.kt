@@ -35,14 +35,14 @@ class ArchiveUiSnapshotTest {
     @Test fun libraryDark()=render("library-dark",dark=true)
     @Test fun detailLight()=render("detail-light",detail=true)
     @Test fun settingsLight()=render("settings-light",settings=true)
-    @Test fun finalReleaseNotesOpenFromSettings()=render("v015-update-notes",settings=true,verify={model->
+    @Test fun finalReleaseNotesOpenFromSettings()=render("v016-update-notes",settings=true,verify={model->
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于与检查更新"))
         compose.onNodeWithText("关于与检查更新").performClick()
         compose.onNodeWithText("检查更新").assertExists()
-        compose.onNodeWithText("本版说明 0.15").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("本版说明 0.16").performScrollTo().assertIsDisplayed()
         val notes=model.updater.currentNotes()!!
-        org.junit.Assert.assertEquals("0.15",notes.version)
-        org.junit.Assert.assertEquals(16,notes.code)
+        org.junit.Assert.assertEquals("0.16",notes.version)
+        org.junit.Assert.assertEquals(17,notes.code)
         notes.sections.flatMap{it.second}.forEach {line->
             compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
         }
@@ -76,14 +76,14 @@ class ArchiveUiSnapshotTest {
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription("设置").performClick()
+        compose.onNodeWithTag("nav-settings").performClick()
         val category=model.state.value.library.labels.first{it.kind=="category"}
         compose.runOnIdle{model.deleteLabel(category)}
         compose.waitUntil(10000){
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
             model.state.value.library.labels.none{it.id==category.id}
         }
-        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithTag("nav-library").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("4 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("移除分类筛选").assertDoesNotExist()
     })
@@ -91,7 +91,7 @@ class ArchiveUiSnapshotTest {
         compose.onNode(hasSetTextAction()).performTextInput("未找到")
         compose.waitForIdle()
         compose.onNodeWithText("新建第一份档案").performClick()
-        compose.onNodeWithText("编辑档案").assertExists()
+        compose.onNodeWithText("新建档案").assertExists()
     })
     @Test fun localAiOptInCanCancelWithoutDownloading()=render("local-ai-opt-in",verify={model->
         compose.onNodeWithText("按意思找 · AI").assertDoesNotExist()
@@ -171,7 +171,7 @@ class ArchiveUiSnapshotTest {
         org.junit.Assert.assertEquals("草稿里的新称呼",runBlocking{model.store.load()}.drafts.single().name)
         compose.onNodeWithText("编辑").performClick()
         compose.onNode(hasSetTextAction() and hasText("草稿里的新称呼")).assertExists()
-        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("放弃修改").performClick()
         compose.onNodeWithText("确认").performClick()
         compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy && model.state.value.editor==null}
         org.junit.Assert.assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
@@ -183,7 +183,7 @@ class ArchiveUiSnapshotTest {
         val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
         verifyImmersiveViewer()
-        compose.onNodeWithText("返回档案").performClick()
+        compose.onNodeWithText("返回").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("搜索档案").assertTextContains("山间")
         compose.onNodeWithText("列表").assertExists()
@@ -197,7 +197,7 @@ class ArchiveUiSnapshotTest {
         val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
-        compose.onNodeWithText("返回档案").assertExists().performClick()
+        compose.onNodeWithText("返回").assertExists().performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("山间的一个下午").fetchSemanticsNodes().isNotEmpty()}
         org.junit.Assert.assertEquals(before,compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithText("列表").assertExists()
@@ -207,7 +207,7 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
-        compose.onNodeWithText("返回档案").assertIsDisplayed()
+        compose.onNodeWithText("返回").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").assertIsDisplayed()
     })
     private fun verifyImmersiveViewer() {
@@ -283,7 +283,7 @@ class ArchiveUiSnapshotTest {
         }
         compose.waitForIdle()
         if(detail){compose.onNodeWithText("山间的一个下午").performClick();compose.waitForIdle()}
-        if(settings){compose.onNodeWithContentDescription("设置").performClick();compose.waitForIdle()}
+        if(settings){compose.onNodeWithTag("nav-settings").performClick();compose.waitForIdle()}
         verify(model);compose.waitForIdle()
         val output=File("build/outputs/archive-ui/$name.png");output.parentFile?.mkdirs()
         compose.onRoot().captureRoboImage(output.absolutePath)

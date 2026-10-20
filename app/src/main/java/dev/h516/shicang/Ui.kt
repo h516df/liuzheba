@@ -31,6 +31,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -56,6 +57,8 @@ private val Muted: Color
     @Composable get()=MaterialTheme.colorScheme.onSurfaceVariant
 @Composable fun ShicangApp(model:AppModel, unlocked:Boolean, unlock:()->Unit, setLock:(Boolean)->Unit, choosePhotos:(String)->Unit,takePhoto:(String)->Unit,backup:()->Unit,restore:()->Unit,chooseProtection:()->Unit={}) {
     val s by model.state.collectAsState()
+    val noteEditing by model.noteEditor.state.collectAsState()
+    var notesOpen by rememberSaveable {mutableStateOf(false)}
     val scheme=appearanceScheme(s.appearance)
     val dark=scheme.background.red<.2f
     MaterialTheme(colorScheme=scheme,typography=Typography(
@@ -72,6 +75,7 @@ private val Muted: Color
     )) {
         val libraryState=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
         var lastEditor by rememberSaveable {mutableStateOf("")}
+        var editorWasExisting by rememberSaveable {mutableStateOf(false)}
         var route by rememberSaveable{mutableStateOf("library")}
         var detailReturn by rememberSaveable {mutableStateOf("library")}
         var photosReturn by rememberSaveable {mutableStateOf("detail")}
@@ -93,14 +97,14 @@ private val Muted: Color
             onDismissRequest=model::dismissProtectionSelection,
             title={Text("找到已有恢复版本")},
             text={Column {
-                Text("显示最近 100 个有效版本，旧文件仍保留。请选择要恢复的版本。恢复前会校验全部原件；当前资料保留为可撤销副本。也可继续保护当前资料，不覆盖旧版本。")
+                Text("显示最近 100 个有效版本，旧文件仍保留。请选择要恢复的版本。恢复前会校验全部原件；当前资料保留为可撤销副本。"+if(s.protectionRestoreOnly) "" else "也可继续保护当前资料，不覆盖旧版本。")
                 LazyColumn(Modifier.heightIn(max=320.dp)) {items(s.recoveryChoices,key={it.name}) {choice ->
                     TextButton(onClick={confirm="将恢复所选版本的 ${choice.archives} 份档案、${choice.media} 项原件。当前资料会保留为可撤销副本。继续吗？" to {model.recoverProtection(choice)}},enabled=!s.busy) {
                         Text("${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(choice.time))}\n${choice.archives} 份档案 · ${choice.media} 项原件")
                     }
                 }}
             }},
-            confirmButton={TextButton(onClick=model::useProtectionFolder,enabled=!s.busy){Text("保护当前资料")}},
+            confirmButton={if(!s.protectionRestoreOnly)TextButton(onClick=model::useProtectionFolder,enabled=!s.busy){Text("保护当前资料")}},
             dismissButton={TextButton(onClick=model::dismissProtectionSelection,enabled=!s.busy){Text("取消")}}
         )
         val context=LocalContext.current
@@ -121,6 +125,7 @@ private val Muted: Color
         val compactHeader=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp<360 || androidx.compose.ui.platform.LocalDensity.current.fontScale>1.4f
         var frameArchive by rememberSaveable {mutableStateOf("")}
         var positions by rememberSaveable {mutableStateOf(hashMapOf<String,String>())}
+        val mediaActive=!appearanceOpen && !s.authorsOpen && noteEditing==null && !notesOpen && !s.downloadsOpen && s.exportRequest==null && s.shares.isEmpty() && s.protectionSelection==null && confirm==null
         val immersive=unlocked && s.ready && !editing && (route=="frame" || zoomPhoto.isNotEmpty())
         DisposableEffect(immersive,dark) {
             val window=(context as? android.app.Activity)?.window
@@ -155,33 +160,36 @@ private val Muted: Color
                 route=="detail"->route=detailReturn
                 route=="photos"->route=photosReturn
                 route=="settings"->{route=settingsReturn;zoomPhoto=settingsPhoto;settingsPhoto=""}
-                route in listOf("bin","labels","updates")->route="settings"
-                else->route="frame"
+                route in listOf("bin","labels","updates","backup")->route="settings"
+                else->route="library"
             }
         }
         LaunchedEffect(s.editor,s.busy,s.library) {
-            if(s.editor!=null) lastEditor=s.editor!!.id
-            else if(lastEditor.isNotEmpty() && !s.busy) {
+            if(s.editor!=null && lastEditor!=s.editor!!.id) {
+                lastEditor=s.editor!!.id
+                editorWasExisting=s.library.active.any{it.id==lastEditor}
+            }
+            else if(s.editor==null && lastEditor.isNotEmpty() && !s.busy) {
                 val id=lastEditor;lastEditor=""
-                if(s.library.drafts.none{it.id==id} && s.library.active.any{it.id==id}) openDetails(id)
+                if(!editorWasExisting && s.library.drafts.none{it.id==id} && s.library.active.any{it.id==id}) openDetails(id)
             }
         }
-        BackHandler(enabled=editing || route !in listOf("frame","library") || zoomPhoto.isNotEmpty()) {backPage()}
+        BackHandler(enabled=editing || route!="library" || zoomPhoto.isNotEmpty()) {backPage()}
         Scaffold(containerColor=scheme.background,contentWindowInsets=if(immersive) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets,snackbarHost={if(unlocked) Box(Modifier.padding(bottom=if(immersive) 96.dp else 0.dp)){SnackbarHost(snackbar)}},
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                    if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
-                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"留着吧";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
+                    if(editing || route !in listOf("frame","library","settings")) GalleryIcon("返回",scheme.onSurface){backPage()}
+                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"档案";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"我的";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
                         if(route=="frame" && !editing) Text("留着吧 · 私人档案",fontSize=11.sp,color=Muted)}
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
                         Box {
                             FilledTonalIconButton(onClick={collectMenu=true},modifier=Modifier.size(48.dp).semantics{contentDescription="导入与作者"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("保存到相册",scheme.onSurfaceVariant)}
                             DropdownMenu(collectMenu,{collectMenu=false}) {
+                                DropdownMenuItem(text={Text("全部笔记")},onClick={collectMenu=false;notesOpen=true})
                                 DropdownMenuItem(text={Text("作者主页与作者卡")},onClick={collectMenu=false;model.openAuthors()})
                                 DropdownMenuItem(text={Text("从链接下载媒体")},onClick={collectMenu=false;model.openDownloads()})
                             }
                         }
-                        FilledTonalIconButton(onClick={openSettings()},modifier=Modifier.size(48.dp).semantics{contentDescription="设置"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("设置",scheme.onSurfaceVariant)}
                         Spacer(Modifier.width(8.dp))
                         if(!s.busy) Button(onClick={model.edit()},shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="＋ 新建"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)){
                             FrameGlyph("新建",scheme.onPrimary);if(!compactHeader){Spacer(Modifier.width(5.dp));Text("新建",style=MaterialTheme.typography.labelLarge)}
@@ -203,15 +211,20 @@ private val Muted: Color
                 if(unlocked && s.ready && !editing && route=="library" && !s.protection.protected) {
                     val needsAttention=s.protection.status in listOf("保护失败","待核对")
                     Surface(modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp),shape=RoundedCornerShape(12.dp),color=if(needsAttention)scheme.errorContainer else scheme.surface) {
-                        TextButton(onClick={openSettings()},modifier=Modifier.fillMaxWidth()) {
+                        TextButton(onClick={route="backup"},modifier=Modifier.fillMaxWidth()) {
                             Text("${s.protection.status} · ${if(needsAttention) "点此处理，原文件请保留" else if(s.protection.location.isEmpty()) "尚未开启外部保护" else "外部保护进行中"}",style=MaterialTheme.typography.labelMedium,color=if(needsAttention)scheme.onErrorContainer else scheme.onSurfaceVariant)
                         }
                     }
                 }
                 if(s.busy){LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(horizontal=24.dp,vertical=4.dp),fontSize=12.sp);if(s.progress.contains("备份")||s.progress.contains("恢复")||s.progress.contains("导入")||s.progress.contains("打包")||s.progress.contains("写入")) TextButton(onClick=model::cancelOperation){Text("取消")}}}
-            }},bottomBar={if(!immersive && !editing && route=="library" && unlocked) NavigationBar(containerColor=scheme.background,tonalElevation=0.dp) {
-                NavigationBarItem(selected=false,onClick={route="frame"},icon={FrameGlyph("发现",scheme.onSurfaceVariant)},label={Text("发现")})
-                NavigationBarItem(selected=true,onClick={route="library"},icon={FrameGlyph("我的",scheme.onPrimaryContainer)},label={Text("档案")},colors=NavigationBarItemDefaults.colors(indicatorColor=scheme.primaryContainer,selectedTextColor=scheme.primary))
+             }},bottomBar={if(!editing && zoomPhoto.isEmpty() && route in listOf("frame","library","settings") && unlocked && s.ready) {
+                NavigationBar(containerColor=scheme.background,tonalElevation=0.dp) {
+                    listOf("frame" to "发现","library" to "档案","settings" to "我的").forEach { (destination,label) ->
+                        NavigationBarItem(selected=route==destination,onClick={route=destination;settingsReturn="library";settingsPhoto=""},
+                            modifier=Modifier.testTag("nav-$destination").semantics{contentDescription="切换到$label"},icon={FrameGlyph(if(destination=="settings") "设置" else label,scheme.onSurfaceVariant)},label={Text(label)},
+                            colors=NavigationBarItemDefaults.colors(indicatorColor=scheme.primaryContainer,selectedTextColor=scheme.primary))
+                    }
+                }
             }}) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when {
@@ -224,19 +237,20 @@ private val Muted: Color
                         val active=remember(s.library.archives){s.library.active.filter{it.photos.isNotEmpty()}}
                         val ids=remember(active){active.map{it.id}}
                         if(active.isEmpty()) Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("让照片成为主角",fontSize=23.sp);Text("添加照片或视频后，在这里全屏翻看。纯文字档案仍保留在档案页。",Modifier.padding(vertical=16.dp),color=Muted);Button(onClick={route="library"}){Text("去档案添加媒体")}}
-                        else key(ids) {ArchiveFeed(active,frameArchive,model,s.appearance,positions,::rememberPhoto,
+                        else libraryState.SaveableStateProvider("discovery") {key(ids) {ArchiveFeed(active,frameArchive,model,s.appearance,positions,::rememberPhoto,
                             {frameArchive=it},{route="library"},::openDetails,::openPhotos,
-                            {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy,enabled=!appearanceOpen && !s.authorsOpen)}
+                            {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy,enabled=mediaActive)}}
                     }
-                    route=="photos"->{val a=s.library.active.firstOrNull{it.id==selected}
+                    route=="photos"->libraryState.SaveableStateProvider("photos:$selected") {val a=s.library.active.firstOrNull{it.id==selected}
                         if(a!=null) AllPhotos(a,model){rememberPhoto(a.id,it);zoomPhoto=it}
                         else Empty("照片集已不存在","返回档案"){route="library"}}
 
                     route=="library"->libraryState.SaveableStateProvider("library") {LibraryV19(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})}
-                    route=="detail"->{val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}},::openDetails,{model.edit(a);choosePhotos(a.id)},{AuthorArchiveSection(model,s,a,false)})}
-                    route=="settings"->Settings(model,s,setLock,chooseProtection,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{route=it},{title,action->confirm=title to action})
+                    route=="detail"->libraryState.SaveableStateProvider("detail:$selected") {val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}},::openDetails,{model.edit(a);choosePhotos(a.id)},{AuthorArchiveSection(model,s,a,false);ArchiveNoteSection(model,s.library,a)})}
+                    route=="settings"->libraryState.SaveableStateProvider("settings") {Settings(model,s,setLock,{route=it},{title,action->confirm=title to action})}
+                    route=="backup"->BackupScreen(model,s,chooseProtection,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
-                    route=="labels"->LabelsScreen(model,s){title,action->confirm=title to action}
+                    route=="labels"->LabelsScreen(model,s,confirm={title,action->confirm=title to action})
                     route=="updates"->UpdateScreen(updater,PaddingValues(0.dp))
                 }
                 if(unlocked && s.ready && !editing && zoomPhoto.isNotEmpty()) {
@@ -246,7 +260,7 @@ private val Muted: Color
                     if(a!=null) key(a.id,"viewer") {FullPhotoFrame(a,model,s.appearance,zoomPhoto,
                         {rememberPhoto(a.id,it)},null,null,{zoomPhoto="";route="library"},
                         {openDetails(a.id)},{openPhotos(a.id)},
-                        {appearanceOpen=true},{zoomPhoto="";model.edit(a)},{zoomPhoto="";model.edit()},s.busy,{zoomPhoto=""},active=!appearanceOpen && !s.authorsOpen)}
+                        {appearanceOpen=true},{model.edit(a)},{model.edit()},s.busy,{zoomPhoto=""},active=mediaActive)}
                     else LaunchedEffect(Unit){zoomPhoto=""}
 
                 }
@@ -254,6 +268,7 @@ private val Muted: Color
         }
         if(unlocked && editing) EditorV19(model,s,choosePhotos,takePhoto,{requestLeaveEditor()},{title,action->confirm=title to action},{s.editor?.let{AuthorArchiveSection(model,s,it,true)}})
         if(unlocked && s.ready && s.authorsOpen) AuthorWorkflowUi(model,s)
+        if(unlocked && s.ready) LongNotesUi(model,s.library,notesOpen,{notesOpen=false})
         if(unlocked && leaveEditorPrompt) AlertDialog(onDismissRequest={leaveEditorPrompt=false},title={Text("保留这次编辑？")},text={Text("保存草稿后返回，下次可以继续；已保存的档案暂不改变。")},confirmButton={TextButton(onClick={leaveEditorPrompt=false;model.leaveEditor()}){Text("保留草稿并返回")}},dismissButton={Row{TextButton(onClick={leaveEditorPrompt=false}){Text("继续编辑")};TextButton(onClick={leaveEditorPrompt=false;model.discardEditor()}){Text("放弃修改")}}})
         if(unlocked && appearanceOpen) ModalBottomSheet(onDismissRequest={appearanceOpen=false},
             sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=scheme.surface,tonalElevation=0.dp,
@@ -351,10 +366,9 @@ private val Muted: Color
         items(a.fields,key={it.id}){f->Surface(shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.surface){Column(Modifier.fillMaxWidth().padding(16.dp)){Text(f.name,fontSize=12.sp,color=Muted);Text(f.value.ifBlank{"未填写"},Modifier.padding(top=5.dp),fontSize=16.sp);if(f.value.startsWith("https://")||f.value.startsWith("http://")) TextButton(onClick={runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(f.value)).addCategory(Intent.CATEGORY_BROWSABLE))}.onFailure{model.message("没有可打开此链接的应用")}}){Text("打开链接")}}}}
     }
 }
-@Composable private fun Settings(model:AppModel,s:AppState,setLock:(Boolean)->Unit,chooseProtection:()->Unit,backup:()->Unit,restore:()->Unit,navigate:(String)->Unit,confirm:(String,()->Unit)->Unit) {
+@Composable private fun Settings(model:AppModel,s:AppState,setLock:(Boolean)->Unit,navigate:(String)->Unit,confirm:(String,()->Unit)->Unit) {
     val c=MaterialTheme.colorScheme
     var appearance by rememberSaveable{mutableStateOf(false)}
-    var backups by rememberSaveable{mutableStateOf(false)}
     var storage by rememberSaveable{mutableStateOf(false)}
     var templates by rememberSaveable{mutableStateOf(false)}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
@@ -368,17 +382,9 @@ private val Muted: Color
             }
         }
         item {
-            ProtectionPanel(s.protection,s.busy,{confirm(PROTECTION_SETUP_NOTICE,chooseProtection)},model::retryProtection,{confirm("请确认：你已核对导入失败或中断的原文件，知道这些原文件不在当前保护范围内，并会继续保留或重新导入。",model::acknowledgeImportWarning)})
-            Text("资料与备份",Modifier.padding(start=4.dp,bottom=10.dp),style=MaterialTheme.typography.titleSmall,color=c.onSurfaceVariant)
+            Text("资料管理",Modifier.padding(start=4.dp,bottom=10.dp),style=MaterialTheme.typography.titleSmall,color=c.onSurfaceVariant)
             Column(Modifier.clip(RoundedCornerShape(20.dp)).background(c.surface).animateContentSize(tween(220)).padding(horizontal=16.dp)) {
-                SettingButton("备份与恢复",if(model.store.lastBackup()>0) "上次备份 ${java.text.DateFormat.getDateInstance().format(java.util.Date(model.store.lastBackup()))}" else "还没有备份"){backups=!backups}
-                AnimatedVisibility(backups){Column {
-                    SettingButton("完整备份","保存全部档案与原始媒体",!s.busy) {
-                        confirm("备份文件未加密，包含完整档案、原始照片与视频、草稿和回收站。原始媒体可能保留拍摄位置。\n\n应用锁不会保护导出的备份。请保存到可信位置，勿公开上传或随意转发。\n\n确认后选择保存位置；取消不创建备份。",backup)
-                    }
-                    SettingButton("从备份恢复","选择 ZIP 文件",!s.busy,restore)
-                    SettingButton("撤销最近一次恢复","切回恢复前的资料",!s.busy,model::undoRestore)
-                }}
+                SettingButton("备份与恢复","${s.protection.status} · 保存、换机与找回资料"){navigate("backup")}
                 SettingButton("存储空间",s.space.values.sum().let{"%.1f MB".format(it/1048576.0)}){storage=!storage}
                 AnimatedVisibility(storage){Column(Modifier.padding(vertical=12.dp)) {
                     s.space.forEach{(name,size)->Row(Modifier.fillMaxWidth().padding(vertical=6.dp)){Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium);Text("%.1f MB".format(size/1048576.0),color=Muted,style=MaterialTheme.typography.bodyMedium)}}
@@ -411,6 +417,25 @@ private val Muted: Color
         item {SettingButton("关于与检查更新",model.updater.hint() ?: "留着吧 v${BuildConfig.VERSION_NAME}"){navigate("updates")}}
     }
 }
+/** A single place for continuous local protection and portable snapshots, without changing either engine. */
+@Composable internal fun BackupScreen(model:AppModel,s:AppState,chooseProtection:()->Unit,backup:()->Unit,restore:()->Unit,confirm:(String,()->Unit)->Unit) {
+    var recoveryOptions by rememberSaveable {mutableStateOf(false)}
+    LazyColumn(Modifier.fillMaxSize().testTag("backup-screen"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item {Text("自动保存到本机目录，或导出备份用于换机。",style=MaterialTheme.typography.bodyMedium)}
+        item {ProtectionPanel(s.protection,s.busy,{confirm(PROTECTION_SETUP_NOTICE,{if(model.prepareProtectionSelection(false))chooseProtection()})},model::retryProtection,{confirm("请确认：你已核对导入失败或中断的原文件，知道这些原文件不在当前保护范围内，并会继续保留或重新导入。",model::acknowledgeImportWarning)})}
+        item {
+            SettingButton("导出备份文件（换机或留存）",if(model.store.lastBackup()>0) "最近导出：${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(model.store.lastBackup()))}" else "保存一份完整资料副本",!s.busy) {
+                confirm("备份文件未加密，包含完整档案、笔记、原始照片与视频、草稿和回收站。原始媒体可能保留拍摄位置。\n\n应用锁不会保护导出的备份。请保存到可信位置，勿公开上传或随意转发。同一手机损坏或丢失时，备份也可能一起丢失。\n\n单个完整备份的展开总量最多20GiB（不是媒体库总容量），需要足够临时空间。超过时不会导出不完整备份。\n\n确认后先检查容量，再选择保存位置；取消不创建备份。",backup)
+            }
+            SettingButton("恢复已有资料","从保护目录或备份文件找回",!s.busy){recoveryOptions=true}
+            SettingButton("撤销最近一次恢复",if(model.store.canUndoRestore()) "切回恢复前的资料" else "暂无可撤销的恢复",!s.busy && model.store.canUndoRestore()) {confirm("切回最近一次恢复前的资料？当前恢复结果会被替换，请先保存需要保留的新内容。",model::undoRestore)}
+        }
+    }
+    if(recoveryOptions)AlertDialog(onDismissRequest={recoveryOptions=false},title={Text("从哪里恢复？")},text={Column {
+        TextButton(onClick={recoveryOptions=false;confirm(PROTECTION_RECOVERY_NOTICE,{if(model.prepareProtectionSelection(true))chooseProtection()})}){Text("选择原保护目录")}
+        TextButton(onClick={recoveryOptions=false;restore()}){Text("选择备份文件")}
+    }},confirmButton={TextButton(onClick={recoveryOptions=false}){Text("取消")}})
+}
 @Composable private fun Choice(title:String,choices:List<String>,selected:String,onSelect:(String)->Unit) {Column {Text(title,fontSize=12.sp,color=Muted);Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){choices.forEach{FilterChip(selected=it==selected,onClick={onSelect(it)},label={Text(it)})}}}}
 @Composable private fun SettingButton(title:String,subtitle:String,enabled:Boolean=true,onClick:()->Unit) {
     Column(Modifier.fillMaxWidth().clickable(enabled=enabled,onClick=onClick)) {
@@ -419,7 +444,7 @@ private val Muted: Color
                 Text(title,fontSize=15.sp,fontWeight=FontWeight.Normal,color=if(enabled) MaterialTheme.colorScheme.onSurface else Muted)
                 if(subtitle.isNotBlank()) Text(subtitle,Modifier.padding(top=5.dp),fontSize=12.sp,color=Muted)
             }
-            FrameGlyph("展开",Muted)
+            if(enabled) FrameGlyph("展开",Muted)
         }
         HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.55f))
     }
@@ -432,14 +457,15 @@ private val Muted: Color
         item {OutlinedButton(onClick={confirm("永久清理回收站及不再引用的照片？这一步不能撤销，手机相册原文件保留。",model::purge)},enabled=!s.busy){Text("永久清理回收站")}}
     }
 }
-@Composable private fun LabelsScreen(model:AppModel,s:AppState,confirm:(String,()->Unit)->Unit) {
+@Composable internal fun LabelsScreen(model:AppModel,s:AppState,confirm:(String,()->Unit)->Unit,initialKind:String="category") {
     var editing by remember{mutableStateOf<Label?>(null)}
     var name by remember{mutableStateOf("")}
     var creating by remember{mutableStateOf(false)}
-    var kind by rememberSaveable{mutableStateOf("category")}
+    var kind by rememberSaveable{mutableStateOf(initialKind)}
     var query by rememberSaveable{mutableStateOf("")}
     val c=MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp)) {
+        Text("分类选一个，用于归档；标签可多个，用于补充描述。",Modifier.padding(vertical=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             FilterChip(kind=="category",{kind="category"},label={Text("分类")})
             FilterChip(kind=="tag",{kind="tag"},label={Text("标签")})
@@ -459,10 +485,16 @@ private val Muted: Color
                         Text("$count 份档案",Modifier.padding(top=4.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     }
                     Box {
-                        GalleryIcon("更多",c.onSurfaceVariant){menu=true}
+                        TextButton(onClick={menu=true},enabled=!s.busy){Text("管理")}
                         DropdownMenu(menu,{menu=false}) {
                             DropdownMenuItem(text={Text("改名")},onClick={menu=false;editing=label;name=label.name})
-                            DropdownMenuItem(text={Text("删除",color=c.error)},onClick={menu=false;confirm("删除「${label.name}」及所有关联？档案和照片保留。",{model.deleteLabel(label)})})
+                            DropdownMenuItem(text={Text("全局删除${if(label.kind=="category") "分类" else "标签"}",color=c.error)},onClick={
+                                menu=false
+                                val archives=s.library.archives.count{if(label.kind=="category") it.category==label.id else label.id in it.tags}
+                                val currentDrafts=s.library.drafts.filterNot{it.id==s.editor?.id}+listOfNotNull(s.editor)
+                                val drafts=currentDrafts.count{if(label.kind=="category") it.category==label.id else label.id in it.tags}
+                                confirm("删除「${label.name}」？将从 $archives 份档案（含回收站）和 $drafts 份草稿移除关联，无法自动恢复这些关联。档案、照片和视频不会删除。若只想移出当前档案，请返回编辑页取消勾选。",{model.deleteLabel(label)})
+                            })
                         }
                     }
                 }

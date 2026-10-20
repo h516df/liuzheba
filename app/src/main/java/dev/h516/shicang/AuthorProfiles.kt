@@ -16,7 +16,7 @@ data class AuthorImportResult(val identity: PlatformIdentity, val message: Strin
 object AuthorProfiles {
     val platforms = listOf("小红书", "抖音", "快手", "微博")
     private val hosts = mapOf(
-        "小红书" to setOf("xiaohongshu.com", "www.xiaohongshu.com", "xhslink.com", "www.xhslink.com"),
+        "小红书" to setOf("xiaohongshu.com", "www.xiaohongshu.com", "xhslink.com", "www.xhslink.com", "xhslink.cn"),
         "抖音" to setOf("douyin.com", "www.douyin.com", "v.douyin.com", "www.iesdouyin.com", "iesdouyin.com", "live.douyin.com"),
         "快手" to setOf("kuaishou.com", "www.kuaishou.com", "v.kuaishou.com", "live.kuaishou.com", "gifshow.com", "www.gifshow.com"),
         "微博" to setOf("weibo.com", "www.weibo.com", "m.weibo.cn", "weibo.cn", "www.weibo.cn")
@@ -32,7 +32,7 @@ object AuthorProfiles {
         val url = Links.normalize(text) ?: return null
         val platform = platform(url) ?: return null
         val uri = URI(url)
-        if (uri.host.lowercase(Locale.ROOT) in setOf("xhslink.com", "www.xhslink.com", "v.douyin.com", "v.kuaishou.com")) return null
+        if (uri.host.lowercase(Locale.ROOT) in setOf("xhslink.com", "www.xhslink.com", "xhslink.cn", "v.douyin.com", "v.kuaishou.com")) return null
         if (Regex("%2f|%5c", RegexOption.IGNORE_CASE).containsMatchIn(uri.rawPath.orEmpty())) return null
         val path = uri.path.orEmpty().trimEnd('/')
         if (uri.host.lowercase(Locale.ROOT).startsWith("live.")) return null
@@ -73,23 +73,32 @@ object AuthorProfiles {
         u.scheme=="https" && u.host=="t.cn" && u.rawUserInfo==null && u.port in listOf(-1,443)
     }.getOrDefault(false)
 
+    /** A recognized source may be opened by the user, but is not a verified author identity. */
+    fun sourceLink(text:String):String? = Links.normalize(text)?.takeIf { platform(it)!=null || weiboShort(it) }
+
     /** No cookies, account state, APIs, or script execution. Failure never invents metadata. */
-    fun resolve(text: String): AuthorImportResult? = resolveWithFetcher(text,PublicProfileNetwork::fetch)
-    internal fun resolveWithFetcher(text:String,fetch:(String,String)->PublicProfileNetwork.Page):AuthorImportResult? {
-        val url = Links.normalize(text) ?: return null
-        val platform = platform(url) ?: if(weiboShort(url)) "微博" else return null
+    fun resolve(text: String): AuthorImportResult = resolveWithFetcher(text,PublicProfileNetwork::fetch)
+    internal fun resolveWithFetcher(text:String,fetch:(String,String)->PublicProfileNetwork.Page):AuthorImportResult {
+        val url = Links.normalize(text) ?: error("未找到有效链接，请粘贴作者主页的完整分享文字或 HTTPS 链接")
+        val platform = platform(url) ?: if(weiboShort(url)) "微博" else error("暂不支持这个链接，请使用小红书、抖音、快手或微博的 HTTPS 分享链接")
         val local = parse(url)
-        return runCatching {
-            val page = fetch(url, platform)
-            val identity = parse(page.url) ?: error("公开页面不是作者主页")
-            val structured = metadataDetails(page.html, identity)
-            val nickname = if(structured.nameConflict) "" else structured.nickname.ifBlank { publicNickname(page.html, identity.platform) }
-            val fetched = nickname.isNotBlank() || structured.account.isNotBlank()
-            val message = if(structured.nameConflict || structured.accountConflict) "公开页面资料不完整或有冲突，相关字段已留空，请手动核对补充。" else if (!fetched) "已识别作者主页；公开页面未提供可确认的资料，请手动补充。" else "已从公开主页读取可用资料，请核对；未读取的字段保留空白。"
-            AuthorImportResult(identity.copy(nickname = nickname, publicAccount = structured.account), message, fetched)
-        }.getOrElse {
-            local?.let { AuthorImportResult(it, "已识别作者主页；公开页面暂不可读取，请手动补充昵称和公开账号。") }
+        fun fallback() = local?.let { AuthorImportResult(it, "已识别作者主页；公开页面暂不可读取，请手动补充昵称和公开账号。") }
+        fun notProfile(destination:String):Nothing {
+            val kind=SharedLinks.parse(destination)?.kind
+            if(kind=="作品" || kind=="直播间") error("已识别$platform${kind}链接，不是作者主页；请在平台作者页重新复制主页分享链接")
+            error("已识别$platform 分享链接，但未取得作者主页；链接可能已失效或公开访问受限。可打开原链接核对，或在平台作者页重新复制主页链接")
         }
+        if(local==null && SharedLinks.parse(url)?.kind in listOf("作品","直播间"))notProfile(url)
+        val page=try { fetch(url,platform) } catch(_:Exception) {
+            return fallback() ?: error("已识别$platform 分享链接，但公开跳转暂时无法完成；请检查网络、稍后重试，或打开原链接重新复制作者主页链接")
+        }
+        if(AuthorProfiles.platform(page.url)!=platform) return fallback() ?: error("已识别$platform 分享链接，但跳转未通过平台安全校验；请重新复制作者主页链接")
+        val identity = parse(page.url) ?: return fallback() ?: notProfile(page.url)
+        val structured = metadataDetails(page.html, identity)
+        val nickname = if(structured.nameConflict) "" else structured.nickname.ifBlank { publicNickname(page.html, identity.platform) }
+        val fetched = nickname.isNotBlank() || structured.account.isNotBlank()
+        val message = if(structured.nameConflict || structured.accountConflict) "公开页面资料不完整或有冲突，相关字段已留空，请手动核对补充。" else if (!fetched) "已识别作者主页；公开页面未提供可确认的资料，请手动补充。" else "已从公开主页读取可用资料，请核对；未读取的字段保留空白。"
+        return AuthorImportResult(identity.copy(nickname = nickname, publicAccount = structured.account), message, fetched)
     }
 
     /** Read only JSON script data belonging to the exact current identity; never evaluate JavaScript. */

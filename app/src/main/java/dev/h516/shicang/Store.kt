@@ -137,8 +137,22 @@ class Store(private val context: Context) {
     private fun remove(kind: String,id: String) { markProtectionDirty();db.execSQL("DELETE FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)) }
     private fun loadUnsafe()=Library(rows("archive").map(Codec::archive),rows("draft").map(Codec::archive),
         rows("label").map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
-        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()), rows("author").map(Codec::author))
+        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()), rows("author").map(Codec::author),rows("longNote").map(LongNote::read),rows("longNoteDraft").map(LongNote::read))
     suspend fun load()=withContext(Dispatchers.IO) { gate.withLock { loadUnsafe() } }
+    suspend fun noteSession(note:LongNote)=withContext(Dispatchers.IO) {gate.withLock {
+        note.validated();NoteSession(rows("longNote").map(LongNote::read).firstOrNull{it.key==note.key},rows("longNoteDraft").map(LongNote::read).firstOrNull{it.key==note.key},generation)
+    }}
+    private fun requireNoteGeneration(token:String){if(token!=generation)throw StaleNoteSession()}
+    suspend fun noteDraft(note:LongNote,token:String)=withContext(Dispatchers.IO) {gate.withLock {
+        requireNoteGeneration(token);note.validated();put("longNoteDraft",note.key,note.json())
+    }}
+    suspend fun discardNoteDraft(note:LongNote,token:String)=withContext(Dispatchers.IO) {gate.withLock {requireNoteGeneration(token);remove("longNoteDraft",note.validated().key)}}
+    suspend fun saveNote(note:LongNote,expected:LongNote?,token:String)=withContext(Dispatchers.IO) {gate.withLock {
+        requireNoteGeneration(token);note.validated()
+        val existing=rows("longNote").map(LongNote::read).firstOrNull{it.key==note.key}
+        require(existing==expected){"笔记已在别处改变；草稿已保留，请重新打开核对"}
+        db.beginTransaction();try {put("longNote",note.key,note.copy(updated=System.currentTimeMillis()).json());remove("longNoteDraft",note.key);db.setTransactionSuccessful()}finally{db.endTransaction()}
+    }}
     suspend fun searchPreferences(value:SearchPreferences)=withContext(Dispatchers.IO) {gate.withLock {put("searchPreferences","rules",SearchPreferences.read(value.json()).json())}}
     suspend fun appearance()=withContext(Dispatchers.IO) { gate.withLock { rows("settings").firstOrNull()?.let(Appearance::read) ?: Appearance() } }
     suspend fun appearance(a: Appearance)=withContext(Dispatchers.IO) { gate.withLock { put("settings","appearance",a.json()) } }
@@ -242,20 +256,56 @@ class Store(private val context: Context) {
             val id=uid();val tmp=File(photoDir,"$id.pending"); val final=File(photoDir,"$id.original")
             try {
                 val declared=context.contentResolver.getType(uri).orEmpty()
-                val digest=MessageDigest.getInstance("SHA-256");var bytes=0L
-                context.contentResolver.openInputStream(uri).use { input -> requireNotNull(input) { "无法读取所选图片" };tmp.outputStream().use { out -> val b=ByteArray(65536);while(true) {operation.ensureActive();val n=input.read(b);if(n<0) break;bytes+=n;require(bytes<=Codec.MAX_MEDIA_BYTES) {"单个视频最多1GB，照片最多200MB"};digest.update(b,0,n);out.write(b,0,n)} } }
+                val digest=MessageDigest.getInstance("SHA-256")
+                val maximum=if(declared.startsWith("image/")) Codec.MAX_PHOTO_BYTES else Codec.MAX_MEDIA_BYTES
+                val expected=LargeMediaIo.declaredSize(context.contentResolver,uri)
+                expected?.let {require(it<=maximum){"所选媒体超过安全上限：视频6GB，照片200MiB"};LargeMediaIo.requireSpace(photoDir.usableSpace,it)}
+                val bytes=context.contentResolver.openInputStream(uri).use { input ->
+                    requireNotNull(input) { "无法读取所选媒体" }
+                    tmp.outputStream().use { out -> LargeMediaIo.copy(input,out,maximum,available={photoDir.usableSpace},
+                        check={operation.ensureActive()},onBytes={buffer,count->digest.update(buffer,0,count)}) }
+                }
                 val metadata=inspectMedia(tmp,declared)
                 require(bytes<=(if(metadata.first.startsWith("video/")) Codec.MAX_MEDIA_BYTES else Codec.MAX_PHOTO_BYTES)) {"单张照片最多200MB"}
                 require(tmp.renameTo(final)) { "照片保存失败" }
                 good.add(Photo(id,final.name,bytes,digest.digest().hex(),metadata.first,metadata.second))
             } catch(e:CancellationException) {tmp.delete();throw e}
-            catch(e: Exception) {tmp.delete();errors.add("第${index+1}张：${e.message ?: "导入失败"}")}
+            catch(e: Exception) {tmp.delete();errors.add("第${index+1}项：${e.message ?: "导入失败"}")}
         }
         } catch(e:CancellationException) {good.forEach{File(photoDir,it.file).delete()};throw e}
         val pending=org.json.JSONArray(prefs.getString("protectionPendingMedia","[]")).strings()+good.map{it.file}
         val warning=if(errors.isNotEmpty()) "有 ${errors.size} 项媒体导入失败，请核对原文件并重新导入" else priorWarning
         check(prefs.edit().putString("protectionPendingMedia",org.json.JSONArray(pending.distinct()).toString()).putString("protectionPriorWarning",warning).putString("protectionImportWarning",if(warning.isNotEmpty()) warning else "有已导入媒体尚未完整写入档案").commit())
         ImportResult(good,errors)
+    } }
+    /** Append a separate derivative to the current archive, never replace its source or stale metadata. */
+    internal suspend fun appendEditedVideo(archiveId:String,original:Photo,source:File,edited:File):Photo=withContext(Dispatchers.IO) { gate.withLock {
+        val operation=coroutineContext
+        val library=loadUnsafe()
+        val archive=library.active.firstOrNull{it.id==archiveId} ?: error("原档案已变更，请重新打开视频")
+        require(archive.photos.any{it==original} && source.canonicalFile==File(photoDir,original.file).canonicalFile){"原视频已变更，请重新打开"}
+        require(source.isFile && source.length()==original.bytes && sha(source){operation.ensureActive()}==original.sha256){"原视频已变更，未保存编辑副本"}
+        require(library.drafts.none{it.id==archiveId}){"该档案有未保存草稿，请先保存再编辑视频"}
+        require(edited.isFile && edited.length() in 1..Codec.MAX_MEDIA_BYTES){"编辑副本不完整或超过 6GB 安全上限"}
+        LargeMediaIo.requireSpace(photoDir.usableSpace,edited.length())
+        val id=uid();val pending=File(photoDir,"$id.pending");val final=File(photoDir,"$id.original")
+        var committed=false
+        try {
+            edited.inputStream().use{input->pending.outputStream().use{output->LargeMediaIo.copy(input,output,Codec.MAX_MEDIA_BYTES,edited.length(),{photoDir.usableSpace},{operation.ensureActive()})}}
+            require(pending.length()==edited.length() && sha(pending){operation.ensureActive()}==sha(edited){operation.ensureActive()}){"副本校验失败"}
+            val metadata=inspectMedia(pending,"video/mp4")
+            require(metadata.first.startsWith("video/") && metadata.second>0){"副本不是有效视频"}
+            val photo=Photo(id,final.name,pending.length(),sha(pending){operation.ensureActive()},metadata.first,metadata.second)
+            operation.ensureActive()
+            withContext(kotlinx.coroutines.NonCancellable) {
+                check(pending.renameTo(final)){"副本保存失败"}
+                db.beginTransaction()
+                try {put("archive",archive.id,Codec.archive(archive.copy(photos=archive.photos+photo,updated=System.currentTimeMillis())));db.setTransactionSuccessful()}
+                finally {db.endTransaction()}
+                committed=true
+            }
+            photo
+        } finally {pending.delete();if(!committed)final.delete()}
     } }
     private fun photos(l: Library)=(l.archives+l.drafts).flatMap { it.photos }.plus(l.photoTrash.map {it.photo}).distinctBy {it.file}
     suspend fun space()=withContext(Dispatchers.IO) { gate.withLock { mapOf("照片与视频" to photoDir.walkTopDown().filter{it.isFile}.sumOf{it.length()},"图片缓存" to File(context.cacheDir,"previews").walkTopDown().filter{it.isFile}.sumOf{it.length()},"恢复前副本" to File(context.filesDir,"libraries").listFiles().orEmpty().filter{it.name!=generation}.sumOf { f -> f.walkTopDown().filter{it.isFile}.sumOf{it.length()} }) } }
@@ -267,6 +317,13 @@ class Store(private val context: Context) {
         val used=photos(loadUnsafe()).map{it.file}.toSet();photoDir.listFiles().orEmpty().filter {it.name !in used}.forEach {check(it.delete()) {"文件暂时无法清理，资料已更新，可重试"}}
     } }
     suspend fun clearCache()=withContext(Dispatchers.IO) { File(context.cacheDir,"previews").deleteRecursively();Unit }
+    /** Preflight before opening the system destination picker; the writer checks again against fresh state. */
+    suspend fun validateBackupCapacity()=withContext(Dispatchers.IO) {gate.withLock {
+        val l=loadUnsafe();val ps=photos(l)
+        val manifestBytes=Codec.library(l).put("appearance",rows("settings").firstOrNull() ?: Appearance().json()).toString().toByteArray(Charsets.UTF_8).size.toLong()
+        BackupLimits.DEFAULT.validateExport(manifestBytes,ps.asSequence().map{it.bytes})
+        LargeMediaIo.requireSpace(context.cacheDir.usableSpace,ps.sumOf{it.bytes}+manifestBytes+1024L*1024)
+    }}
     suspend fun backup(uri: Uri, progress: (String)->Unit)=withContext(Dispatchers.IO) { gate.withLock {
         val operation=coroutineContext
         val l=loadUnsafe();val ps=photos(l);val appearance=rows("settings").firstOrNull() ?: Appearance().json()
@@ -276,20 +333,26 @@ class Store(private val context: Context) {
         val tmp=File(context.cacheDir,"backup-${uid()}.zip")
         var destinationOpened=false
         try {
-            ZipOutputStream(tmp.outputStream().buffered()).use { zip ->
+            LargeMediaIo.requireSpace(context.cacheDir.usableSpace,ps.sumOf{it.bytes}+manifest.size+1024L*1024)
+            ZipOutputStream(LargeMediaIo.guardedOutput(tmp){operation.ensureActive()}.buffered()).use { zip ->
                 zip.putNextEntry(ZipEntry("manifest.json"));zip.write(manifest);zip.closeEntry()
+                // Media is already compressed. DEFLATED level 0 keeps streaming/ZIP64 without wasting CPU re-compressing GB videos.
+                zip.setLevel(java.util.zip.Deflater.NO_COMPRESSION)
                 ps.forEachIndexed { i,p ->
                     operation.ensureActive()
-                    val f=File(photoDir,p.file);require(f.length()==p.bytes && sha(f)==p.sha256) { "照片校验失败，备份未完成" }
-                    progress("打包媒体 ${i+1}/${ps.size}");zip.putNextEntry(ZipEntry("photos/${p.file}"));f.inputStream().use{copyChecked(it,zip){operation.ensureActive()}};zip.closeEntry()
+                    val f=File(photoDir,p.file);require(f.isFile && f.length()==p.bytes) { "照片校验失败，备份未完成" }
+                    val digest=MessageDigest.getInstance("SHA-256")
+                    progress("打包媒体 ${i+1}/${ps.size}");zip.putNextEntry(ZipEntry("photos/${p.file}"))
+                    f.inputStream().use {LargeMediaIo.copy(it,zip,p.bytes,p.bytes,check={operation.ensureActive()},onBytes={b,n->digest.update(b,0,n)})}
+                    require(digest.digest().hex()==p.sha256){"照片校验失败，备份未完成"};zip.closeEntry()
                 }
             }
             progress("写入所选位置")
             operation.ensureActive()
             context.contentResolver.openOutputStream(uri,"w").use { out -> requireNotNull(out);destinationOpened=true;tmp.inputStream().use {copyChecked(it,out){operation.ensureActive()}} }
             // Read back the destination, not just the temporary zip.
-            val actual=context.contentResolver.openInputStream(uri).use { requireNotNull(it);hashStream(it) }
-            require(actual==sha(tmp)) { "备份位置校验失败，请重新备份" }
+            val actual=context.contentResolver.openInputStream(uri).use { requireNotNull(it);hashStream(it){operation.ensureActive()} }
+            require(actual==sha(tmp){operation.ensureActive()}) { "备份位置校验失败，请重新备份" }
             prefs.edit().putLong("lastBackup",System.currentTimeMillis()).putString("backupLocation",uri.toString()).apply()
         } catch(e:Exception) { if(destinationOpened) runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver,uri) };throw e }
         finally {tmp.delete()}
@@ -307,14 +370,18 @@ class Store(private val context: Context) {
                     require(!entry.isDirectory && entries.add(n) && entries.size<=BackupLimits.DEFAULT.entries && (n=="manifest.json" || n.matches(Regex("photos/[a-f0-9-]{36}\\.original")))) { "备份包含异常或重复条目" }
                     val max=if(n=="manifest.json") BackupLimits.DEFAULT.manifestBytes else BackupLimits.DEFAULT.mediaBytes
                     val dst=if(n=="manifest.json") File(stage,"manifest.json") else File(dir,n.removePrefix("photos/"))
-                    dst.outputStream().use {out ->var size=0L;val buf=ByteArray(65536);while(true){operation.ensureActive();val k=zip.read(buf);if(k<0) break;size+=k;total+=k;require(size<=max && total<=BackupLimits.DEFAULT.totalBytes) {"备份展开容量超限"};out.write(buf,0,k)}}
+                    require(entry.size<0 || entry.size<=max){"备份条目大小超过安全上限"}
+                    dst.outputStream().use {out ->
+                        LargeMediaIo.copy(zip,out,minOf(max,BackupLimits.DEFAULT.totalBytes-total),
+                            available={stage.usableSpace},check={operation.ensureActive()},onBytes={_,count->total+=count})
+                    }
                     if(n=="manifest.json") manifest=JSONObject(dst.readText(Charsets.UTF_8))
                     progress("校验恢复文件 ${entries.size}");zip.closeEntry()
                 }
             } }
             val o=requireNotNull(manifest) { "缺少备份清单" };val l=Codec.library(o);val ps=photos(l)
             require(entries==ps.map { "photos/${it.file}" }.toSet()+"manifest.json") { "备份照片清单不一致" }
-            ps.forEach { operation.ensureActive();val f=File(dir,it.file);require(f.length()==it.bytes && sha(f)==it.sha256) {"备份照片损坏"} }
+            ps.forEach { operation.ensureActive();val f=File(dir,it.file);require(f.length()==it.bytes && sha(f){operation.ensureActive()}==it.sha256) {"备份照片损坏"} }
             progress("切换到已校验资料")
             operation.ensureActive();markProtectionDirty()
             installRestoredLibrary(stage,newId,o,l);committed=true
@@ -328,6 +395,8 @@ class Store(private val context: Context) {
                     l.photoTrash.forEach{put("photoTrash",it.id,JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",Codec.photo(it.photo)).put("index",it.index).put("removed",it.removed),next)}
                     l.templates.forEach{put("template",it.id,Templates.json(it),next)}
                     l.authors.forEach{put("author",it.id,Codec.author(it),next)}
+                    l.notes.forEach{put("longNote",it.key,it.json(),next)}
+                    l.noteDrafts.forEach{put("longNoteDraft",it.key,it.json(),next)}
                     put("searchPreferences","rules",l.searchPreferences.json(),next)
                     put("settings","appearance",Appearance.read(o.optJSONObject("appearance") ?: JSONObject()).json(),next)
                     next.setTransactionSuccessful()
@@ -340,6 +409,10 @@ class Store(private val context: Context) {
         } finally {if(!installed)next.close()}
     }
     fun lastBackup()=prefs.getLong("lastBackup",0)
+    fun canUndoRestore():Boolean {
+        val old=prefs.getString("previousGeneration",null) ?: return false
+        return (Codec.validId(old)||old=="initial") && File(context.filesDir,"libraries/$old/library.db").isFile
+    }
     suspend fun undoRestore()=withContext(Dispatchers.IO) {gate.withLock {
         val old=prefs.getString("previousGeneration",null) ?: error("没有恢复前副本")
         require(Codec.validId(old)||old=="initial");val next=File(context.filesDir,"libraries/$old");require(File(next,"library.db").isFile)
@@ -351,6 +424,6 @@ class Store(private val context: Context) {
     }}
 }
 fun ByteArray.hex()=joinToString("") {"%02x".format(it)}
-fun hashStream(input: java.io.InputStream): String {val d=MessageDigest.getInstance("SHA-256");val b=ByteArray(65536);while(true){val n=input.read(b);if(n<0) break;d.update(b,0,n)};return d.digest().hex()}
-fun sha(file: File)=FileInputStream(file).use(::hashStream)
+fun hashStream(input: java.io.InputStream,check:()->Unit={}): String {val d=MessageDigest.getInstance("SHA-256");val b=ByteArray(65536);while(true){check();val n=input.read(b);if(n<0) break;d.update(b,0,n)};return d.digest().hex()}
+fun sha(file: File,check:()->Unit={})=FileInputStream(file).use{hashStream(it,check)}
 internal fun copyChecked(input:java.io.InputStream,output:java.io.OutputStream,check:()->Unit) {val b=ByteArray(65536);while(true){check();val n=input.read(b);if(n<0)break;output.write(b,0,n)}}

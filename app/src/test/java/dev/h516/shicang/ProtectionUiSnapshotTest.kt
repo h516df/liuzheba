@@ -41,7 +41,7 @@ class ProtectionUiSnapshotTest {
             }}
         }}
         compose.onNodeWithText("自动保护 · ${state.status}").assertExists()
-        compose.onNodeWithText(if(state.location.isEmpty())"开启 / 找回资料" else "重新选择 / 恢复").performScrollTo().performClick()
+        compose.onNodeWithText(if(state.location.isEmpty())"开启自动保护" else "更换保存位置").performScrollTo().performClick()
         org.junit.Assert.assertEquals(1,requested)
         compose.onNodeWithText("自动保护 · ${state.status}").performScrollTo()
         val output=File("build/outputs/protection-ui/$name.png");output.parentFile.mkdirs();compose.onRoot().captureRoboImage(output.absolutePath)

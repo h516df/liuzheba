@@ -30,7 +30,7 @@ object MediaExport {
             operation.ensureActive()
             progress("保存 ${index+1} / ${request.photos.size}")
             val source=file(p)
-            require(source.isFile && source.length()==p.bytes && sha(source)==p.sha256) {"原件读取或校验失败"}
+            require(source.isFile && source.length()==p.bytes && sha(source){operation.ensureActive()}==p.sha256) {"原件读取或校验失败"}
             val remembered=history.getString(p.sha256,null)
             if(remembered!=null && runCatching{resolver.openFileDescriptor(Uri.parse(remembered),"r")?.use{it.statSize==p.bytes}==true}.getOrDefault(false)) {count++;continue}
             if(Build.VERSION.SDK_INT>=29) {
@@ -42,8 +42,8 @@ object MediaExport {
                 }
                 val uri=resolver.insert(collection,values) ?: error("无法创建相册文件")
                 try {
-                    resolver.openOutputStream(uri,"w").use {out->requireNotNull(out);source.inputStream().use{input->copyChecked(input,out){operation.ensureActive()}}}
-                    val actual=resolver.openInputStream(uri).use{requireNotNull(it);hashStream(it)}
+                    resolver.openOutputStream(uri,"w").use {out->requireNotNull(out);source.inputStream().use{input->LargeMediaIo.copy(input,out,p.bytes,p.bytes,check={operation.ensureActive()})}}
+                    val actual=resolver.openInputStream(uri).use{requireNotNull(it);hashStream(it){operation.ensureActive()}}
                     require(actual==p.sha256) {"相册文件校验失败"}
                     values.clear();values.put(MediaStore.MediaColumns.IS_PENDING,0);check(resolver.update(uri,values,null,null)==1)
                     history.edit().putString(p.sha256,uri.toString()).apply()
@@ -52,8 +52,8 @@ object MediaExport {
                 @Suppress("DEPRECATION") val folder=File(Environment.getExternalStoragePublicDirectory(if(p.isVideo)Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES),"留册").apply{mkdirs()}
                 val dest=File(folder,name(request.archive,p));val temp=File(folder,".${p.id}.pending")
                 try {
-                    source.inputStream().use{input->temp.outputStream().use{out->copyChecked(input,out){operation.ensureActive()}}}
-                    require(sha(temp)==p.sha256);check(temp.renameTo(dest)) {"相册保存失败"}
+                    source.inputStream().use{input->temp.outputStream().use{out->LargeMediaIo.copy(input,out,p.bytes,p.bytes,{folder.usableSpace},{operation.ensureActive()})}}
+                    require(sha(temp){operation.ensureActive()}==p.sha256);check(temp.renameTo(dest)) {"相册保存失败"}
                     MediaScannerConnection.scanFile(context,arrayOf(dest.path),arrayOf(p.mime),null)
                 } finally {temp.delete()}
             }

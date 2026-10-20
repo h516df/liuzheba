@@ -28,7 +28,7 @@ class BackupLimitsTest {
     }
     @Test fun productionBoundsRejectLargeLibrariesUsingMetadataOnly() {
         val production=BackupLimits.DEFAULT
-        assertEquals(20L*1024*1024*1024,production.totalBytes)
+        assertEquals(LargeMediaIo.BACKUP_BYTES,production.totalBytes)
         assertEquals(100001,production.entries)
         assertEquals(32L*1024*1024,production.manifestBytes)
         production.validateExport(production.manifestBytes,sequenceOf(Codec.MAX_MEDIA_BYTES))
