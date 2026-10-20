@@ -82,6 +82,13 @@ private val Muted: Color
         var zoomPhoto by rememberSaveable{mutableStateOf("")}
         val snackbar=remember{SnackbarHostState()}
         var confirm by remember{mutableStateOf<Pair<String,()->Unit>?>(null)}
+        var leaveEditorPrompt by remember{mutableStateOf(false)}
+        var collectMenu by remember{mutableStateOf(false)}
+        fun requestLeaveEditor() {
+            if(s.busy)return
+            val editor=s.editor ?: return
+            if(s.library.active.firstOrNull{it.id==editor.id}==editor)model.discardEditor() else leaveEditorPrompt=true
+        }
         if(s.protectionSelection!=null) AlertDialog(
             onDismissRequest=model::dismissProtectionSelection,
             title={Text("找到已有恢复版本")},
@@ -144,7 +151,7 @@ private val Muted: Color
         fun backPage() {
             when {
                 zoomPhoto.isNotEmpty()->zoomPhoto=""
-                editing->model.leaveEditor()
+                editing->requestLeaveEditor()
                 route=="detail"->route=detailReturn
                 route=="photos"->route=photosReturn
                 route=="settings"->{route=settingsReturn;zoomPhoto=settingsPhoto;settingsPhoto=""}
@@ -167,7 +174,13 @@ private val Muted: Color
                     Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"留着吧";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
                         if(route=="frame" && !editing) Text("留着吧 · 私人档案",fontSize=11.sp,color=Muted)}
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
-                        FilledTonalIconButton(onClick={model.openDownloads()},modifier=Modifier.size(48.dp).semantics{contentDescription="链接下载"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("保存到相册",scheme.onSurfaceVariant)}
+                        Box {
+                            FilledTonalIconButton(onClick={collectMenu=true},modifier=Modifier.size(48.dp).semantics{contentDescription="导入与作者"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("保存到相册",scheme.onSurfaceVariant)}
+                            DropdownMenu(collectMenu,{collectMenu=false}) {
+                                DropdownMenuItem(text={Text("作者主页与作者卡")},onClick={collectMenu=false;model.openAuthors()})
+                                DropdownMenuItem(text={Text("从链接下载媒体")},onClick={collectMenu=false;model.openDownloads()})
+                            }
+                        }
                         FilledTonalIconButton(onClick={openSettings()},modifier=Modifier.size(48.dp).semantics{contentDescription="设置"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("设置",scheme.onSurfaceVariant)}
                         Spacer(Modifier.width(8.dp))
                         if(!s.busy) Button(onClick={model.edit()},shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="＋ 新建"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)){
@@ -187,15 +200,18 @@ private val Muted: Color
                         TextButton(onClick=updater::dismissPrompt){Text("稍后")}
                     }
                 }
-                if(unlocked && s.ready && !editing && route=="library") {
-                    TextButton(onClick={openSettings()},modifier=Modifier.fillMaxWidth()) {
-                        Text(if(s.protection.protected) "已保护 · ${s.protection.mediaCount} 项原件" else "${s.protection.status} · ${if(s.protection.location.isEmpty()) "自动保护尚未开启" else "最新资料尚未完成外部保护"}",style=MaterialTheme.typography.labelMedium)
+                if(unlocked && s.ready && !editing && route=="library" && !s.protection.protected) {
+                    val needsAttention=s.protection.status in listOf("保护失败","待核对")
+                    Surface(modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp),shape=RoundedCornerShape(12.dp),color=if(needsAttention)scheme.errorContainer else scheme.surface) {
+                        TextButton(onClick={openSettings()},modifier=Modifier.fillMaxWidth()) {
+                            Text("${s.protection.status} · ${if(needsAttention) "点此处理，原文件请保留" else if(s.protection.location.isEmpty()) "尚未开启外部保护" else "外部保护进行中"}",style=MaterialTheme.typography.labelMedium,color=if(needsAttention)scheme.onErrorContainer else scheme.onSurfaceVariant)
+                        }
                     }
                 }
                 if(s.busy){LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(horizontal=24.dp,vertical=4.dp),fontSize=12.sp);if(s.progress.contains("备份")||s.progress.contains("恢复")||s.progress.contains("导入")||s.progress.contains("打包")||s.progress.contains("写入")) TextButton(onClick=model::cancelOperation){Text("取消")}}}
             }},bottomBar={if(!immersive && !editing && route=="library" && unlocked) NavigationBar(containerColor=scheme.background,tonalElevation=0.dp) {
                 NavigationBarItem(selected=false,onClick={route="frame"},icon={FrameGlyph("发现",scheme.onSurfaceVariant)},label={Text("发现")})
-                NavigationBarItem(selected=true,onClick={route="library"},icon={FrameGlyph("我的",scheme.onPrimaryContainer)},label={Text("我的")},colors=NavigationBarItemDefaults.colors(indicatorColor=scheme.primaryContainer,selectedTextColor=scheme.primary))
+                NavigationBarItem(selected=true,onClick={route="library"},icon={FrameGlyph("我的",scheme.onPrimaryContainer)},label={Text("档案")},colors=NavigationBarItemDefaults.colors(indicatorColor=scheme.primaryContainer,selectedTextColor=scheme.primary))
             }}) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when {
@@ -216,7 +232,7 @@ private val Muted: Color
                         else Empty("照片集已不存在","返回档案"){route="library"}}
 
                     route=="library"->libraryState.SaveableStateProvider("library") {LibraryV19(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})}
-                    route=="detail"->{val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}},::openDetails)}
+                    route=="detail"->{val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}},::openDetails,{model.edit(a);choosePhotos(a.id)},{AuthorArchiveSection(model,s,a,false)})}
                     route=="settings"->Settings(model,s,setLock,chooseProtection,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{route=it},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
                     route=="labels"->LabelsScreen(model,s){title,action->confirm=title to action}
@@ -234,7 +250,9 @@ private val Muted: Color
                 }
             }
         }
-        if(unlocked && editing) EditorV19(model,s,choosePhotos,takePhoto,{model.leaveEditor()},{title,action->confirm=title to action})
+        if(unlocked && editing) EditorV19(model,s,choosePhotos,takePhoto,{requestLeaveEditor()},{title,action->confirm=title to action},{s.editor?.let{AuthorArchiveSection(model,s,it,true)}})
+        if(unlocked && s.ready && s.authorsOpen) AuthorWorkflowUi(model,s)
+        if(unlocked && leaveEditorPrompt) AlertDialog(onDismissRequest={leaveEditorPrompt=false},title={Text("保留这次编辑？")},text={Text("保存草稿后返回，下次可以继续；已保存的档案暂不改变。")},confirmButton={TextButton(onClick={leaveEditorPrompt=false;model.leaveEditor()}){Text("保留草稿并返回")}},dismissButton={Row{TextButton(onClick={leaveEditorPrompt=false}){Text("继续编辑")};TextButton(onClick={leaveEditorPrompt=false;model.discardEditor()}){Text("放弃修改")}}})
         if(unlocked && appearanceOpen) ModalBottomSheet(onDismissRequest={appearanceOpen=false},
             sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=scheme.surface,tonalElevation=0.dp,
             shape=RoundedCornerShape(topStart=26.dp,topEnd=26.dp)) {
@@ -243,8 +261,11 @@ private val Muted: Color
         if(unlocked && s.ready) MediaCollectionUi(model,s)
         if(unlocked && s.ready && s.shares.isNotEmpty()) AlertDialog(onDismissRequest={if(!s.busy)model.dismissShare()},
             title={Text("拾取分享链接")},text={Column {Text(SharedLinks.parse(s.shares.first())?.let{"${it.platform} · ${it.kind}\n${it.name}"}.orEmpty());Text(if(s.editor!=null) "当前编辑会保留为草稿。新建后可核对名称、类型和链接。" else "自动填写平台、类型、名称与链接，保存前可修改。",Modifier.padding(top=12.dp))}},
-            confirmButton={TextButton(onClick={model.importShare()},enabled=!s.busy){Text(if(s.busy) "识别中…" else "创建档案草稿")}},
-            dismissButton={Row {TextButton(onClick={val text=s.shares.first();model.dismissShare();model.openDownloads(text)},enabled=!s.busy){Text("下载媒体")};TextButton(onClick=model::dismissShare,enabled=!s.busy){Text("取消")}}})
+            confirmButton={TextButton(onClick={
+                if(SharedLinks.parse(s.shares.first())?.kind=="个人主页") {val text=s.shares.first();model.dismissShare();model.openAuthors(input=text);model.importAuthor()}
+                else model.importShare()
+            },enabled=!s.busy){Text(if(s.busy) "识别中…" else if(SharedLinks.parse(s.shares.first())?.kind=="个人主页") "预览作者资料" else "创建档案草稿")}},
+            dismissButton={Row {TextButton(onClick={val text=s.shares.first();model.dismissShare();model.openAuthors(input=text)},enabled=!s.busy){Text("导入作者")};TextButton(onClick={val text=s.shares.first();model.dismissShare();model.openDownloads(text)},enabled=!s.busy){Text("下载媒体")};TextButton(onClick=model::dismissShare,enabled=!s.busy){Text("取消")}}})
         if(unlocked) confirm?.let {(title,action)->AlertDialog(onDismissRequest={confirm=null},title={Text("确认操作")},text={Text(title)},confirmButton={TextButton(onClick={confirm=null;action()}){Text("确认")}},dismissButton={TextButton(onClick={confirm=null}){Text("取消")}})}
     }
 }

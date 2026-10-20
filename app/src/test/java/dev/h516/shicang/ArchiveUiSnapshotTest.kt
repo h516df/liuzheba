@@ -82,6 +82,8 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithText("编辑档案").assertExists()
     })
     @Test fun localAiOptInCanCancelWithoutDownloading()=render("local-ai-opt-in",verify={model->
+        compose.onNodeWithText("按意思找 · AI").assertDoesNotExist()
+        compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("按意思找 · AI").performClick()
         compose.onNodeWithText("下载 / 校验本机 AI 模型").performClick()
         compose.onNodeWithText("下载本机中文语义模型？").assertExists()
@@ -92,18 +94,25 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun cancelledRuleDraftDoesNotRewriteLibrary()=render("search-rules-cancel",verify={model->
         val before=model.state.value.library
+        compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("旧回忆")
         compose.onNodeWithText("对应的原名称或关键词").performTextInput("一封旧信")
         compose.onNodeWithText("添加 / 更新别名").performClick()
         compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("收起选项").assertExists()
+        compose.onNodeWithText("定制规则").assertExists()
         org.junit.Assert.assertEquals(before,model.state.value.library)
     })
     @Test fun rulesBackDiscardsDraft()=render("search-rules-back",verify={model->
         val before=model.state.value.library
+        compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("不保存")
         compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithText("收起选项").assertExists()
         org.junit.Assert.assertEquals(before,runBlocking{model.store.load()})
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").assert(hasText("不保存",substring=true).not())
@@ -112,11 +121,14 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithText("添加 / 更新别名").performClick()
         androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithText("定制规则").assertExists()
+        compose.onNodeWithText("收起选项").assertExists()
         org.junit.Assert.assertEquals(before,runBlocking{model.store.load()})
     })
     @Test @Config(qualifiers="zh-rCN-w320dp-h900dp-xhdpi")
     fun narrowRulesSaveOnlyOnExplicitAction()=render("rules-320-font200",fontScale=2f,verify={model->
         val before=model.state.value.library
+        compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performScrollTo().performTextInput("旧回忆")
         compose.onNodeWithText("对应的原名称或关键词").performScrollTo().performTextInput("一封旧信")
@@ -136,6 +148,22 @@ class ArchiveUiSnapshotTest {
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("一封旧信").assertExists()
         compose.onNode(hasText("自定义别名",substring=true)).assertExists()
+    })
+    @Test fun editorBackKeepsDraftAndExplicitCancelRestoresSavedContent()=render("archive-draft-return",verify={model->
+        compose.onNodeWithText("一封旧信").performClick()
+        compose.onNodeWithText("编辑").performClick()
+        compose.onNode(hasSetTextAction() and hasText("一封旧信")).performTextReplacement("草稿里的新称呼")
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithText("保留草稿并返回").performClick()
+        compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy && model.state.value.editor==null}
+        org.junit.Assert.assertEquals("草稿里的新称呼",runBlocking{model.store.load()}.drafts.single().name)
+        compose.onNodeWithText("编辑").performClick()
+        compose.onNode(hasSetTextAction() and hasText("草稿里的新称呼")).assertExists()
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("确认").performClick()
+        compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy && model.state.value.editor==null}
+        org.junit.Assert.assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
+        compose.onNodeWithText("一封旧信").assertExists()
     })
     private fun render(name:String,dark:Boolean=false,detail:Boolean=false,settings:Boolean=false,empty:Boolean=false,fontScale:Float=1f,verify:(AppModel)->Unit={}) {
         RuntimeEnvironment.setFontScale(fontScale)
@@ -164,6 +192,15 @@ class ArchiveUiSnapshotTest {
                 store.save(Archive(name="手写食谱",fields=listOf(Field(name="来源",value="合成测试资料")),updated=100))
             }
         }
+        // Robolectric cannot decode ImageDecoder sources; use Android BitmapFactory for these real PNG fixtures.
+        val imageLoader=coil3.ImageLoader.Builder(app).components{add(coil3.decode.BitmapFactoryDecoder.Factory())}.build()
+        coil3.SingletonImageLoader.setUnsafe(imageLoader)
+        runBlocking {
+            store.load().active.flatMap{it.photos}.distinctBy{it.id}.forEach{photo->
+                val result=imageLoader.execute(coil3.request.ImageRequest.Builder(app).data(File(store.photoDir,photo.file)).build())
+                check(result is coil3.request.SuccessResult){"Synthetic photo did not decode: $result"}
+            }
+        }
         val model=AppModel(app)
         val models=androidx.lifecycle.ViewModelStore().apply{put("fixture",model)}
         try {
@@ -179,6 +216,6 @@ class ArchiveUiSnapshotTest {
         verify(model);compose.waitForIdle()
         val output=File("build/outputs/archive-ui/$name.png");output.parentFile?.mkdirs()
         compose.onRoot().captureRoboImage(output.absolutePath)
-        } finally {models.clear();compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();model.resourcesClosed};runBlocking{store.close()}}
+        } finally {models.clear();compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();model.resourcesClosed};runBlocking{store.close()};imageLoader.shutdown()}
     }
 }

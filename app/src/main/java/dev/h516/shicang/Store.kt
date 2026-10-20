@@ -137,7 +137,7 @@ class Store(private val context: Context) {
     private fun remove(kind: String,id: String) { markProtectionDirty();db.execSQL("DELETE FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)) }
     private fun loadUnsafe()=Library(rows("archive").map(Codec::archive),rows("draft").map(Codec::archive),
         rows("label").map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
-        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()))
+        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()), rows("author").map(Codec::author))
     suspend fun load()=withContext(Dispatchers.IO) { gate.withLock { loadUnsafe() } }
     suspend fun searchPreferences(value:SearchPreferences)=withContext(Dispatchers.IO) {gate.withLock {put("searchPreferences","rules",SearchPreferences.read(value.json()).json())}}
     suspend fun appearance()=withContext(Dispatchers.IO) { gate.withLock { rows("settings").firstOrNull()?.let(Appearance::read) ?: Appearance() } }
@@ -148,6 +148,35 @@ class Store(private val context: Context) {
         require(existing.size<500 || existing.any{it.id==t.id}) {"模板已达上限"}
         require(existing.none{it.id!=t.id && normalizedLabel(it.name)==normalizedLabel(t.name)}) {"同名模板已存在"}
         put("template",t.id,Templates.json(t))
+    }}
+    suspend fun saveAuthor(input:Author,draft:Archive?=null,linkTo:String?=null)=withContext(Dispatchers.IO) {gate.withLock {
+        val author=Codec.author(Codec.author(input.copy(name=input.name.trim(),updated=System.currentTimeMillis())))
+        require(author.name.isNotBlank() || author.identities.any{it.nickname.isNotBlank() || it.profileUrl.isNotBlank()}) {"请填写作者称呼或主页"}
+        val library=loadUnsafe();val others=library.authors.filter{it.id!=author.id}
+        require(others.size<100000 && author.identities.none{identity->others.any{other->other.identities.any{it.id==identity.id}}}) {"作者或平台身份编号重复"}
+        val target=linkTo?.let{id->library.active.firstOrNull{it.id==id} ?: error("档案已不存在")}
+        if(draft!=null)require(draft.authorIds.all{id->id==author.id || others.any{it.id==id}}){"作者关联已变更"}
+        fun linked(a:Archive)=a.copy(authorIds=(a.authorIds+author.id).distinct(),updated=System.currentTimeMillis())
+        db.beginTransaction();try {
+            put("author",author.id,Codec.author(author))
+            if(draft!=null)put("draft",draft.id,Codec.archive(linked(draft)))
+            else if(target!=null) {
+                put("archive",target.id,Codec.archive(linked(target)))
+                library.drafts.firstOrNull{it.id==target.id}?.let{put("draft",it.id,Codec.archive(linked(it)))}
+            }
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
+    }}
+    suspend fun linkAuthor(authorId:String,archiveId:String,linked:Boolean)=withContext(Dispatchers.IO) {gate.withLock {
+        val library=loadUnsafe()
+        require(library.authors.any{it.id==authorId}) {"作者已不存在"}
+        val archive=library.active.firstOrNull{it.id==archiveId} ?: error("档案已不存在")
+        fun links(a:Archive)=a.copy(authorIds=if(linked)(a.authorIds+authorId).distinct() else a.authorIds-authorId,updated=System.currentTimeMillis())
+        db.beginTransaction();try {
+            put("archive",archive.id,Codec.archive(links(archive)))
+            library.drafts.firstOrNull{it.id==archiveId}?.let{put("draft",it.id,Codec.archive(links(it)))}
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
     }}
     suspend fun deleteTemplate(id:String)=withContext(Dispatchers.IO) {gate.withLock {remove("template",id)}}
     suspend fun draft(a: Archive)=withContext(Dispatchers.IO) { gate.withLock { put("draft",a.id,Codec.archive(a));settleImportedMedia() } }
@@ -166,6 +195,7 @@ class Store(private val context: Context) {
         require(a.photos.all { File(photoDir,it.file).isFile }) { "照片尚未保存，请等待导入完成" }
         val library=loadUnsafe()
         require((a.category.isEmpty() || library.labels.any{it.id==a.category && it.kind=="category"}) && a.tags.all{id -> library.labels.any{it.id==id && it.kind=="tag"}}) {"分类或标签已变更，请重新选择"}
+        require(a.authorIds.distinct().size==a.authorIds.size && a.authorIds.all{id->library.authors.any{it.id==id}}) {"作者关联已变更，请重新选择"}
         val old=library.archives.firstOrNull { it.id==a.id }
         db.beginTransaction()
         try {
@@ -297,6 +327,7 @@ class Store(private val context: Context) {
                     l.labels.forEach{put("label",it.id,JSONObject().put("id",it.id).put("kind",it.kind).put("name",it.name),next)}
                     l.photoTrash.forEach{put("photoTrash",it.id,JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",Codec.photo(it.photo)).put("index",it.index).put("removed",it.removed),next)}
                     l.templates.forEach{put("template",it.id,Templates.json(it),next)}
+                    l.authors.forEach{put("author",it.id,Codec.author(it),next)}
                     put("searchPreferences","rules",l.searchPreferences.json(),next)
                     put("settings","appearance",Appearance.read(o.optJSONObject("appearance") ?: JSONObject()).json(),next)
                     next.setTransactionSuccessful()

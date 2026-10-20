@@ -148,7 +148,9 @@ class DesignV19Test {
             val searchDeadline=SystemClock.uptimeMillis()+5000
             while(node("林雨（示例）")!=null && SystemClock.uptimeMillis()<searchDeadline) Thread.sleep(80)
             assertNull(node("林雨（示例）"));click("妈妈");waitNode("档案");waitNode("杭州")
-            assertNull(node("照片与视频"));screenshot("reopened-no-photo")
+            // Empty-media archives retain the same media section and direct add action.
+            nodes().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);Thread.sleep(300)
+            waitNode("照片与视频");waitNode("尚未添加照片与视频");waitNode("添加");screenshot("reopened-no-photo")
             if(InstrumentationRegistry.getArguments().getString("visualDensity")=="true") {
                 store.save(Archive(name="周末的城市散步",category=category,photos=photos.take(1),fields=listOf(Field(name="地点",value="老街与河岸"))))
                 store.save(Archive(name="外婆的手写食谱与节日记忆",photos=photos.take(2)))
