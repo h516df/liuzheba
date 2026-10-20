@@ -35,6 +35,17 @@ class ArchiveUiSnapshotTest {
     @Test fun libraryDark()=render("library-dark",dark=true)
     @Test fun detailLight()=render("detail-light",detail=true)
     @Test fun settingsLight()=render("settings-light",settings=true)
+    @Test fun finalReleaseNotesOpenFromSettings()=render("v015-update-notes",settings=true,verify={model->
+        compose.onNodeWithText("关于与检查更新").performScrollTo().performClick()
+        compose.onNodeWithText("检查更新").assertExists()
+        compose.onNodeWithText("本版说明 0.15").performScrollTo().assertIsDisplayed()
+        val notes=model.updater.currentNotes()!!
+        org.junit.Assert.assertEquals("0.15",notes.version)
+        org.junit.Assert.assertEquals(16,notes.code)
+        notes.sections.flatMap{it.second}.forEach {line->
+            compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
+        }
+    })
     @Test fun emptyLight()=render("empty-light",empty=true)
     @Test @Config(qualifiers="zh-rCN-w320dp-h900dp-xhdpi")
     fun narrowLargeDark()=render("library-320-dark-font150",dark=true,fontScale=1.5f)

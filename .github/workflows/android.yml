@@ -26,7 +26,20 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - run: chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
+      - name: Existing feature validation
+        if: ${{ !startsWith(github.head_ref || github.ref_name, 'release/') }}
+        run: chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
+      - name: Final release inputs and unsigned package
+        if: startsWith(github.head_ref || github.ref_name, 'release/')
+        run: chmod +x gradlew && ./gradlew --no-daemon --max-workers=1 testDebugUnitTest --tests dev.h516.update.EmbeddedReleaseNotesTest --tests dev.h516.shicang.ArchiveUiSnapshotTest.finalReleaseNotesOpenFromSettings assembleRelease
+      - name: Preserve unsigned release for local official signing
+        if: startsWith(github.head_ref || github.ref_name, 'release/')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-release-${{ github.sha }}
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 14
       - name: Preserve test and lint reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
