@@ -216,7 +216,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun edit(a: Archive?=null) {
         if(!mutable.value.ready || mutable.value.busy) return
         val target=a?.let { formal -> mutable.value.library.drafts.firstOrNull{it.id==formal.id} ?: formal } ?: Archive(fields=listOf(Field()))
-        mutable.value=mutable.value.copy(editor=target,draftStatus="正在保存草稿")
+        mutable.value=mutable.value.copy(editor=target,draftStatus="正在保存草稿",message="")
         change(target)
     }
     fun change(a: Archive) {
@@ -263,7 +263,17 @@ class AppModel(app: Application): AndroidViewModel(app) {
     }
     }
     fun renameLabel(item: Label,name: String)=work("修改名称") {store.renameLabel(item.id,name)}
-    fun deleteLabel(item: Label) {if(mutable.value.busy) return;draftJob?.cancel();work("移除关联") {store.deleteLabel(item.id);mutable.value.editor?.let {a -> mutable.value=mutable.value.copy(editor=a.copy(category=if(a.category==item.id) "" else a.category,tags=a.tags-item.id))}}}
+    fun deleteLabel(item: Label) {
+        if(mutable.value.busy) return
+        draftJob?.cancel()
+        val draft=mutable.value.editor
+        work("移除关联") {
+            // Preserve edits still inside the debounce window before clearing associations.
+            if(draft!=null) store.draft(draft)
+            store.deleteLabel(item.id)
+            draft?.let {a->mutable.value=mutable.value.copy(editor=a.copy(category=if(a.category==item.id) "" else a.category,tags=a.tags-item.id),draftStatus="草稿已保存")}
+        }
+    }
     fun saveTemplate(name:String,replaceId:String?=null) {
         val a=mutable.value.editor ?: return
         val template=runCatching{Templates.create(name,a.fields)}.getOrElse{message(it.message ?: "模板未保存");return}

@@ -171,7 +171,7 @@ class ArchiveUiSnapshotTest {
         org.junit.Assert.assertEquals("草稿里的新称呼",runBlocking{model.store.load()}.drafts.single().name)
         compose.onNodeWithText("编辑").performClick()
         compose.onNode(hasSetTextAction() and hasText("草稿里的新称呼")).assertExists()
-        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("放弃修改").performClick()
         compose.onNodeWithText("确认").performClick()
         compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy && model.state.value.editor==null}
         org.junit.Assert.assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())

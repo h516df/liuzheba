@@ -250,7 +250,7 @@ private val Muted: Color
                     route=="settings"->libraryState.SaveableStateProvider("settings") {Settings(model,s,setLock,{route=it},{title,action->confirm=title to action})}
                     route=="backup"->BackupScreen(model,s,chooseProtection,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
-                    route=="labels"->LabelsScreen(model,s){title,action->confirm=title to action}
+                    route=="labels"->LabelsScreen(model,s,confirm={title,action->confirm=title to action})
                     route=="updates"->UpdateScreen(updater,PaddingValues(0.dp))
                 }
                 if(unlocked && s.ready && !editing && zoomPhoto.isNotEmpty()) {
@@ -457,14 +457,15 @@ private val Muted: Color
         item {OutlinedButton(onClick={confirm("永久清理回收站及不再引用的照片？这一步不能撤销，手机相册原文件保留。",model::purge)},enabled=!s.busy){Text("永久清理回收站")}}
     }
 }
-@Composable private fun LabelsScreen(model:AppModel,s:AppState,confirm:(String,()->Unit)->Unit) {
+@Composable internal fun LabelsScreen(model:AppModel,s:AppState,confirm:(String,()->Unit)->Unit,initialKind:String="category") {
     var editing by remember{mutableStateOf<Label?>(null)}
     var name by remember{mutableStateOf("")}
     var creating by remember{mutableStateOf(false)}
-    var kind by rememberSaveable{mutableStateOf("category")}
+    var kind by rememberSaveable{mutableStateOf(initialKind)}
     var query by rememberSaveable{mutableStateOf("")}
     val c=MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp)) {
+        Text("分类选一个，用于归档；标签可多个，用于补充描述。",Modifier.padding(vertical=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             FilterChip(kind=="category",{kind="category"},label={Text("分类")})
             FilterChip(kind=="tag",{kind="tag"},label={Text("标签")})
@@ -484,10 +485,16 @@ private val Muted: Color
                         Text("$count 份档案",Modifier.padding(top=4.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     }
                     Box {
-                        GalleryIcon("更多",c.onSurfaceVariant){menu=true}
+                        TextButton(onClick={menu=true},enabled=!s.busy){Text("管理")}
                         DropdownMenu(menu,{menu=false}) {
                             DropdownMenuItem(text={Text("改名")},onClick={menu=false;editing=label;name=label.name})
-                            DropdownMenuItem(text={Text("删除",color=c.error)},onClick={menu=false;confirm("删除「${label.name}」及所有关联？档案和照片保留。",{model.deleteLabel(label)})})
+                            DropdownMenuItem(text={Text("全局删除${if(label.kind=="category") "分类" else "标签"}",color=c.error)},onClick={
+                                menu=false
+                                val archives=s.library.archives.count{if(label.kind=="category") it.category==label.id else label.id in it.tags}
+                                val currentDrafts=s.library.drafts.filterNot{it.id==s.editor?.id}+listOfNotNull(s.editor)
+                                val drafts=currentDrafts.count{if(label.kind=="category") it.category==label.id else label.id in it.tags}
+                                confirm("删除「${label.name}」？将从 $archives 份档案（含回收站）和 $drafts 份草稿移除关联，无法自动恢复这些关联。档案、照片和视频不会删除。若只想移出当前档案，请返回编辑页取消勾选。",{model.deleteLabel(label)})
+                            })
                         }
                     }
                 }

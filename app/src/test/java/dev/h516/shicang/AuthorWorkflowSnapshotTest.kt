@@ -33,7 +33,7 @@ class AuthorWorkflowSnapshotTest {
         compose.onNodeWithText("核对作者资料").assertExists()
         compose.onNodeWithText("公开昵称（未获取可留空）").performTextReplacement("核对后的昵称")
         shot("author-preview")
-        compose.onNodeWithText("确认保存").performClick()
+        compose.onNodeWithText("保存并关联此档案").performClick()
         wait{!model.state.value.busy && model.state.value.authorPreview==null}
         val library=runBlocking{model.store.load()}
         assertEquals("核对后的昵称",library.authors.single().identities.single().nickname)
@@ -62,7 +62,7 @@ class AuthorWorkflowSnapshotTest {
         compose.runOnIdle{model.appearance(model.state.value.appearance)}
         wait{!model.state.value.busy && model.state.value.library.authors.any{it.id==existing.id}}
         compose.onNodeWithText("公开昵称（未获取可留空）").performTextReplacement("只修改昵称")
-        compose.onNodeWithText("确认保存").performClick()
+        compose.onNodeWithText("保存作者资料").performClick()
         wait{!model.state.value.busy && model.state.value.authorPreview==null}
         assertTrue(runBlocking{model.store.load()}.active.single().authorIds.isEmpty())
         assertEquals("只修改昵称",runBlocking{model.store.load()}.authors.single().identities.single().nickname)
@@ -71,7 +71,7 @@ class AuthorWorkflowSnapshotTest {
     fun largeDarkPreviewCanSaveVerifiedLinkWithMissingNames()=render("author-dark-font200",dark=true,font=2f) {model,archive->
         compose.runOnIdle{model.openAuthors(archive.id);model.previewAuthor(Author(identities=listOf(AuthorProfiles.parse("https://weibo.com/u/123456789")!!)))}
         shot("author-dark-large-preview")
-        compose.onNodeWithText("确认保存").assertIsDisplayed().performClick()
+        compose.onNodeWithText("保存并关联此档案").assertIsDisplayed().performClick()
         wait{!model.state.value.busy && model.state.value.authorPreview==null}
         assertEquals("",runBlocking{model.store.load()}.authors.single().name)
         compose.onNodeWithText("未填写称呼的作者").performScrollTo().assertExists()

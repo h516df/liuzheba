@@ -70,7 +70,7 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
     Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
             PageBar(if(preview==null) "作者" else "核对作者资料",{back()}) {
-                if(preview!=null)Button(onClick=model::saveAuthor,enabled=!s.busy){Text("确认保存")}
+                if(preview!=null)Button(onClick=model::saveAuthor,enabled=!s.busy){Text(if(s.library.authors.none{it.id==preview.id} && s.authorTarget!=null) "保存并关联此档案" else "保存作者资料")}
             }
             if(s.busy)LinearProgressIndicator(Modifier.fillMaxWidth())
             if(s.message.isNotBlank())Text(s.message,Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error)

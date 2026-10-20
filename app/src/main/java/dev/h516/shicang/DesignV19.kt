@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -261,13 +262,19 @@ private fun openLink(context:Context,url:String,model:AppModel) {
     var addMedia by remember{mutableStateOf(false)}
     var labels by remember{mutableStateOf(false)}
     var templates by remember{mutableStateOf(false)}
+    var managingLabels by rememberSaveable{mutableStateOf<String?>(null)}
+    var optional by rememberSaveable(a.id){mutableStateOf(a.authorIds.isNotEmpty() || a.fields.any{it.name.isNotBlank() || it.value.isNotBlank()})}
     var saveTemplate by remember{mutableStateOf(false)}
     var templateName by remember{mutableStateOf("")}
     var removed by remember(a.id){mutableStateOf<Pair<Int,Field>?>(null)}
     fun change(value:Archive){model.change(value)}
     BackHandler(templates){templates=false}
+    BackHandler(managingLabels!=null){managingLabels=null}
     Surface(Modifier.fillMaxSize(),color=c.background) {
-        if(templates) Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        if(managingLabels!=null) Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+            PageBar("管理分类与标签",{managingLabels=null})
+            LabelsScreen(model,s,confirm,managingLabels!!)
+        } else if(templates) Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             PageBar("选择模板",{templates=false})
             LazyColumn(Modifier.padding(horizontal=24.dp),contentPadding=PaddingValues(vertical=20.dp)) {
                 item{Text("只添加字段名称与类型，保留已填内容。",color=c.onSurfaceVariant,fontSize=12.sp,modifier=Modifier.padding(bottom=18.dp))}
@@ -275,12 +282,13 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 items(s.library.templates,key={it.id}){t->Column(Modifier.fillMaxWidth().clickable{model.applyTemplate(t);templates=false}.padding(vertical=20.dp)){Text(t.name,fontSize=17.sp);Text(t.fields.joinToString(" · "){it.name},Modifier.padding(top=6.dp),fontSize=12.sp,color=c.onSurfaceVariant);HorizontalDivider(Modifier.padding(top=20.dp),color=c.outlineVariant.copy(alpha=.5f))}}
             }
         } else Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            PageBar(if(s.library.active.any{it.id==a.id}) "编辑档案" else "新建档案",back){TextButton(onClick={confirm("放弃这次编辑？已保存的档案保持原样。",model::discardEditor)},enabled=!s.busy){Text("取消")};Button(onClick=model::saveEditor,enabled=!s.busy,shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp)){Text(if(s.busy) "处理中" else "保存")}}
+            PageBar(if(s.library.active.any{it.id==a.id}) "编辑档案" else "新建档案",back){TextButton(onClick={confirm("放弃这次编辑？已保存的档案保持原样。",model::discardEditor)},enabled=!s.busy){Text("放弃修改")};Button(onClick=model::saveEditor,enabled=!s.busy,shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp)){Text(if(s.busy) "处理中" else "保存")}}
+            Text("${s.draftStatus.ifBlank{"正在保留草稿"}} · 返回保留草稿",Modifier.padding(horizontal=20.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
             if(s.message.isNotEmpty()) Row(Modifier.fillMaxWidth().background(c.surfaceVariant).padding(start=24.dp),verticalAlignment=Alignment.CenterVertically){Text(s.message,Modifier.weight(1f),fontSize=12.sp);TextButton(onClick=model::dismissMessage){Text("知道了",fontSize=12.sp)}}
             if(s.busy) {LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(start=24.dp),fontSize=12.sp);TextButton(onClick=model::cancelOperation){Text("取消")}}}
-            LazyColumn(contentPadding=PaddingValues(start=20.dp,end=20.dp,top=16.dp,bottom=24.dp)) {
+            LazyColumn(Modifier.testTag("archive-editor-fields"),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=16.dp,bottom=24.dp)) {
                 item {
-                    Text("称呼",Modifier.padding(bottom=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+                    Text("档案名称",Modifier.padding(bottom=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     TextField(a.name,{change(a.copy(name=it))},Modifier.fillMaxWidth(),enabled=!s.busy,singleLine=true,shape=RoundedCornerShape(16.dp),placeholder={Text("名称或称呼",style=MaterialTheme.typography.headlineMedium)},textStyle=MaterialTheme.typography.headlineMedium,colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,disabledContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
                     SectionTitle("照片与视频"){FilledTonalButton(onClick={addMedia=true},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=14.dp)){Text("添加")}}
                     if(a.photos.isEmpty()) Text("可稍后添加，只有资料也能保存。",fontSize=12.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=10.dp))
@@ -299,40 +307,41 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                         }
                     }}
                     Spacer(Modifier.height(16.dp))
-                    authorSection()
-                    SectionTitle("来源链接") {
-                        TextButton(onClick={val name=generateSequence(1){it+1}.map{if(it==1) "来源" else "来源$it"}.first{candidate->a.fields.none{it.name==candidate}};change(a.copy(fields=a.fields+Field(name=name,type="链接")))},enabled=!s.busy && a.fields.size<40){Text("添加链接")}
-                    }
-                    a.fields.filter{it.type=="链接"}.forEach{f->
-                        key(f.id){ArchiveFieldEditor(a,f,s.busy,::change){removed=a.fields.indexOf(f) to f;change(a.copy(fields=a.fields-f))}}
-                    }
                     Row(Modifier.fillMaxWidth().clickable(enabled=!s.busy){labels=true}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("分类与标签",style=MaterialTheme.typography.bodyMedium)
-                            val selectedLabels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
-                            if(selectedLabels.isNotEmpty()) Text(selectedLabels.joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
+                            Text("分类（单选）：${s.library.labelName(a.category).ifBlank{ "未分类" }}",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+                            Text("标签（多选）：${a.tags.map(s.library::labelName).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"未添加"}}",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                         }
                         FrameGlyph("展开",c.onSurfaceVariant)
                     }
-                    SectionTitle("资料"){
+                    TextButton(onClick={optional=!optional}){Text(if(optional) "收起可选资料" else "添加可选资料（作者、来源、字段）")}
+                    if(optional) {
+                        authorSection()
+                        SectionTitle("来源链接") {
+                            TextButton(onClick={val name=generateSequence(1){it+1}.map{if(it==1) "来源" else "来源$it"}.first{candidate->a.fields.none{it.name==candidate}};change(a.copy(fields=a.fields+Field(name=name,type="链接")))},enabled=!s.busy && a.fields.size<40){Text("添加链接")}
+                        }
+                        a.fields.filter{it.type=="链接"}.forEach{f->
+                            key(f.id){ArchiveFieldEditor(a,f,s.busy,::change){removed=a.fields.indexOf(f) to f;change(a.copy(fields=a.fields-f))}}
+                        }
+                    }
+                    if(optional) SectionTitle("自定义字段（可选）"){
                         TextButton(onClick={templates=true},enabled=!s.busy,contentPadding=PaddingValues(6.dp)){Text("选择模板",fontSize=12.sp)}
                         TextButton(onClick={saveTemplate=true},enabled=!s.busy,contentPadding=PaddingValues(6.dp)){Text("存为模板",fontSize=12.sp)}
                     }
                     removed?.let{pair->Row(verticalAlignment=Alignment.CenterVertically){Text("已移除字段",Modifier.weight(1f),fontSize=12.sp,color=c.onSurfaceVariant);TextButton(onClick={if(a.fields.size<40){val fs=a.fields.toMutableList();fs.add(pair.first.coerceAtMost(fs.size),pair.second);change(a.copy(fields=fs));removed=null}},enabled=!s.busy && a.fields.size<40){Text("撤销")}}}
                 }
-                items(a.fields.filterNot{it.type=="链接"},key={it.id}){f->
+                items(if(optional) a.fields.filterNot{it.type=="链接"} else emptyList(),key={it.id}){f->
                     ArchiveFieldEditor(a,f,s.busy,::change){removed=a.fields.indexOf(f) to f;change(a.copy(fields=a.fields-f))}
                 }
                 item {
-                    TextButton(onClick={change(a.copy(fields=a.fields+Field()))},enabled=!s.busy && a.fields.size<40){Text("＋ 添加字段")}
-                    Text(s.draftStatus,Modifier.padding(top=12.dp),color=c.onSurfaceVariant,fontSize=11.sp)
-                    TextButton(onClick={confirm("放弃这份草稿？已保存的档案保持原样。",model::discardEditor)},enabled=!s.busy){Text("放弃草稿",fontSize=12.sp,color=c.onSurfaceVariant)}
+                    if(optional) TextButton(onClick={change(a.copy(fields=a.fields+Field()))},enabled=!s.busy && a.fields.size<40){Text("＋ 添加字段")}
                 }
             }
         }
     }
     if(addMedia) AlertDialog(onDismissRequest={addMedia=false},title={Text("添加照片与视频")},text={Text("选入后保留原文件副本；视频默认静音，轻触播放。")},confirmButton={TextButton(onClick={addMedia=false;choose(a.id)}){Text("从相册选择")}},dismissButton={TextButton(onClick={addMedia=false;take(a.id)}){Text("拍照")}})
-    if(labels) LabelPicker(s.library,a.category,a.tags,{change(a.copy(category=it.first,tags=it.second));labels=false},{labels=false},"分类与标签",{kind,name->model.label(kind,name,false)},busy=s.busy)
+    if(labels) LabelPicker(s.library,a.category,a.tags,{change(a.copy(category=it.first,tags=it.second));labels=false},{labels=false},"分类与标签",{kind,name->model.label(kind,name,false)},busy=s.busy,manage={kind,selection->change(a.copy(category=selection.first,tags=selection.second));labels=false;managingLabels=kind})
     if(saveTemplate) {
         val existing=s.library.templates.firstOrNull{normalizedLabel(it.name)==normalizedLabel(templateName)}
         AlertDialog(onDismissRequest={saveTemplate=false},title={Text(if(existing==null) "存为模板" else "更新同名模板")},text={Column{Text("只保存字段名称、类型和顺序，不包含任何资料内容。",fontSize=12.sp);QuietInput(templateName,{templateName=it},"模板名称",Modifier.fillMaxWidth());if(existing!=null) Text("将更新「${existing.name}」。已建档案不受影响。",fontSize=12.sp)}},confirmButton={TextButton(onClick={model.saveTemplate(templateName,existing?.id);saveTemplate=false},enabled=templateName.isNotBlank()&&!s.busy){Text(if(existing==null) "保存模板" else "确认更新")}},dismissButton={TextButton(onClick={saveTemplate=false}){Text("取消")}})
@@ -356,7 +365,7 @@ private fun isArchiveSource(field:Field)=field.type=="链接" || field.value.tri
 
 }
 
-@Composable internal fun LabelPicker(library:Library,initialCategory:String,initialTags:List<String>,apply:(Pair<String,List<String>>)->Unit,close:()->Unit,title:String,create:((String,String)->Unit)?=null,busy:Boolean=false) {
+@Composable internal fun LabelPicker(library:Library,initialCategory:String,initialTags:List<String>,apply:(Pair<String,List<String>>)->Unit,close:()->Unit,title:String,create:((String,String)->Unit)?=null,busy:Boolean=false,manage:((String,Pair<String,List<String>>)->Unit)?=null) {
     var category by rememberSaveable{mutableStateOf(initialCategory)}
     var tags by rememberSaveable{mutableStateOf(initialTags)}
     var query by rememberSaveable{mutableStateOf("")}
@@ -392,7 +401,8 @@ private fun isArchiveSource(field:Field)=field.type=="链接" || field.value.tri
                 items(library.labels.filter{it.kind==kind && it.name.contains(query,true)},key={it.id}){l->Row(Modifier.fillMaxWidth().clickable{if(kind=="category") category=if(category==l.id) "" else l.id else tags=if(l.id in tags) tags-l.id else tags+l.id}.padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Text(l.name,Modifier.weight(1f),fontSize=15.sp);if(kind=="category") RadioButton(category==l.id,null) else Checkbox(l.id in tags,null)}}
                 if(create!=null && query.isNotBlank() && library.labels.none{it.kind==kind && normalizedLabel(it.name)==normalizedLabel(query)}) item{TextButton(enabled=pending==null && !busy,onClick={createError="";pending=kind to query.trim();create(kind,query.trim())}){Text("新建${if(kind=="category") "分类" else "标签"}「$query」")}}
             }
-            Text(if(kind=="category") "每份档案选择一个分类。" else "可以选择多个标签，筛选时同时匹配。",fontSize=11.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=14.dp))
+            if(manage!=null) TextButton(onClick={manage(kind,category to tags)},enabled=!busy && pending==null){Text("管理${if(kind=="category") "分类" else "标签"}（改名或全局删除）")}
+            Text(if(kind=="category") "每份档案只选一个分类。" else "标签可多选。取消勾选或点 × 仅移出当前选择，不删除标签。",fontSize=11.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=14.dp))
         }
     }
 }
