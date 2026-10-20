@@ -70,21 +70,30 @@ import kotlinx.coroutines.withContext
     var category by rememberSaveable{mutableStateOf("")}
     var tags by rememberSaveable{mutableStateOf(listOf<String>())}
     var byName by rememberSaveable{mutableStateOf(false)}
+    var rules by remember{mutableStateOf(false)}
+    var aliases by rememberSaveable{mutableStateOf(true)}
+    var recent by rememberSaveable{mutableStateOf(0L)}
+    var semantic by rememberSaveable{mutableStateOf(false)}
     var filters by rememberSaveable{mutableStateOf(false)}
     val prefs=LocalContext.current.getSharedPreferences("device",0)
     val focus=androidx.compose.ui.platform.LocalFocusManager.current
     var covers by rememberSaveable{mutableStateOf(prefs.getBoolean("libraryCovers",true))}
-    val selection=ArchiveQuery(query,category,tags,byName).normalized(s.library)
+    val selection=ArchiveQuery(query,category,tags,byName,aliases,recent,semantic).normalized(s.library)
     LaunchedEffect(selection.category,selection.tags) {category=selection.category;tags=selection.tags}
+    var hits by remember{mutableStateOf<List<SearchHit>>(emptyList())}
     var results by remember{mutableStateOf<List<Archive>?>(null)}
     var completedQuery by remember{mutableStateOf<ArchiveQuery?>(null)}
     val c=MaterialTheme.colorScheme
-    LaunchedEffect(s.library,selection){
-        val found=withContext(Dispatchers.Default){selection.results(s.library)}
-        results=found;completedQuery=selection
+    LaunchedEffect(s.library,selection,s.modelDownloading){
+        val found=model.search(s.library,selection)
+        hits=found;results=found.map{it.archive};completedQuery=selection
     }
     val searching=results==null || completedQuery!=selection
-    fun clear(){query="";category="";tags=emptyList();focus.clearFocus()}
+    fun clear(){query="";category="";tags=emptyList();recent=0L;focus.clearFocus()}
+    if(rules) {
+        SearchRulesPage(s.library,s.busy,model::searchPreferences){rules=false}
+        return
+    }
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             TextField(query,{query=it},Modifier.weight(1f).semantics{contentDescription="搜索档案"},singleLine=true,
@@ -100,6 +109,13 @@ import kotlinx.coroutines.withContext
                 FrameGlyph("筛选",c.primary)
             }
         }
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            FilterChip(aliases,{aliases=!aliases},label={Text("我的别名")})
+            FilterChip(recent>0,{recent=if(recent>0)0L else System.currentTimeMillis()-30L*86400000},label={Text("近30天更新")})
+            FilterChip(semantic,{semantic=!semantic},label={Text("按意思找 · AI")})
+            TextButton(onClick={rules=true}){Text("定制规则")}
+        }
+        if(semantic) LocalModelPanel(model,s)
         if(selection.category.isNotBlank()||selection.tags.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(top=8.dp)) {
             if(selection.category.isNotBlank()) item(key="category") {ActiveArchiveFilter(s.library.labelName(selection.category),"移除分类筛选"){category=""}}
             items(selection.tags,key={"tag-$it"}){id->ActiveArchiveFilter(s.library.labelName(id),"移除标签筛选 ${s.library.labelName(id)}"){tags=tags-id}}
@@ -129,7 +145,7 @@ import kotlinx.coroutines.withContext
                 val swipe=rememberSwipeToDismissBoxState(confirmValueChange={value->if(value==SwipeToDismissBoxValue.EndToStart) deleteTarget=a;false})
                 SwipeToDismissBox(state=swipe,modifier=Modifier.animateItem(),enableDismissFromStartToEnd=false,gesturesEnabled=!s.busy,
                     backgroundContent={Box(Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(c.errorContainer).padding(16.dp),contentAlignment=Alignment.CenterEnd){Text("回收站",color=c.onErrorContainer)}}) {
-                    ArchiveShelfCard(a,s.library,model,{open(a.id)},{view(a)})
+                    Column {ArchiveShelfCard(a,s.library,model,{open(a.id)},{view(a)});if(query.isNotBlank())Text(hits.firstOrNull{it.archive.id==a.id}?.reason.orEmpty(),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=3)}
                 }
             }
         } else LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(bottom=24.dp)) {
@@ -137,7 +153,7 @@ import kotlinx.coroutines.withContext
                 val swipe=rememberSwipeToDismissBoxState(confirmValueChange={value->if(value==SwipeToDismissBoxValue.EndToStart) deleteTarget=a;false})
                 SwipeToDismissBox(state=swipe,modifier=Modifier.animateItem(),enableDismissFromStartToEnd=false,gesturesEnabled=!s.busy,
                     backgroundContent={Box(Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(c.errorContainer).padding(20.dp),contentAlignment=Alignment.CenterEnd){Text("移入回收站",color=c.onErrorContainer)}}) {
-                    ArchiveShelfRow(a,s.library,model,{open(a.id)},{view(a)})
+                    Column {ArchiveShelfRow(a,s.library,model,{open(a.id)},{view(a)});if(query.isNotBlank())Text(hits.firstOrNull{it.archive.id==a.id}?.reason.orEmpty(),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=3)}
                 }
             }
         }
@@ -146,7 +162,7 @@ import kotlinx.coroutines.withContext
     if(filters) LabelPicker(s.library,selection.category,selection.tags,{category=it.first;tags=it.second;filters=false},{filters=false},"筛选档案")
 }
 
-@Composable internal fun DetailV19(model:AppModel,s:AppState,a:Archive,back:()->Unit,zoom:(String)->Unit,album:()->Unit,delete:()->Unit) {
+@Composable internal fun DetailV19(model:AppModel,s:AppState,a:Archive,back:()->Unit,zoom:(String)->Unit,album:()->Unit,delete:()->Unit,openRelated:(String)->Unit={}) {
     val c=MaterialTheme.colorScheme
     val context=LocalContext.current
     Column(Modifier.fillMaxSize()) {
@@ -209,6 +225,13 @@ import kotlinx.coroutines.withContext
                     }
                 }
             }
+            item {
+                val related=SearchAssistant.related(s.library,a)
+                if(related.isNotEmpty()) {
+                    SectionTitle("相关档案 · 供核对")
+                    related.forEach{hit->Column(Modifier.padding(vertical=8.dp)){TextButton(onClick={openRelated(hit.archive.id)}){Text(hit.archive.name)};Text(hit.reason,style=MaterialTheme.typography.bodySmall)}}
+                }
+            }
             item{TextButton(onClick=delete,enabled=!s.busy,modifier=Modifier.padding(top=24.dp)){Text("移入回收站",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)}}
         }
     }
@@ -253,6 +276,7 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                         }
                         FrameGlyph("展开",c.onSurfaceVariant)
                     }
+                    TagSuggestionsPanel(model,s,a)
                     SectionTitle("照片与视频"){FilledTonalButton(onClick={addMedia=true},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=14.dp)){Text("添加")}}
                     if(a.photos.isEmpty()) Text("可稍后添加，只有资料也能保存。",fontSize=12.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=10.dp))
                     LazyRow(horizontalArrangement=Arrangement.spacedBy(10.dp)) {items(a.photos,key={it.id}){p->

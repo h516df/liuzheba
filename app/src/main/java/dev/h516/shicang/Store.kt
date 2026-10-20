@@ -52,6 +52,8 @@ class Store(private val context: Context) {
             execSQL("PRAGMA user_version=1")
         }
     }
+    /** Caller must cancel its jobs first; wait for any active transaction before releasing SQLite. */
+    suspend fun close()=withContext(Dispatchers.IO) {gate.withLock {if(db.isOpen)db.close()}}
     private fun rows(kind: String) = db.rawQuery("SELECT json FROM objects WHERE kind=?",arrayOf(kind)).use { c -> buildList { while(c.moveToNext()) add(JSONObject(c.getString(0))) } }
     private val protectionMutable=kotlinx.coroutines.flow.MutableStateFlow(readProtection())
     val protection: kotlinx.coroutines.flow.StateFlow<ProtectionState> = protectionMutable
@@ -135,8 +137,9 @@ class Store(private val context: Context) {
     private fun remove(kind: String,id: String) { markProtectionDirty();db.execSQL("DELETE FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)) }
     private fun loadUnsafe()=Library(rows("archive").map(Codec::archive),rows("draft").map(Codec::archive),
         rows("label").map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
-        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read))
+        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()))
     suspend fun load()=withContext(Dispatchers.IO) { gate.withLock { loadUnsafe() } }
+    suspend fun searchPreferences(value:SearchPreferences)=withContext(Dispatchers.IO) {gate.withLock {put("searchPreferences","rules",SearchPreferences.read(value.json()).json())}}
     suspend fun appearance()=withContext(Dispatchers.IO) { gate.withLock { rows("settings").firstOrNull()?.let(Appearance::read) ?: Appearance() } }
     suspend fun appearance(a: Appearance)=withContext(Dispatchers.IO) { gate.withLock { put("settings","appearance",a.json()) } }
     suspend fun saveTemplate(t:FieldTemplate)=withContext(Dispatchers.IO) {gate.withLock {
@@ -294,6 +297,7 @@ class Store(private val context: Context) {
                     l.labels.forEach{put("label",it.id,JSONObject().put("id",it.id).put("kind",it.kind).put("name",it.name),next)}
                     l.photoTrash.forEach{put("photoTrash",it.id,JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",Codec.photo(it.photo)).put("index",it.index).put("removed",it.removed),next)}
                     l.templates.forEach{put("template",it.id,Templates.json(it),next)}
+                    put("searchPreferences","rules",l.searchPreferences.json(),next)
                     put("settings","appearance",Appearance.read(o.optJSONObject("appearance") ?: JSONObject()).json(),next)
                     next.setTransactionSuccessful()
                 } finally {next.endTransaction()}

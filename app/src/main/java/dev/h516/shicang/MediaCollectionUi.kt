@@ -30,7 +30,7 @@ import coil3.compose.AsyncImage
 @Composable internal fun MediaCollectionUi(model:AppModel,s:AppState) {
     val context=LocalContext.current
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {granted ->
-        if(granted)model.exportMedia() else {model.cancelExport();model.message("未获得相册写入权限，原件仍保存在留册")}
+        if(granted)model.exportMedia() else {model.cancelExport();model.message("未获得相册写入权限，原件仍保存在留着吧")}
     }
     LaunchedEffect(s.exportRequest) {
         if(s.exportRequest!=null) {
@@ -107,7 +107,7 @@ import coil3.compose.AsyncImage
                         }
                     }
                     if(s.busy)item{LinearProgressIndicator(Modifier.fillMaxWidth());Text(s.progress,style=MaterialTheme.typography.bodySmall)}
-                    item {Text("部分平台需在网页中完成登录或验证。也可从其他 App 直接分享图片、视频到留册。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
+                    item {Text("部分平台需在网页中完成登录或验证。也可从其他 App 直接分享图片、视频到留着吧。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
                 }
             }
         }

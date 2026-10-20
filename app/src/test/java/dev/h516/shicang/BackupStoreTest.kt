@@ -26,6 +26,9 @@ import java.io.File
 @Config(sdk=[28], application=Application::class)
 @SQLiteMode(SQLiteMode.Mode.LEGACY)
 class BackupStoreTest {
+    private val openedStores=mutableListOf<Store>()
+    private fun newStore()=Store(app).also{openedStores+=it}
+    @org.junit.After fun closeStores(){runBlocking{openedStores.forEach{it.close()}}}
     private lateinit var app: Application
     private lateinit var store: Store
     private lateinit var provider: BackupProvider
@@ -34,10 +37,24 @@ class BackupStoreTest {
     @Before fun setup() {
         app=RuntimeEnvironment.getApplication()
         app.getSharedPreferences("device",0).edit().clear().putString("generation",uid()).commit()
-        store=Store(app)
+        store=newStore()
         provider=BackupProvider(File(app.cacheDir,"previous.zip").apply { writeText("existing backup") })
         provider.attachInfo(app,ProviderInfo().apply { authority="backup.fixture" })
         ShadowContentResolver.registerProviderInternal("backup.fixture",provider)
+    }
+    @Test fun closedModelCannotDownloadOrReopen()=runBlocking {
+        val model=LocalTextModel(app);model.close();model.close()
+        assertEquals("本机模型已关闭",runCatching{model.download{error("unexpected network progress")}}.exceptionOrNull()?.message)
+        assertEquals("本机模型已关闭",runCatching{model.suggest(Library(),Archive())}.exceptionOrNull()?.message)
+        val a=Archive(name="关闭后文字仍可用")
+        assertEquals(listOf(a.id),model.search(Library(archives=listOf(a)),ArchiveQuery(text="关闭后",semantic=true)).map{it.archive.id})
+        assertFalse(File(app.filesDir,"local-text-model-bge-v1").exists())
+    }
+    @Test fun closeIsIdempotentAndDoesNotDeleteData()=runBlocking {
+        val a=Archive(name="资源关闭合成档案");store.save(a)
+        store.close();store.close()
+        assertTrue(runCatching{store.load()}.isFailure)
+        assertEquals(a.name,newStore().load().active.single().name)
     }
     private suspend fun rejectWithoutTouchingDestination(expectedMessage:String) {
         val previous=provider.file.readBytes()
@@ -90,7 +107,7 @@ class BackupStoreTest {
         assertTrue(source.delete())
         assertEquals(originalHash,sha(File(store.photoDir,photo.file)))
         store.save(Archive(name="synthetic photo",photos=listOf(photo)))
-        assertEquals(photo,Store(app).load().active.single().photos.single())
+        assertEquals(photo,newStore().load().active.single().photos.single())
         store.backup(destination) {}
         assertEquals(1,provider.writeOpens)
         assertTrue(store.lastBackup()>0)

@@ -28,3 +28,8 @@
 
 Seal、YTDLnis、XHS-Downloader、DouK、Ketch 只用于调研，没有复制其实现或将 GPL 下载器整体加入本项目。
 - certifi 2026.10.18：MPL-2.0；证书集合与许可由其固定 Python wheel 分发，用于保持 HTTPS 证书验证，未关闭 TLS 校验。
+
+## Optional local text embeddings
+
+ONNX Runtime Android 1.25.0, Microsoft, MIT: https://github.com/microsoft/onnxruntime/blob/v1.25.0/LICENSE .
+BGE-small-zh-v1.5, BAAI, MIT: https://huggingface.co/BAAI/bge-small-zh-v1.5 . Optional user-requested download, not bundled. Fixed Xenova ONNX export and verified hashes are documented in docs/LOCAL_SEARCH_ASSISTANT.md. No private text is transmitted for inference.

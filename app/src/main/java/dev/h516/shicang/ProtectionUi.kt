@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-internal const val PROTECTION_SETUP_NOTICE="留册会自动创建“留册自动保护”文件夹，之后自动保存资料与原始照片、视频；不用每次导出。首次只需在系统界面允许访问本机 Documents 等位置，无需手动创建文件夹。\n\n保护文件未加密，包含草稿、回收站和原始媒体（可能含拍摄位置）；应用锁不保护外部文件夹。请选择可信的本机位置，不要选择网盘或公开共享目录。\n\n必须等到“已保护”再考虑删除原文件。重装或清除数据后，重新选择同一位置并确认恢复。"
+internal const val PROTECTION_SETUP_NOTICE="留着吧会自动创建“留册自动保护”文件夹（沿用旧名称，兼容已有备份），之后自动保存资料与原始照片、视频；不用每次导出。首次只需在系统界面允许访问本机 Documents 等位置，无需手动创建文件夹。\n\n保护文件未加密，包含草稿、回收站和原始媒体（可能含拍摄位置）；应用锁不保护外部文件夹。请选择可信的本机位置，不要选择网盘或公开共享目录。\n\n必须等到“已保护”再考虑删除原文件。重装或清除数据后，重新选择同一位置并确认恢复。"
 
 @Composable internal fun ProtectionPanel(state:ProtectionState,busy:Boolean,choose:()->Unit,retry:()->Unit,acknowledge:()->Unit={}) {
     val colors=MaterialTheme.colorScheme

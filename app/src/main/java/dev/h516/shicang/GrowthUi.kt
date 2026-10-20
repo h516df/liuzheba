@@ -87,7 +87,7 @@ import java.time.ZoneId
         LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(horizontal=28.dp,vertical=24.dp),verticalArrangement=Arrangement.spacedBy(32.dp)) {
             item {Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Text("慢慢收集，慢慢记得",style=MaterialTheme.typography.headlineMedium)
-                Text("在留册相伴 ${java.time.temporal.ChronoUnit.DAYS.between(firstDate,today).coerceAtLeast(0)+1} 天",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
+                Text("在留着吧相伴 ${java.time.temporal.ChronoUnit.DAYS.between(firstDate,today).coerceAtLeast(0)+1} 天",style=MaterialTheme.typography.bodyMedium,color=colors.onSurfaceVariant)
             }}
             item {Text("收获的留念",style=MaterialTheme.typography.titleMedium)}
             if(earned.isEmpty()) item {Text("留下一份档案，故事就开始了。",color=colors.onSurfaceVariant)}
