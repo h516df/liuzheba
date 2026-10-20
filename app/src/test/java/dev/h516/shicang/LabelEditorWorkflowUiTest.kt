@@ -30,9 +30,9 @@ class LabelEditorWorkflowUiTest:UnifiedNavigationFixture() {
         model.edit(model.state.value.library.active.single());idle{model.state.value.editor!=null}
         model.change(model.state.value.editor!!.copy(name="尚未等待防抖的修改"))
         screenshot("editor-regular")
-        compose.onNodeWithText("分类与标签").performScrollTo().performClick()
-        compose.onNodeWithText("标签 · 1").performClick()
-        compose.onNodeWithText("管理标签（改名或全局删除）").performClick()
+        compose.onNodeWithText("全部标签").performScrollTo().performClick()
+        compose.onNodeWithText("标签 · 1").assertIsSelected()
+        compose.onNodeWithText("管理标签").performClick()
         compose.onNodeWithText("管理").performClick()
         compose.onNodeWithText("全局删除标签").performClick()
         compose.onNodeWithText("1 份档案（含回收站）和 1 份草稿",substring=true).assertExists()
@@ -55,7 +55,7 @@ class LabelEditorWorkflowUiTest:UnifiedNavigationFixture() {
         model.label("tag","旅行",false);idle{!model.state.value.busy && model.state.value.library.labels.isNotEmpty()}
         val tag=model.state.value.library.labels.single()
         model.edit(a.copy(tags=listOf(tag.id)));idle{model.state.value.editor!=null}
-        compose.onNodeWithText("分类与标签").performScrollTo().performClick()
+        compose.onNodeWithText("全部标签").performScrollTo().performClick()
         compose.onNodeWithContentDescription("移除标签 旅行").performClick()
         compose.onNodeWithText("完成").performClick()
         assertTrue(model.state.value.editor!!.tags.isEmpty())

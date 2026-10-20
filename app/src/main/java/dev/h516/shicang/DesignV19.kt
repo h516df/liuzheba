@@ -49,9 +49,13 @@ import androidx.compose.ui.semantics.semantics
 }
 
 @Composable private fun SectionTitle(title:String,action:(@Composable RowScope.()->Unit)?=null) {
-    Row(Modifier.fillMaxWidth().heightIn(min=52.dp),verticalAlignment=Alignment.CenterVertically) {
-        Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
-        action?.invoke(this)
+    val largeText=LocalDensity.current.fontScale>1.4f
+    Column {
+        Row(Modifier.fillMaxWidth().heightIn(min=52.dp),verticalAlignment=Alignment.CenterVertically) {
+            Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+            if(!largeText) action?.invoke(this)
+        }
+        if(largeText && action!=null) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){action()}
     }
 }
 
@@ -74,6 +78,7 @@ import androidx.compose.ui.semantics.semantics
     var recent by rememberSaveable{mutableStateOf(0L)}
     var semantic by rememberSaveable{mutableStateOf(false)}
     var filters by rememberSaveable{mutableStateOf(false)}
+    val quickTags=remember(s.library.archives,s.library.labels){archiveQuickTags(s.library)}
     val prefs=LocalContext.current.getSharedPreferences("device",0)
     val focus=androidx.compose.ui.platform.LocalFocusManager.current
     var covers by rememberSaveable{mutableStateOf(prefs.getBoolean("libraryCovers",true))}
@@ -108,6 +113,12 @@ import androidx.compose.ui.semantics.semantics
                 FrameGlyph("筛选",c.primary)
             }
         }
+        if(quickTags.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(top=8.dp)) {
+            items(quickTags,key={it.id}) {label->
+                FilterChip(selected=label.id in selection.tags,onClick={tags=if(label.id in tags) tags-label.id else tags+label.id;focus.clearFocus()},
+                    label={Text(label.name,maxLines=1)},modifier=Modifier.semantics{contentDescription="筛选标签 ${label.name}"})
+            }
+        }
         if(searchOptions) FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             FilterChip(aliases,{aliases=!aliases},label={Text("我的别名")})
             FilterChip(recent>0,{recent=if(recent>0)0L else System.currentTimeMillis()-30L*86400000},label={Text("近30天更新")})
@@ -115,9 +126,8 @@ import androidx.compose.ui.semantics.semantics
             TextButton(onClick={rules=true}){Text("定制规则")}
         }
         if(searchOptions && semantic) LocalModelPanel(model,s)
-        if(selection.category.isNotBlank()||selection.tags.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(top=8.dp)) {
-            if(selection.category.isNotBlank()) item(key="category") {ActiveArchiveFilter(s.library.labelName(selection.category),"移除分类筛选"){category=""}}
-            items(selection.tags,key={"tag-$it"}){id->ActiveArchiveFilter(s.library.labelName(id),"移除标签筛选 ${s.library.labelName(id)}"){tags=tags-id}}
+        if(selection.category.isNotBlank()) Row(Modifier.padding(top=8.dp)) {
+            ActiveArchiveFilter(s.library.labelName(selection.category),"移除分类筛选"){category=""}
         }
         FlowRow(Modifier.fillMaxWidth().padding(top=8.dp,bottom=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center,itemVerticalAlignment=Alignment.CenterVertically) {
             Text(if(searching) "正在查找" else "${results.orEmpty().size} 份档案",(if(LocalDensity.current.fontScale>1.4f) Modifier.fillMaxWidth() else Modifier.weight(1f)).padding(end=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
@@ -132,7 +142,8 @@ import androidx.compose.ui.semantics.semantics
         if(s.library.drafts.isNotEmpty()) LazyRow(contentPadding=PaddingValues(bottom=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             items(s.library.drafts,key={it.id}){a->SuggestionChip(onClick={model.edit(a)},enabled=!s.busy,label={Text("继续草稿 · ${a.name.ifBlank{"未命名"}}",maxLines=1,overflow=TextOverflow.Ellipsis)})}
         }
-        if(searching) Box(Modifier.fillMaxWidth().weight(1f),contentAlignment=Alignment.Center){CircularProgressIndicator(Modifier.size(24.dp),strokeWidth=2.dp)}
+        // Keep visible results stable while an updated query is calculated instead of flashing an empty wall.
+        if(searching && results.isNullOrEmpty()) Box(Modifier.fillMaxWidth().weight(1f),contentAlignment=Alignment.Center){CircularProgressIndicator(Modifier.size(24.dp),strokeWidth=2.dp)}
         else if(results.orEmpty().isEmpty()) Column(Modifier.fillMaxWidth().weight(1f).padding(horizontal=20.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
             ArchiveNameplate("留",Modifier.size(112.dp))
             Text(if(s.library.active.isEmpty()) "把值得记住的，留在这里" else "没有匹配的档案",Modifier.padding(top=24.dp,bottom=8.dp),style=MaterialTheme.typography.titleMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
@@ -166,6 +177,13 @@ import androidx.compose.ui.semantics.semantics
     val c=MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize()) {
         PageBar("档案详情",back){FilledTonalButton(onClick={model.edit(a)},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp)){Text("编辑")}}
+        if(s.busy) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically) {
+                Text(s.progress,Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
+                if(s.progress.contains("导入")) TextButton(onClick=model::cancelOperation){Text("取消导入")}
+            }
+        }
         LazyColumn(contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=32.dp)) {
             item {
                 Text(a.name,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(bottom=12.dp))
@@ -195,9 +213,9 @@ import androidx.compose.ui.semantics.semantics
             if(sourceFields.isNotEmpty()) item { SectionTitle("来源链接") }
             items(sourceFields,key={it.id}){f->ArchiveFieldValue(f,model);Spacer(Modifier.height(8.dp))}
             item {
-                val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
+                val labels=(a.tags+listOf(a.category)).map(s.library::labelName).filter{it.isNotBlank()}
                 if(labels.isNotEmpty()) {
-                    SectionTitle("分类与标签")
+                    SectionTitle("标签与分类")
                     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         labels.forEach{label->Surface(color=c.secondaryContainer,shape=RoundedCornerShape(8.dp)){
                             Text(label,Modifier.padding(horizontal=10.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSecondaryContainer)
@@ -259,8 +277,9 @@ private fun openLink(context:Context,url:String,model:AppModel) {
 @Composable internal fun EditorV19(model:AppModel,s:AppState,choose:(String)->Unit,take:(String)->Unit,back:()->Unit,confirm:(String,()->Unit)->Unit,authorSection:@Composable ()->Unit={}) {
     val a=s.editor ?: return
     val c=MaterialTheme.colorScheme
-    var addMedia by remember{mutableStateOf(false)}
     var labels by remember{mutableStateOf(false)}
+    var labelKind by remember{mutableStateOf("tag")}
+    val quickTags=remember(s.library.archives,s.library.labels){archiveQuickTags(s.library)}
     var templates by remember{mutableStateOf(false)}
     var managingLabels by rememberSaveable{mutableStateOf<String?>(null)}
     var optional by rememberSaveable(a.id){mutableStateOf(a.authorIds.isNotEmpty() || a.fields.any{it.name.isNotBlank() || it.value.isNotBlank()})}
@@ -272,7 +291,7 @@ private fun openLink(context:Context,url:String,model:AppModel) {
     BackHandler(managingLabels!=null){managingLabels=null}
     Surface(Modifier.fillMaxSize(),color=c.background) {
         if(managingLabels!=null) Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            PageBar("管理分类与标签",{managingLabels=null})
+            PageBar("管理标签与分类",{managingLabels=null})
             LabelsScreen(model,s,confirm,managingLabels!!)
         } else if(templates) Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             PageBar("选择模板",{templates=false})
@@ -290,7 +309,10 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 item {
                     Text("档案名称",Modifier.padding(bottom=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     TextField(a.name,{change(a.copy(name=it))},Modifier.fillMaxWidth(),enabled=!s.busy,singleLine=true,shape=RoundedCornerShape(16.dp),placeholder={Text("名称或称呼",style=MaterialTheme.typography.headlineMedium)},textStyle=MaterialTheme.typography.headlineMedium,colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,disabledContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
-                    SectionTitle("照片与视频"){FilledTonalButton(onClick={addMedia=true},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=14.dp)){Text("添加")}}
+                    SectionTitle("照片与视频") {
+                        TextButton(onClick={take(a.id)},enabled=!s.busy){Text("拍照")}
+                        FilledTonalButton(onClick={choose(a.id)},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=14.dp)){Text("相册")}
+                    }
                     if(a.photos.isEmpty()) Text("可稍后添加，只有资料也能保存。",fontSize=12.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=10.dp))
                     LazyRow(horizontalArrangement=Arrangement.spacedBy(10.dp)) {items(a.photos,key={it.id}){p->
                         Column(Modifier.width(104.dp).clip(RoundedCornerShape(16.dp)).background(c.surface)) {
@@ -307,13 +329,17 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                         }
                     }}
                     Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth().clickable(enabled=!s.busy){labels=true}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("分类与标签",style=MaterialTheme.typography.bodyMedium)
-                            Text("分类（单选）：${s.library.labelName(a.category).ifBlank{ "未分类" }}",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
-                            Text("标签（多选）：${a.tags.map(s.library::labelName).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"未添加"}}",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+                    SectionTitle(if(a.tags.isEmpty()) "标签" else "标签 · 已选 ${a.tags.size}") {
+                        TextButton(onClick={labelKind="tag";labels=true},enabled=!s.busy){Text(if(quickTags.isEmpty()) "添加标签" else "全部标签")}
+                    }
+                    if(quickTags.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        items(quickTags,key={it.id}) {label->
+                            FilterChip(selected=label.id in a.tags,onClick={change(a.copy(tags=if(label.id in a.tags) a.tags-label.id else a.tags+label.id))},enabled=!s.busy,
+                                label={Text(label.name,maxLines=1)},modifier=Modifier.semantics{contentDescription="档案标签 ${label.name}"})
                         }
-                        FrameGlyph("展开",c.onSurfaceVariant)
+                    }
+                    TextButton(onClick={labelKind="category";labels=true},enabled=!s.busy) {
+                        Text("分类（可选）：${s.library.labelName(a.category).ifBlank{"未设置"}}",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     }
                     TextButton(onClick={optional=!optional}){Text(if(optional) "收起可选资料" else "添加可选资料（作者、来源、字段）")}
                     if(optional) {
@@ -340,8 +366,7 @@ private fun openLink(context:Context,url:String,model:AppModel) {
             }
         }
     }
-    if(addMedia) AlertDialog(onDismissRequest={addMedia=false},title={Text("添加照片与视频")},text={Text("选入后保留原文件副本；视频默认静音，轻触播放。")},confirmButton={TextButton(onClick={addMedia=false;choose(a.id)}){Text("从相册选择")}},dismissButton={TextButton(onClick={addMedia=false;take(a.id)}){Text("拍照")}})
-    if(labels) LabelPicker(s.library,a.category,a.tags,{change(a.copy(category=it.first,tags=it.second));labels=false},{labels=false},"分类与标签",{kind,name->model.label(kind,name,false)},busy=s.busy,manage={kind,selection->change(a.copy(category=selection.first,tags=selection.second));labels=false;managingLabels=kind})
+    if(labels) LabelPicker(s.library,a.category,a.tags,{change(a.copy(category=it.first,tags=it.second));labels=false},{labels=false},"标签与分类",{kind,name->model.label(kind,name,false)},busy=s.busy,initialKind=labelKind,manage={kind,selection->change(a.copy(category=selection.first,tags=selection.second));labels=false;managingLabels=kind})
     if(saveTemplate) {
         val existing=s.library.templates.firstOrNull{normalizedLabel(it.name)==normalizedLabel(templateName)}
         AlertDialog(onDismissRequest={saveTemplate=false},title={Text(if(existing==null) "存为模板" else "更新同名模板")},text={Column{Text("只保存字段名称、类型和顺序，不包含任何资料内容。",fontSize=12.sp);QuietInput(templateName,{templateName=it},"模板名称",Modifier.fillMaxWidth());if(existing!=null) Text("将更新「${existing.name}」。已建档案不受影响。",fontSize=12.sp)}},confirmButton={TextButton(onClick={model.saveTemplate(templateName,existing?.id);saveTemplate=false},enabled=templateName.isNotBlank()&&!s.busy){Text(if(existing==null) "保存模板" else "确认更新")}},dismissButton={TextButton(onClick={saveTemplate=false}){Text("取消")}})
@@ -365,11 +390,11 @@ private fun isArchiveSource(field:Field)=field.type=="链接" || field.value.tri
 
 }
 
-@Composable internal fun LabelPicker(library:Library,initialCategory:String,initialTags:List<String>,apply:(Pair<String,List<String>>)->Unit,close:()->Unit,title:String,create:((String,String)->Unit)?=null,busy:Boolean=false,manage:((String,Pair<String,List<String>>)->Unit)?=null) {
+@Composable internal fun LabelPicker(library:Library,initialCategory:String,initialTags:List<String>,apply:(Pair<String,List<String>>)->Unit,close:()->Unit,title:String,create:((String,String)->Unit)?=null,busy:Boolean=false,initialKind:String="tag",manage:((String,Pair<String,List<String>>)->Unit)?=null) {
     var category by rememberSaveable{mutableStateOf(initialCategory)}
     var tags by rememberSaveable{mutableStateOf(initialTags)}
     var query by rememberSaveable{mutableStateOf("")}
-    var kind by rememberSaveable{mutableStateOf("category")}
+    var kind by rememberSaveable{mutableStateOf(initialKind)}
     var pending by remember{mutableStateOf<Pair<String,String>?>(null)}
     var createError by remember{mutableStateOf("")}
     LaunchedEffect(library.labels,busy){
@@ -386,8 +411,8 @@ private fun isArchiveSource(field:Field)=field.type=="链接" || field.value.tri
     val c=MaterialTheme.colorScheme
     ModalBottomSheet(onDismissRequest=close,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=c.background){
         Column(Modifier.fillMaxWidth().fillMaxHeight(.86f).padding(horizontal=20.dp).imePadding()) {
-            Row(verticalAlignment=Alignment.CenterVertically){Text(title,Modifier.weight(1f),fontSize=20.sp,fontWeight=FontWeight.SemiBold);TextButton(onClick={category="";tags=emptyList()}){Text("清除")};Button(onClick={apply(category to tags)},enabled=pending==null && !busy,shape=RoundedCornerShape(12.dp)){Text("完成")}}
-            Row{FilterChip(kind=="category",{kind="category"},label={Text("分类")});Spacer(Modifier.width(10.dp));FilterChip(kind=="tag",{kind="tag"},label={Text("标签 · ${tags.size}")})}
+            Row(verticalAlignment=Alignment.CenterVertically){Text(title,Modifier.weight(1f),fontSize=20.sp,fontWeight=FontWeight.SemiBold);TextButton(onClick={if(kind=="tag")tags=emptyList() else category=""},enabled=!busy && pending==null,modifier=Modifier.semantics{contentDescription=if(kind=="tag") "清除标签选择" else "清除分类选择"}){Text("清除")};Button(onClick={apply(category to tags)},enabled=pending==null && !busy,shape=RoundedCornerShape(12.dp)){Text("完成")}}
+            Row{FilterChip(kind=="tag",{kind="tag";query=""},label={Text("标签 · ${tags.size}")});Spacer(Modifier.width(10.dp));FilterChip(kind=="category",{kind="category";query=""},label={Text("分类")},modifier=Modifier.semantics{contentDescription="分类（可选）"})}
             if(tags.isNotEmpty()) FlowRow(Modifier.heightIn(max=112.dp).verticalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 library.labels.filter{it.id in tags}.forEach{label->
                     InputChip(selected=true,onClick={tags=tags-label.id},label={Text(label.name)},
@@ -401,8 +426,8 @@ private fun isArchiveSource(field:Field)=field.type=="链接" || field.value.tri
                 items(library.labels.filter{it.kind==kind && it.name.contains(query,true)},key={it.id}){l->Row(Modifier.fillMaxWidth().clickable{if(kind=="category") category=if(category==l.id) "" else l.id else tags=if(l.id in tags) tags-l.id else tags+l.id}.padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Text(l.name,Modifier.weight(1f),fontSize=15.sp);if(kind=="category") RadioButton(category==l.id,null) else Checkbox(l.id in tags,null)}}
                 if(create!=null && query.isNotBlank() && library.labels.none{it.kind==kind && normalizedLabel(it.name)==normalizedLabel(query)}) item{TextButton(enabled=pending==null && !busy,onClick={createError="";pending=kind to query.trim();create(kind,query.trim())}){Text("新建${if(kind=="category") "分类" else "标签"}「$query」")}}
             }
-            if(manage!=null) TextButton(onClick={manage(kind,category to tags)},enabled=!busy && pending==null){Text("管理${if(kind=="category") "分类" else "标签"}（改名或全局删除）")}
-            Text(if(kind=="category") "每份档案只选一个分类。" else "标签可多选。取消勾选或点 × 仅移出当前选择，不删除标签。",fontSize=11.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=14.dp))
+            if(manage!=null) TextButton(onClick={manage(kind,category to tags)},enabled=!busy && pending==null){Text("管理${if(kind=="category") "分类" else "标签"}")}
+            Text(if(kind=="category") "可不选；每份档案最多一个分类。" else "可多选，取消选择不会删除标签。",fontSize=11.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=14.dp))
         }
     }
 }

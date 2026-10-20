@@ -65,6 +65,8 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun appliedCategoryCanBeRemoved()=render("filtered",verify={
         compose.onNodeWithContentDescription("筛选").performClick()
+        compose.onNodeWithText("标签 · 0").assertIsSelected()
+        compose.onNodeWithContentDescription("分类（可选）").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
@@ -73,6 +75,8 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun deletingActiveCategoryWhileAwayRestoresLibrary()=render("deleted-filter-return",verify={model->
         compose.onNodeWithContentDescription("筛选").performClick()
+        compose.onNodeWithText("标签 · 0").assertIsSelected()
+        compose.onNodeWithContentDescription("分类（可选）").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}

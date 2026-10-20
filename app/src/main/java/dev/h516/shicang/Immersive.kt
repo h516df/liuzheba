@@ -282,9 +282,11 @@ import java.io.File
     var choosing by rememberSaveable(a.id){mutableStateOf(false)}
     var chosen by rememberSaveable(a.id){mutableStateOf(listOf<String>())}
     val selected=a.photos.filter{it.id in chosen}
+    BackHandler(choosing) {choosing=false;chosen=emptyList()}
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
-            TextButton(onClick={choosing=!choosing;chosen=emptyList()}){Text(if(choosing)"完成" else "多选")}
+        FlowRow(Modifier.fillMaxWidth().padding(horizontal=12.dp),verticalArrangement=Arrangement.Center,itemVerticalAlignment=Alignment.CenterVertically) {
+            TextButton(onClick={choosing=!choosing;chosen=emptyList()}){Text(if(choosing)"取消" else "多选")}
+            if(choosing) Text("已选 ${selected.size}",style=MaterialTheme.typography.labelMedium)
             if(choosing) TextButton(onClick={chosen=if(selected.size==a.photos.size)emptyList() else a.photos.map{it.id}}){Text(if(selected.size==a.photos.size)"取消全选" else "全选")}
             Spacer(Modifier.weight(1f))
             if(choosing) {
@@ -295,7 +297,10 @@ import java.io.File
         LazyVerticalGrid(GridCells.Fixed(3),Modifier.weight(1f),contentPadding=PaddingValues(8.dp),
             horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
             itemsIndexed(a.photos,key={_,p->p.id}) {i,p->
-                Box(Modifier.aspectRatio(.75f).clip(RoundedCornerShape(4.dp)).clickable {if(choosing)chosen=if(p.id in chosen)chosen-p.id else chosen+p.id else select(p.id)}) {
+                Box(Modifier.aspectRatio(.75f).clip(RoundedCornerShape(4.dp)).combinedClickable(
+                    onClick={if(choosing)chosen=if(p.id in chosen)chosen-p.id else chosen+p.id else select(p.id)},
+                    onLongClickLabel="选择这项媒体",onLongClick={choosing=true;chosen=(chosen+p.id).distinct()})
+                    .semantics{if(choosing)stateDescription=if(p.id in chosen) "已选择" else "未选择"}) {
                     MediaThumb(p,model,Modifier.fillMaxSize(),"查看第${i+1}项照片或视频")
                     Text("${i+1}",Modifier.align(Alignment.BottomEnd).background(Color.Black.copy(alpha=.5f)).padding(horizontal=6.dp,vertical=2.dp),color=Color.White,fontSize=11.sp)
                     if(choosing) Checkbox(p.id in chosen,{checked->chosen=if(checked)chosen+p.id else chosen-p.id},Modifier.align(Alignment.TopEnd))

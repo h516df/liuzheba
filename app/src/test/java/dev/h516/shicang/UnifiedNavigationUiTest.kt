@@ -23,6 +23,8 @@ import java.io.File
 @OptIn(ExperimentalCoroutinesApi::class,coil3.annotation.DelicateCoilApi::class)
 abstract class UnifiedNavigationFixture {
     @get:Rule val compose=createComposeRule()
+    protected val chooseRequests=mutableListOf<String>()
+    protected val cameraRequests=mutableListOf<String>()
     @Before fun bind(){Dispatchers.setMain(android.os.Handler(android.os.Looper.getMainLooper()).asCoroutineDispatcher().immediate)}
     @After fun reset(){Dispatchers.resetMain();RuntimeEnvironment.setFontScale(1f)}
     protected fun idle(check:()->Boolean){compose.waitUntil(15000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();check()}}
@@ -48,7 +50,7 @@ abstract class UnifiedNavigationFixture {
         val loader=coil3.ImageLoader.Builder(app).components{add(coil3.decode.BitmapFactoryDecoder.Factory())}.build();coil3.SingletonImageLoader.setUnsafe(loader)
         val model=AppModel(app);val owners=androidx.lifecycle.ViewModelStore().apply{put("fixture",model)}
         try {
-            compose.setContent{ShicangApp(model,true,{},{},{},{},{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
+            compose.setContent{ShicangApp(model,true,{},{},{chooseRequests.add(it)},{cameraRequests.add(it)},{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
             check(model,a)
         } finally {owners.clear();idle{model.resourcesClosed};loader.shutdown()}
     }

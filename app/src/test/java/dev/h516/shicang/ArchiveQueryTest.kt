@@ -9,7 +9,11 @@ class ArchiveQueryTest {
     @Test fun textSearchIncludesLabelsAndFields(){assertEquals(listOf(a),ArchiveQuery(text=" 森林 ").results(library));assertEquals(listOf(a),ArchiveQuery(text="日常").results(library))}
     @Test fun clearConditionsRetainsAllActiveArchives(){assertEquals(listOf(b,a),ArchiveQuery().results(library));assertFalse(ArchiveQuery(text="  ").filtered);assertTrue(ArchiveQuery(tags=listOf("t")).filtered)}
     @Test fun nameAndUpdatedSortAreDeterministic(){assertEquals(listOf(a,b),ArchiveQuery(byName=true).results(library));assertEquals(listOf(b,a),ArchiveQuery().results(library))}
-    @Test fun captionsAreBoundedAndPreferLabels(){assertEquals("日常 · 自然 +1",archiveCaption(a,library));assertEquals("森林",archiveCaption(a.copy(category="",tags=emptyList()),library))}
+    @Test fun captionsAreBoundedAndPreferLabels(){assertEquals("自然 · 旅行 +1",archiveCaption(a,library));assertEquals("森林",archiveCaption(a.copy(category="",tags=emptyList()),library))}
+    @Test fun frequentTagsIgnoreCategoriesAndDeletedArchives(){
+        val rows=library.copy(labels=library.labels+Label("x","tag","未使用"),archives=library.archives+List(20){a.copy(id="trash$it",tags=listOf("u"),deleted=1)})
+        assertEquals(listOf("t","u","x"),archiveQuickTags(rows).map{it.id})
+    }
     @Test fun nameOnlyEntryDoesNotPretendPhotoIsMissing(){assertEquals("",archiveCaption(Archive(name="旧信"),Library()))}
     @Test fun deletedOrWrongKindFiltersAreRemovedAfterRestore(){
         val stale=ArchiveQuery(text="森林",category="gone",tags=listOf("t","gone","c","t"),byName=true)

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.h516.shicang.MediaPerformanceBenchmarkTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-20T13:05:42.822Z" hostname="3ab803840755" time="6.489">
+  <properties/>
+  <testcase name="streamedBackupRetainsFullReadback" classname="dev.h516.shicang.MediaPerformanceBenchmarkTest" time="3.944"/>
+  <testcase name="labelWorkAndProtectionContention" classname="dev.h516.shicang.MediaPerformanceBenchmarkTest" time="2.545"/>
+  <system-out><![CDATA[PERF backup bytes=134217728 backup_ms=[517.350522, 515.169471, 481.368533] zip_bytes=134239021
+PERF labels archives=1000 photos=4000 add_ms=[49.041394, 38.706026, 49.976086, 41.100666, 35.953484, 52.841739, 39.556542] rename_ms=[36.705741, 35.019432, 48.240923, 35.702224, 62.425921, 48.975894, 45.148236] delete_ms=383.806385 archive_writes=1000
+PERF protection provider_delay_ms=750 load_ms=763.349417 source_sha=ca024752f77de72f97a2bf8df753003b0de0099a92c95dab15ed823bb3fd9b96
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
