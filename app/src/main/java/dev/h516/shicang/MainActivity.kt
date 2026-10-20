@@ -68,7 +68,7 @@ class MainActivity: FragmentActivity() {
         securePreview()
         if(savedInstanceState==null) receiveShare(intent)
         setContent {ShicangApp(model,unlocked.value,{authenticate()},::setLock,::choosePhotos,::takePhoto,
-            {backup.launch("留着吧备份-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.ROOT).format(java.util.Date())}.zip")},
+            {model.prepareBackup{backup.launch("留着吧备份-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.ROOT).format(java.util.Date())}.zip")}},
             {restore.launch(arrayOf("application/zip","application/octet-stream"))},::chooseProtectionLocation)}
     }
     override fun onNewIntent(intent:Intent) {super.onNewIntent(intent);setIntent(intent);receiveShare(intent)}

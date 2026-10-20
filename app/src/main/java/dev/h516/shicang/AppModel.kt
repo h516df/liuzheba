@@ -321,6 +321,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     }
     fun acknowledgeImportWarning()=work("确认已核对原件") {store.acknowledgeImportWarning()}
     fun retryProtection() {if(mutable.value.ready)viewModelScope.launch {store.protectNow(forceVerify=true)}}
+    fun prepareBackup(launch:()->Unit)=work("检查备份容量") {store.validateBackupCapacity();launch()}
     fun backup(uri: Uri)=work("准备备份") {store.backup(uri){s -> mutable.value=mutable.value.copy(progress=s)};message("完整备份已保存并校验，可在所选文件位置找到")}
     fun restoreBackup(uri: Uri)=work("准备恢复") {store.restore(uri){s -> mutable.value=mutable.value.copy(progress=s)};mutable.value=mutable.value.copy(editor=null);message("资料已恢复，恢复前副本保留，可撤销恢复")}
     fun undoRestore()=work("还原恢复前资料") {store.undoRestore();message("已切换回恢复前资料")}

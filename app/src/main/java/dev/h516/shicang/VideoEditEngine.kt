@@ -34,7 +34,8 @@ internal data class VideoEditInfo(val width:Int,val height:Int,val durationMs:Lo
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal object VideoEditEngine {
     suspend fun inspect(source:File,expected:Photo):VideoEditInfo=withContext(Dispatchers.IO) {
-        require(expected.isVideo && source.isFile && source.length()==expected.bytes && sha(source)==expected.sha256){"原视频校验失败，未修改原片"}
+        val operation=coroutineContext
+        require(expected.isVideo && source.isFile && source.length()==expected.bytes && sha(source){operation.ensureActive()}==expected.sha256){"原视频校验失败，未修改原片"}
         ensureActive()
         val reader=MediaMetadataRetriever()
         try {
@@ -74,7 +75,7 @@ internal object VideoEditEngine {
                     override fun run() {
                         if(closed || !continuation.isActive)return
                         if(output.length()>Codec.MAX_MEDIA_BYTES || folder.usableSpace<32L*1024*1024) {
-                            closed=true;transformer?.cancel();continuation.resumeWithException(IllegalStateException("导出超过 1GB 或剩余空间不足；原片未改动"));return
+                            closed=true;transformer?.cancel();continuation.resumeWithException(IllegalStateException("导出超过 6GB 安全上限或剩余空间不足；原片未改动"));return
                         }
                         progress(if(transformer?.getProgress(holder)==Transformer.PROGRESS_STATE_AVAILABLE) holder.progress else null)
                         handler.postDelayed(this,300)

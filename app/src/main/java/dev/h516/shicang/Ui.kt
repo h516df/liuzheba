@@ -425,7 +425,7 @@ private val Muted: Color
         item {ProtectionPanel(s.protection,s.busy,{confirm(PROTECTION_SETUP_NOTICE,{if(model.prepareProtectionSelection(false))chooseProtection()})},model::retryProtection,{confirm("请确认：你已核对导入失败或中断的原文件，知道这些原文件不在当前保护范围内，并会继续保留或重新导入。",model::acknowledgeImportWarning)})}
         item {
             SettingButton("导出备份文件（换机或留存）",if(model.store.lastBackup()>0) "最近导出：${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(model.store.lastBackup()))}" else "保存一份完整资料副本",!s.busy) {
-                confirm("备份文件未加密，包含完整档案、笔记、原始照片与视频、草稿和回收站。原始媒体可能保留拍摄位置。\n\n应用锁不会保护导出的备份。请保存到可信位置，勿公开上传或随意转发。同一手机损坏或丢失时，备份也可能一起丢失。\n\n确认后选择保存位置，生成完整 ZIP 文件；取消不创建备份。",backup)
+                confirm("备份文件未加密，包含完整档案、笔记、原始照片与视频、草稿和回收站。原始媒体可能保留拍摄位置。\n\n应用锁不会保护导出的备份。请保存到可信位置，勿公开上传或随意转发。同一手机损坏或丢失时，备份也可能一起丢失。\n\n单个完整备份的展开总量最多20GiB（不是媒体库总容量），需要足够临时空间。超过时不会导出不完整备份。\n\n确认后先检查容量，再选择保存位置；取消不创建备份。",backup)
             }
             SettingButton("恢复已有资料","从保护目录或备份文件找回",!s.busy){recoveryOptions=true}
             SettingButton("撤销最近一次恢复",if(model.store.canUndoRestore()) "切回恢复前的资料" else "暂无可撤销的恢复",!s.busy && model.store.canUndoRestore()) {confirm("切回最近一次恢复前的资料？当前恢复结果会被替换，请先保存需要保留的新内容。",model::undoRestore)}

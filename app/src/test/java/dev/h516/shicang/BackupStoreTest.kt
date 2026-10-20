@@ -71,6 +71,7 @@ class BackupStoreTest {
         // No large file is created. Missing files must not mask the known capacity failure.
         val photos=List(20) { val id=uid(); Photo(id,"$id.original",Codec.MAX_MEDIA_BYTES,"0".repeat(64),"video/mp4",1000) }
         store.draft(Archive(name="synthetic large library",photos=photos))
+        assertTrue(runCatching{store.validateBackupCapacity()}.isFailure)
         rejectWithoutTouchingDestination("展开容量超过恢复上限")
     }
     @Test fun damagedMediaDoesNotDeleteOrOverwritePreviousBackup()=runBlocking {

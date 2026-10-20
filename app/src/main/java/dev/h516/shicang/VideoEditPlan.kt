@@ -14,5 +14,5 @@ internal data class VideoEditPlan(val startMs:Long,val endMs:Long,val crop:Video
         require(crop.valid() && (mask==null || mask.valid())){"画面选区太小或无效，请重新框选"}
     }
     // Conservative reservation for output plus importing it as an independent library original.
-    fun requiredBytes(sourceBytes:Long):Long = (sourceBytes.coerceAtLeast(1)*4).coerceAtMost(Codec.MAX_MEDIA_BYTES*2)+64L*1024*1024
+    fun requiredBytes(sourceBytes:Long):Long = sourceBytes.coerceIn(1,Codec.MAX_MEDIA_BYTES/2)*4+64L*1024*1024
 }

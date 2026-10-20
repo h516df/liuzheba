@@ -92,7 +92,7 @@ object Codec {
         return l
     }
     fun validId(s: String) = s.matches(Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"))
-    const val MAX_MEDIA_BYTES = 1024L * 1024 * 1024
+    const val MAX_MEDIA_BYTES = LargeMediaIo.VIDEO_BYTES
     const val MAX_PHOTO_BYTES = 200L * 1024 * 1024
 }
 fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }

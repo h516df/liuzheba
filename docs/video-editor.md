@@ -11,7 +11,7 @@
 - 官方 Crop 坐标：https://developer.android.com/reference/androidx/media3/effect/Crop
 - 官方 GitHub demo（Apache 2.0）：https://github.com/androidx/media/tree/1.11.1/demos/transformer
 
-黑色遮挡适合固定按钮；不能还原被弹幕遮住的真实内容，不是 AI 去物、移动目标跟踪或局部模糊。当前保留单个连续片段、单个遮挡区域，后续按实际需求扩展。最大输入边长 4096，单个导出副本沿用现有 1GB 上限。长录屏建议先截取有用片段。
+黑色遮挡适合固定按钮；不能还原被弹幕遮住的真实内容，不是 AI 去物、移动目标跟踪或局部模糊。当前保留单个连续片段、单个遮挡区域，后续按实际需求扩展。最大输入边长 4096，单个导出副本沿用统一 6GB（6,000,000,000字节）上限。长录屏建议先截取有用片段。大文件流式与空间边界见 [6GB 视频说明](large-media.md)。
 
 ## 数据和生命周期
 
