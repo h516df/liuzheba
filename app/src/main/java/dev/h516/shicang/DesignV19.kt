@@ -7,16 +7,14 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -35,17 +32,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable internal fun PageBar(title:String,back:()->Unit,action:@Composable RowScope.()->Unit={}) {
     val c=MaterialTheme.colorScheme
     Column {
+        val largeText=LocalDensity.current.fontScale>1.4f
         Row(Modifier.fillMaxWidth().heightIn(min=64.dp).padding(horizontal=12.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
             GalleryIcon("返回",c.onSurface,back)
             Text(title,Modifier.weight(1f).padding(horizontal=8.dp),style=MaterialTheme.typography.titleMedium,color=c.onSurface)
-            action()
+            if(!largeText)action()
         }
+        if(largeText)Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp),horizontalArrangement=Arrangement.End){action()}
         HorizontalDivider(color=c.outlineVariant.copy(alpha=.35f))
     }
 }
@@ -71,6 +68,7 @@ import kotlinx.coroutines.withContext
     var tags by rememberSaveable{mutableStateOf(listOf<String>())}
     var byName by rememberSaveable{mutableStateOf(false)}
     var rules by remember{mutableStateOf(false)}
+    var searchOptions by rememberSaveable{mutableStateOf(false)}
     var aliases by rememberSaveable{mutableStateOf(true)}
     var recent by rememberSaveable{mutableStateOf(0L)}
     var semantic by rememberSaveable{mutableStateOf(false)}
@@ -109,19 +107,20 @@ import kotlinx.coroutines.withContext
                 FrameGlyph("筛选",c.primary)
             }
         }
-        FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+        if(searchOptions) FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             FilterChip(aliases,{aliases=!aliases},label={Text("我的别名")})
             FilterChip(recent>0,{recent=if(recent>0)0L else System.currentTimeMillis()-30L*86400000},label={Text("近30天更新")})
             FilterChip(semantic,{semantic=!semantic},label={Text("按意思找 · AI")})
             TextButton(onClick={rules=true}){Text("定制规则")}
         }
-        if(semantic) LocalModelPanel(model,s)
+        if(searchOptions && semantic) LocalModelPanel(model,s)
         if(selection.category.isNotBlank()||selection.tags.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(top=8.dp)) {
             if(selection.category.isNotBlank()) item(key="category") {ActiveArchiveFilter(s.library.labelName(selection.category),"移除分类筛选"){category=""}}
             items(selection.tags,key={"tag-$it"}){id->ActiveArchiveFilter(s.library.labelName(id),"移除标签筛选 ${s.library.labelName(id)}"){tags=tags-id}}
         }
         FlowRow(Modifier.fillMaxWidth().padding(top=8.dp,bottom=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center,itemVerticalAlignment=Alignment.CenterVertically) {
             Text(if(searching) "正在查找" else "${results.orEmpty().size} 份档案",(if(LocalDensity.current.fontScale>1.4f) Modifier.fillMaxWidth() else Modifier.weight(1f)).padding(end=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+            TextButton(onClick={searchOptions=!searchOptions},contentPadding=PaddingValues(horizontal=8.dp)){Text(if(searchOptions) "收起选项" else "搜索选项",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)}
             TextButton(onClick={byName=!byName},contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.semantics{contentDescription=if(byName) "排序：按名称" else "排序：最近更新"}){
                 Text(if(byName) "按名称" else "最近更新",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)
             }
@@ -140,7 +139,7 @@ import kotlinx.coroutines.withContext
             Spacer(Modifier.height(16.dp))
             if(s.library.active.isEmpty()) FilledTonalButton(onClick={model.edit()},enabled=!s.busy){Text("新建第一份档案")}
             if(selection.filtered) TextButton(onClick={clear()}){Text("清除搜索与筛选")}
-        } else if(covers) LazyVerticalGrid(GridCells.Adaptive(148.dp),verticalArrangement=Arrangement.spacedBy(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
+        } else if(covers) LazyVerticalStaggeredGrid(StaggeredGridCells.Adaptive(148.dp),verticalItemSpacing=12.dp,horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
             items(results.orEmpty(),key={it.id}){a->
                 val swipe=rememberSwipeToDismissBoxState(confirmValueChange={value->if(value==SwipeToDismissBoxValue.EndToStart) deleteTarget=a;false})
                 SwipeToDismissBox(state=swipe,modifier=Modifier.animateItem(),enableDismissFromStartToEnd=false,gesturesEnabled=!s.busy,
@@ -162,22 +161,18 @@ import kotlinx.coroutines.withContext
     if(filters) LabelPicker(s.library,selection.category,selection.tags,{category=it.first;tags=it.second;filters=false},{filters=false},"筛选档案")
 }
 
-@Composable internal fun DetailV19(model:AppModel,s:AppState,a:Archive,back:()->Unit,zoom:(String)->Unit,album:()->Unit,delete:()->Unit,openRelated:(String)->Unit={}) {
+@Composable internal fun DetailV19(model:AppModel,s:AppState,a:Archive,back:()->Unit,zoom:(String)->Unit,album:()->Unit,delete:()->Unit,openRelated:(String)->Unit={},addMedia:(()->Unit)?=null,authorSection:@Composable ()->Unit={}) {
     val c=MaterialTheme.colorScheme
-    val context=LocalContext.current
     Column(Modifier.fillMaxSize()) {
         PageBar("档案",back){FilledTonalButton(onClick={model.edit(a)},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp)){Text("编辑")}}
         LazyColumn(contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=32.dp)) {
             item {
-                if(a.photos.isEmpty()) ArchiveNameplate(a.name,Modifier.size(72.dp).padding(bottom=4.dp))
-                Text(a.name,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(top=8.dp,bottom=12.dp))
-                val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
-                if(labels.isNotEmpty()) FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    labels.forEach{label->Surface(color=c.secondaryContainer,shape=RoundedCornerShape(8.dp)){
-                        Text(label,Modifier.padding(horizontal=10.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSecondaryContainer)
-                    }}
+                Text(a.name,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(bottom=12.dp))
+                SectionTitle("照片与视频") {
+                    TextButton(onClick={addMedia?.invoke() ?: model.edit(a)},enabled=!s.busy){Text("添加")}
+                    if(a.photos.isNotEmpty()) TextButton(onClick=album){Text("查看全部",style=MaterialTheme.typography.labelMedium)}
                 }
-                Spacer(Modifier.height(24.dp))
+                if(a.photos.isEmpty()) Text("尚未添加照片与视频",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,modifier=Modifier.padding(bottom=16.dp))
             }
             if(a.photos.isNotEmpty()) item {
                 val cover=a.coverPhoto() ?: a.photos.first()
@@ -189,15 +184,28 @@ import kotlinx.coroutines.withContext
                         }
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(top=8.dp,bottom=12.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Text("照片与视频",Modifier.weight(1f),style=MaterialTheme.typography.titleSmall)
-                    TextButton(onClick=album){Text("查看全部",style=MaterialTheme.typography.labelMedium);FrameGlyph("展开",c.primary)}
-                }
+                Spacer(Modifier.height(12.dp))
                 if(a.photos.size>1) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(bottom=12.dp)) {
                     items(a.photos.filter{it.id!=cover.id}.take(5),key={it.id}){p->MediaThumb(p,model,Modifier.size(76.dp).clip(RoundedCornerShape(12.dp)).clickable{zoom(p.id)},"查看${if(p.isVideo) "视频" else "照片"}")}
                 }
             }
-            item{SectionTitle("资料")}
+            item { authorSection() }
+            val sourceFields=a.fields.filter{isArchiveSource(it)}
+            if(sourceFields.isNotEmpty()) item { SectionTitle("来源链接") }
+            items(sourceFields,key={it.id}){f->ArchiveFieldValue(f,model);Spacer(Modifier.height(8.dp))}
+            item {
+                val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
+                if(labels.isNotEmpty()) {
+                    SectionTitle("分类与标签")
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        labels.forEach{label->Surface(color=c.secondaryContainer,shape=RoundedCornerShape(8.dp)){
+                            Text(label,Modifier.padding(horizontal=10.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSecondaryContainer)
+                        }}
+                    }
+                }
+            }
+            if(a.fields.any{!isArchiveSource(it)} || a.fields.isEmpty()) item{SectionTitle("资料")}
+
             if(a.fields.isEmpty()) item{Surface(color=c.surface,shape=RoundedCornerShape(20.dp)){
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
                     Text("从一点一滴开始",style=MaterialTheme.typography.titleSmall)
@@ -205,25 +213,9 @@ import kotlinx.coroutines.withContext
                     TextButton(onClick={model.edit(a)},enabled=!s.busy,modifier=Modifier.padding(top=8.dp)){Text("补充资料")}
                 }
             }}
-            items(a.fields,key={it.id}){f->
-                val url=if(f.type=="链接" || f.value.trim().startsWith("http")) Links.normalize(f.value) else null
-                val first=a.fields.first().id==f.id;val last=a.fields.last().id==f.id
-                Surface(color=c.surface,shape=RoundedCornerShape(topStart=if(first) 16.dp else 0.dp,topEnd=if(first) 16.dp else 0.dp,bottomStart=if(last) 16.dp else 0.dp,bottomEnd=if(last) 16.dp else 0.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal=16.dp)) {
-                        Row(Modifier.fillMaxWidth().padding(vertical=18.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f).then(if(url!=null) Modifier.clickable{openLink(context,url,model)} else Modifier)) {
-                                Text(f.name,style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
-                                Text(if(url!=null) Links.title(url) else f.value.ifBlank{"未填写"},Modifier.padding(top=5.dp),style=MaterialTheme.typography.bodyLarge,color=if(url!=null) c.primary else c.onSurface)
-                                if(url!=null) Text(Links.host(url),Modifier.padding(top=3.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
-                            }
-                            if(url!=null) {
-                                IconButton(onClick={openLink(context,url,model)},modifier=Modifier.size(48.dp).semantics{contentDescription="打开链接"}){FrameGlyph("打开链接",c.primary)}
-                                TextButton(onClick={(context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(f.name,url));model.message("链接已复制")},contentPadding=PaddingValues(6.dp),modifier=Modifier.heightIn(min=48.dp)){Text("复制",style=MaterialTheme.typography.labelMedium)}
-                            }
-                        }
-                        if(!last) HorizontalDivider(color=c.outlineVariant.copy(alpha=.55f))
-                    }
-                }
+            items(a.fields.filterNot{isArchiveSource(it)},key={it.id}){f->
+                ArchiveFieldValue(f,model)
+                Spacer(Modifier.height(8.dp))
             }
             item {
                 val related=SearchAssistant.related(s.library,a)
@@ -237,11 +229,33 @@ import kotlinx.coroutines.withContext
     }
 }
 
+@Composable private fun ArchiveFieldValue(f:Field,model:AppModel) {
+    val c=MaterialTheme.colorScheme
+    val context=LocalContext.current
+    val url=if(f.type=="链接" || f.value.trim().startsWith("http")) Links.normalize(f.value) else null
+    Surface(color=c.surface,shape=RoundedCornerShape(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp)) {
+            Row(Modifier.fillMaxWidth().padding(vertical=18.dp),verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).then(if(url!=null) Modifier.clickable{openLink(context,url,model)} else Modifier)) {
+                    Text(f.name,style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+                    Text(if(url!=null) Links.title(url) else f.value.ifBlank{"未填写"},Modifier.padding(top=5.dp),style=MaterialTheme.typography.bodyLarge,color=if(url!=null) c.primary else c.onSurface)
+                    if(url!=null) Text(Links.host(url),Modifier.padding(top=3.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
+                }
+                if(url!=null) {
+                    IconButton(onClick={openLink(context,url,model)},modifier=Modifier.size(48.dp).semantics{contentDescription="打开链接"}){FrameGlyph("打开链接",c.primary)}
+                    TextButton(onClick={(context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(f.name,url));model.message("链接已复制")},contentPadding=PaddingValues(6.dp),modifier=Modifier.heightIn(min=48.dp)){Text("复制",style=MaterialTheme.typography.labelMedium)}
+                }
+            }
+        }
+    }
+
+}
+
 private fun openLink(context:Context,url:String,model:AppModel) {
     runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))}.onFailure{model.message("没有找到可打开此链接的应用，请复制网址后使用浏览器")}
 }
 
-@Composable internal fun EditorV19(model:AppModel,s:AppState,choose:(String)->Unit,take:(String)->Unit,back:()->Unit,confirm:(String,()->Unit)->Unit) {
+@Composable internal fun EditorV19(model:AppModel,s:AppState,choose:(String)->Unit,take:(String)->Unit,back:()->Unit,confirm:(String,()->Unit)->Unit,authorSection:@Composable ()->Unit={}) {
     val a=s.editor ?: return
     val c=MaterialTheme.colorScheme
     var addMedia by remember{mutableStateOf(false)}
@@ -261,22 +275,13 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 items(s.library.templates,key={it.id}){t->Column(Modifier.fillMaxWidth().clickable{model.applyTemplate(t);templates=false}.padding(vertical=20.dp)){Text(t.name,fontSize=17.sp);Text(t.fields.joinToString(" · "){it.name},Modifier.padding(top=6.dp),fontSize=12.sp,color=c.onSurfaceVariant);HorizontalDivider(Modifier.padding(top=20.dp),color=c.outlineVariant.copy(alpha=.5f))}}
             }
         } else Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            PageBar("编辑档案",back){Button(onClick=model::saveEditor,enabled=!s.busy,shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp)){Text(if(s.busy) "处理中" else "保存")}}
+            PageBar("编辑档案",back){TextButton(onClick={confirm("放弃这次编辑？已保存的档案保持原样。",model::discardEditor)},enabled=!s.busy){Text("取消")};Button(onClick=model::saveEditor,enabled=!s.busy,shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp)){Text(if(s.busy) "处理中" else "保存")}}
             if(s.message.isNotEmpty()) Row(Modifier.fillMaxWidth().background(c.surfaceVariant).padding(start=24.dp),verticalAlignment=Alignment.CenterVertically){Text(s.message,Modifier.weight(1f),fontSize=12.sp);TextButton(onClick=model::dismissMessage){Text("知道了",fontSize=12.sp)}}
             if(s.busy) {LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(start=24.dp),fontSize=12.sp);TextButton(onClick=model::cancelOperation){Text("取消")}}}
             LazyColumn(contentPadding=PaddingValues(start=20.dp,end=20.dp,top=16.dp,bottom=24.dp)) {
                 item {
                     Text("称呼",Modifier.padding(bottom=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     TextField(a.name,{change(a.copy(name=it))},Modifier.fillMaxWidth(),enabled=!s.busy,singleLine=true,shape=RoundedCornerShape(16.dp),placeholder={Text("名称或称呼",style=MaterialTheme.typography.headlineMedium)},textStyle=MaterialTheme.typography.headlineMedium,colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,disabledContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
-                    Row(Modifier.fillMaxWidth().clickable(enabled=!s.busy){labels=true}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("分类与标签",style=MaterialTheme.typography.bodyMedium)
-                            val selectedLabels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
-                            if(selectedLabels.isNotEmpty()) Text(selectedLabels.joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        }
-                        FrameGlyph("展开",c.onSurfaceVariant)
-                    }
-                    TagSuggestionsPanel(model,s,a)
                     SectionTitle("照片与视频"){FilledTonalButton(onClick={addMedia=true},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=14.dp)){Text("添加")}}
                     if(a.photos.isEmpty()) Text("可稍后添加，只有资料也能保存。",fontSize=12.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=10.dp))
                     LazyRow(horizontalArrangement=Arrangement.spacedBy(10.dp)) {items(a.photos,key={it.id}){p->
@@ -293,24 +298,30 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                             TextButton(onClick={change(a.copy(cover=p.id))},enabled=!s.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp),contentPadding=PaddingValues(0.dp)){Text(if(a.coverPhoto()?.id==p.id) "当前封面" else "设为封面",style=MaterialTheme.typography.labelMedium)}
                         }
                     }}
-                    Spacer(Modifier.height(22.dp))
-                    SectionTitle("自定义字段"){
+                    Spacer(Modifier.height(16.dp))
+                    authorSection()
+                    SectionTitle("来源链接") {
+                        TextButton(onClick={val name=generateSequence(1){it+1}.map{if(it==1) "来源" else "来源$it"}.first{candidate->a.fields.none{it.name==candidate}};change(a.copy(fields=a.fields+Field(name=name,type="链接")))},enabled=!s.busy && a.fields.size<40){Text("添加链接")}
+                    }
+                    a.fields.filter{it.type=="链接"}.forEach{f->
+                        key(f.id){ArchiveFieldEditor(a,f,s.busy,::change){removed=a.fields.indexOf(f) to f;change(a.copy(fields=a.fields-f))}}
+                    }
+                    Row(Modifier.fillMaxWidth().clickable(enabled=!s.busy){labels=true}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("分类与标签",style=MaterialTheme.typography.bodyMedium)
+                            val selectedLabels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
+                            if(selectedLabels.isNotEmpty()) Text(selectedLabels.joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        }
+                        FrameGlyph("展开",c.onSurfaceVariant)
+                    }
+                    SectionTitle("资料"){
                         TextButton(onClick={templates=true},enabled=!s.busy,contentPadding=PaddingValues(6.dp)){Text("选择模板",fontSize=12.sp)}
                         TextButton(onClick={saveTemplate=true},enabled=!s.busy,contentPadding=PaddingValues(6.dp)){Text("存为模板",fontSize=12.sp)}
                     }
                     removed?.let{pair->Row(verticalAlignment=Alignment.CenterVertically){Text("已移除字段",Modifier.weight(1f),fontSize=12.sp,color=c.onSurfaceVariant);TextButton(onClick={if(a.fields.size<40){val fs=a.fields.toMutableList();fs.add(pair.first.coerceAtMost(fs.size),pair.second);change(a.copy(fields=fs));removed=null}},enabled=!s.busy && a.fields.size<40){Text("撤销")}}}
                 }
-                items(a.fields,key={it.id}){f->
-                    var typeMenu by remember{mutableStateOf(false)}
-                    Column(Modifier.padding(bottom=12.dp).clip(RoundedCornerShape(16.dp)).background(c.surface).padding(12.dp)) {
-                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                            TextField(f.name,{value->change(a.copy(fields=a.fields.map{if(it.id==f.id) it.copy(name=value) else it}))},Modifier.weight(1f),enabled=!s.busy,singleLine=true,placeholder={Text("字段名称",fontSize=13.sp)},textStyle=LocalTextStyle.current.copy(fontSize=14.sp),colors=TextFieldDefaults.colors(unfocusedContainerColor=Color.Transparent,focusedContainerColor=Color.Transparent,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
-                            Box{TextButton(onClick={typeMenu=true},enabled=!s.busy){Text("${f.type}⌄",fontSize=12.sp)};DropdownMenu(typeMenu,{typeMenu=false}){Templates.types.forEach{type->DropdownMenuItem(text={Text(type)},onClick={change(a.copy(fields=a.fields.map{if(it.id==f.id) it.copy(type=type) else it}));typeMenu=false})}}}
-                            TextButton(onClick={removed=a.fields.indexOf(f) to f;change(a.copy(fields=a.fields-f))},enabled=!s.busy,modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp),contentPadding=PaddingValues(0.dp)){Text("删除",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)}
-                        }
-                        QuietInput(f.value,{value->change(a.copy(fields=a.fields.map{if(it.id==f.id) it.copy(value=value) else it}))},when(f.type){"链接"->"网址或平台分享文字";"日期"->"YYYY-MM-DD";"数字"->"填写数值";else->"填写内容"},Modifier.fillMaxWidth(),singleLine=f.type!in listOf("文本","链接"),enabled=!s.busy,keyboard=when(f.type){"数字"->KeyboardType.Decimal;"链接"->KeyboardType.Uri;else->KeyboardType.Text})
-                        if(f.type=="链接") Text("可粘贴分享文字，保存时提取有效网址。",Modifier.padding(top=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
-                    }
+                items(a.fields.filterNot{it.type=="链接"},key={it.id}){f->
+                    ArchiveFieldEditor(a,f,s.busy,::change){removed=a.fields.indexOf(f) to f;change(a.copy(fields=a.fields-f))}
                 }
                 item {
                     TextButton(onClick={change(a.copy(fields=a.fields+Field()))},enabled=!s.busy && a.fields.size<40){Text("＋ 添加字段")}
@@ -326,6 +337,23 @@ private fun openLink(context:Context,url:String,model:AppModel) {
         val existing=s.library.templates.firstOrNull{normalizedLabel(it.name)==normalizedLabel(templateName)}
         AlertDialog(onDismissRequest={saveTemplate=false},title={Text(if(existing==null) "存为模板" else "更新同名模板")},text={Column{Text("只保存字段名称、类型和顺序，不包含任何资料内容。",fontSize=12.sp);QuietInput(templateName,{templateName=it},"模板名称",Modifier.fillMaxWidth());if(existing!=null) Text("将更新「${existing.name}」。已建档案不受影响。",fontSize=12.sp)}},confirmButton={TextButton(onClick={model.saveTemplate(templateName,existing?.id);saveTemplate=false},enabled=templateName.isNotBlank()&&!s.busy){Text(if(existing==null) "保存模板" else "确认更新")}},dismissButton={TextButton(onClick={saveTemplate=false}){Text("取消")}})
     }
+}
+
+private fun isArchiveSource(field:Field)=field.type=="链接" || field.value.trim().startsWith("http")
+
+@Composable private fun ArchiveFieldEditor(a:Archive,f:Field,busy:Boolean,change:(Archive)->Unit,remove:()->Unit) {
+    val c=MaterialTheme.colorScheme
+    var typeMenu by remember{mutableStateOf(false)}
+    Column(Modifier.padding(bottom=12.dp).clip(RoundedCornerShape(16.dp)).background(c.surface).padding(12.dp)) {
+        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            TextField(f.name,{value->change(a.copy(fields=a.fields.map{if(it.id==f.id) it.copy(name=value) else it}))},Modifier.weight(1f),enabled=!busy,singleLine=true,placeholder={Text("字段名称",fontSize=13.sp)},textStyle=LocalTextStyle.current.copy(fontSize=14.sp),colors=TextFieldDefaults.colors(unfocusedContainerColor=Color.Transparent,focusedContainerColor=Color.Transparent,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
+            Box{TextButton(onClick={typeMenu=true},enabled=!busy){Text("${f.type}⌄",fontSize=12.sp)};DropdownMenu(typeMenu,{typeMenu=false}){Templates.types.forEach{type->DropdownMenuItem(text={Text(type)},onClick={change(a.copy(fields=a.fields.map{if(it.id==f.id) it.copy(type=type) else it}));typeMenu=false})}}}
+            TextButton(onClick={remove()},enabled=!busy,modifier=Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp),contentPadding=PaddingValues(0.dp)){Text("删除",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)}
+        }
+        QuietInput(f.value,{value->change(a.copy(fields=a.fields.map{if(it.id==f.id) it.copy(value=value) else it}))},when(f.type){"链接"->"网址或平台分享文字";"日期"->"YYYY-MM-DD";"数字"->"填写数值";else->"填写内容"},Modifier.fillMaxWidth(),singleLine=f.type!in listOf("文本","链接"),enabled=!busy,keyboard=when(f.type){"数字"->KeyboardType.Decimal;"链接"->KeyboardType.Uri;else->KeyboardType.Text})
+        if(f.type=="链接") Text("可粘贴分享文字，保存时提取有效网址。",Modifier.padding(top=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+    }
+
 }
 
 @Composable internal fun LabelPicker(library:Library,initialCategory:String,initialTags:List<String>,apply:(Pair<String,List<String>>)->Unit,close:()->Unit,title:String,create:((String,String)->Unit)?=null,busy:Boolean=false) {
