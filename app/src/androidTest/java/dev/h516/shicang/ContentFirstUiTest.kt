@@ -41,10 +41,10 @@ class ContentFirstUiTest {
         fun scrollTo(text:String){repeat(8){if(find(text)!=null)return;nodes().lastOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);Thread.sleep(250)};wait(text)}
         try {
             wait("搜索档案");wait("4 份档案");assertNull(find("收藏成长"));shot("wall")
-            scrollTo(archive.name);click(archive.name);wait("档案");wait("编辑");shot("detail")
+            scrollTo(archive.name);click(archive.name);wait("档案详情");wait("编辑");shot("detail")
             assertNull(find("完整照片，双击或双指缩放"))
             click("浏览${archive.name}的照片与视频");wait("完整照片，双击或双指缩放");shot("viewer")
-            click("返回档案");wait("档案");click("返回");wait("搜索档案")
+            click("返回");wait("档案详情");click("返回");wait("搜索档案")
             scrollTo(archive.name)
             var target:AccessibilityNodeInfo?=wait(archive.name);while(target!=null && !target.isClickable)target=target.parent
             val bounds=Rect();checkNotNull(target).getBoundsInScreen(bounds)

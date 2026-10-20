@@ -54,6 +54,7 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
                     TextButton(onClick={(context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("作者主页",identity.profileUrl));model.message("主页链接已复制")},enabled=identity.profileUrl.isNotBlank()){Text("复制")}
                 }
             }
+            TextButton(onClick={model.noteEditor.open("author",author.id,authorTitle(author))}){Text("编辑作者笔记")}
             actions()
         }
     }

@@ -60,7 +60,7 @@ import java.io.File
     Dialog(onDismissRequest={close()},properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
         BackHandler {close()}
         Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Text("编辑视频",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
                     TextButton(onClick={close()},enabled=!saving){Text(if(running)"取消并返回" else "返回")}

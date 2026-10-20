@@ -43,7 +43,7 @@ class ShareSwipeTest {
    // Receive the same real ACTION_SEND entry point used by the system share sheet.
    val text="示例直播间 https://live.kuaishou.com/u/demo"
    c.startActivity(Intent(c,MainActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-   click("创建档案草稿");wait("编辑档案");wait("示例直播间");shot("share-prefilled")
+   click("创建档案草稿");wait("新建档案");wait("示例直播间");shot("share-prefilled")
    click("保存");wait("档案")
    val saved=store.load().active.first{it.name=="示例直播间"}
    assertEquals("快手",saved.fields.first{it.name=="平台"}.value)

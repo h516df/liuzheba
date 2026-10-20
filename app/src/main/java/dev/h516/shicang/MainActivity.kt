@@ -46,8 +46,8 @@ class MainActivity: FragmentActivity() {
                 RecoveryFolder.validateLocalTree(uri)
                 contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 model.chooseProtectionFolder(uri)
-            } catch(e:Exception) {model.message("未开启自动保护：${e.message}，请保留原文件")}
-        }
+            } catch(e:Exception) {model.cancelProtectionSelectionRequest();model.message("无法使用所选目录：${e.message}，请保留原文件")}
+        } else model.cancelProtectionSelectionRequest()
     }
     private fun chooseProtectionLocation() {
         protectionFolder.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {

@@ -137,8 +137,22 @@ class Store(private val context: Context) {
     private fun remove(kind: String,id: String) { markProtectionDirty();db.execSQL("DELETE FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)) }
     private fun loadUnsafe()=Library(rows("archive").map(Codec::archive),rows("draft").map(Codec::archive),
         rows("label").map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
-        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()), rows("author").map(Codec::author))
+        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()), rows("author").map(Codec::author),rows("longNote").map(LongNote::read),rows("longNoteDraft").map(LongNote::read))
     suspend fun load()=withContext(Dispatchers.IO) { gate.withLock { loadUnsafe() } }
+    suspend fun noteSession(note:LongNote)=withContext(Dispatchers.IO) {gate.withLock {
+        note.validated();NoteSession(rows("longNote").map(LongNote::read).firstOrNull{it.key==note.key},rows("longNoteDraft").map(LongNote::read).firstOrNull{it.key==note.key},generation)
+    }}
+    private fun requireNoteGeneration(token:String){if(token!=generation)throw StaleNoteSession()}
+    suspend fun noteDraft(note:LongNote,token:String)=withContext(Dispatchers.IO) {gate.withLock {
+        requireNoteGeneration(token);note.validated();put("longNoteDraft",note.key,note.json())
+    }}
+    suspend fun discardNoteDraft(note:LongNote,token:String)=withContext(Dispatchers.IO) {gate.withLock {requireNoteGeneration(token);remove("longNoteDraft",note.validated().key)}}
+    suspend fun saveNote(note:LongNote,expected:LongNote?,token:String)=withContext(Dispatchers.IO) {gate.withLock {
+        requireNoteGeneration(token);note.validated()
+        val existing=rows("longNote").map(LongNote::read).firstOrNull{it.key==note.key}
+        require(existing==expected){"笔记已在别处改变；草稿已保留，请重新打开核对"}
+        db.beginTransaction();try {put("longNote",note.key,note.copy(updated=System.currentTimeMillis()).json());remove("longNoteDraft",note.key);db.setTransactionSuccessful()}finally{db.endTransaction()}
+    }}
     suspend fun searchPreferences(value:SearchPreferences)=withContext(Dispatchers.IO) {gate.withLock {put("searchPreferences","rules",SearchPreferences.read(value.json()).json())}}
     suspend fun appearance()=withContext(Dispatchers.IO) { gate.withLock { rows("settings").firstOrNull()?.let(Appearance::read) ?: Appearance() } }
     suspend fun appearance(a: Appearance)=withContext(Dispatchers.IO) { gate.withLock { put("settings","appearance",a.json()) } }
@@ -357,6 +371,8 @@ class Store(private val context: Context) {
                     l.photoTrash.forEach{put("photoTrash",it.id,JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",Codec.photo(it.photo)).put("index",it.index).put("removed",it.removed),next)}
                     l.templates.forEach{put("template",it.id,Templates.json(it),next)}
                     l.authors.forEach{put("author",it.id,Codec.author(it),next)}
+                    l.notes.forEach{put("longNote",it.key,it.json(),next)}
+                    l.noteDrafts.forEach{put("longNoteDraft",it.key,it.json(),next)}
                     put("searchPreferences","rules",l.searchPreferences.json(),next)
                     put("settings","appearance",Appearance.read(o.optJSONObject("appearance") ?: JSONObject()).json(),next)
                     next.setTransactionSuccessful()
@@ -369,6 +385,10 @@ class Store(private val context: Context) {
         } finally {if(!installed)next.close()}
     }
     fun lastBackup()=prefs.getLong("lastBackup",0)
+    fun canUndoRestore():Boolean {
+        val old=prefs.getString("previousGeneration",null) ?: return false
+        return (Codec.validId(old)||old=="initial") && File(context.filesDir,"libraries/$old/library.db").isFile
+    }
     suspend fun undoRestore()=withContext(Dispatchers.IO) {gate.withLock {
         val old=prefs.getString("previousGeneration",null) ?: error("没有恢复前副本")
         require(Codec.validId(old)||old=="initial");val next=File(context.filesDir,"libraries/$old");require(File(next,"library.db").isFile)

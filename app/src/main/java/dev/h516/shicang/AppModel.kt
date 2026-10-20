@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-data class AppState(val authorBase:Author?=null,val authorsOpen:Boolean=false,val authorTarget:String?=null,val authorInput:String="",val authorPreview:Author?=null,val authorNotice:String="",val aiTagSource:Archive?=null,val aiTagLabels:List<Label> = emptyList(),val aiTagPreferences:SearchPreferences?=null,val aiTagSuggestions:List<TagSuggestion> = emptyList(),val aiTagArchive:String="",val aiTagBusy:Boolean=false,val localModelStatus:String="本机 AI 未下载 · 当前仅文字与别名搜索",val modelDownloading:Boolean=false,val protection:ProtectionState=ProtectionState(),val recoveryChoices:List<RecoveryChoice> = emptyList(),val protectionSelection:Uri?=null,val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
+data class AppState(val authorBase:Author?=null,val authorsOpen:Boolean=false,val authorTarget:String?=null,val authorInput:String="",val authorPreview:Author?=null,val authorNotice:String="",val aiTagSource:Archive?=null,val aiTagLabels:List<Label> = emptyList(),val aiTagPreferences:SearchPreferences?=null,val aiTagSuggestions:List<TagSuggestion> = emptyList(),val aiTagArchive:String="",val aiTagBusy:Boolean=false,val localModelStatus:String="本机 AI 未下载 · 当前仅文字与别名搜索",val modelDownloading:Boolean=false,val protection:ProtectionState=ProtectionState(),val recoveryChoices:List<RecoveryChoice> = emptyList(),val protectionSelection:Uri?=null,val protectionRestoreOnly:Boolean=false,val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
     val exportRequest:MediaExportRequest?=null,val downloadsOpen:Boolean=false,val downloadInput:String="",
     val resolving:Boolean=false,val downloadError:String="",val mediaPlan:MediaPlan?=null,val downloads:List<MediaDownload> = emptyList())
 class AppModel(app: Application): AndroidViewModel(app) {
@@ -58,6 +58,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private val mutable=MutableStateFlow(AppState())
     val state=mutable.asStateFlow()
     lateinit var store: Store; private set
+    val noteEditor=LongNoteEditor(viewModelScope,{store},{reload()},{message(it)})
     private var draftJob: Job?=null
     private var operation: Job?=null
     private var resolution:Job?=null
@@ -285,13 +286,27 @@ class AppModel(app: Application): AndroidViewModel(app) {
         searchPreferences(next)
     }
     fun appearance(a: Appearance)=work("保存外观") {store.appearance(a)}
-    fun chooseProtectionFolder(uri:Uri)=work("检查保护文件夹") {
-        val choices=store.inspectProtectionFolder(uri)
-        if(choices.isEmpty()) {store.selectProtectionFolder(uri);message("留着吧将自动创建保护文件夹并保存原件，请等待“已保护”")}
-        else mutable.value=mutable.value.copy(recoveryChoices=choices,protectionSelection=uri)
+    // Persist only the pending picker intent so a restored Activity cannot turn a recovery request into setup.
+    fun prepareProtectionSelection(restoreOnly:Boolean):Boolean {
+        val saved=getApplication<Application>().getSharedPreferences("device",0).edit().putBoolean("protectionRestoreOnly",restoreOnly).commit()
+        if(!saved)message("无法记录操作，请检查存储空间后重试")
+        return saved
     }
-    fun dismissProtectionSelection(){mutable.value=mutable.value.copy(recoveryChoices=emptyList(),protectionSelection=null)}
+    fun cancelProtectionSelectionRequest(){getApplication<Application>().getSharedPreferences("device",0).edit().remove("protectionRestoreOnly").apply()}
+    fun chooseProtectionFolder(uri:Uri)=work("检查保护文件夹") {
+        val prefs=getApplication<Application>().getSharedPreferences("device",0)
+        val restoreOnly=prefs.getBoolean("protectionRestoreOnly",true)
+        cancelProtectionSelectionRequest()
+        val choices=store.inspectProtectionFolder(uri)
+        when {
+            choices.isNotEmpty()->mutable.value=mutable.value.copy(recoveryChoices=choices,protectionSelection=uri,protectionRestoreOnly=restoreOnly)
+            restoreOnly->message("未找到可恢复版本；当前资料未改变，也未开启自动保护。请核对原保存位置。")
+            else->{store.selectProtectionFolder(uri);message("留着吧将自动创建保护文件夹并保存原件，请等待“已保护”")}
+        }
+    }
+    fun dismissProtectionSelection(){mutable.value=mutable.value.copy(recoveryChoices=emptyList(),protectionSelection=null,protectionRestoreOnly=false)}
     fun useProtectionFolder() {
+        if(mutable.value.protectionRestoreOnly)return
         val uri=mutable.value.protectionSelection ?: return
         work("启用自动保护") {store.selectProtectionFolder(uri);dismissProtectionSelection();message("开始保护当前资料，已有恢复版本仍保留")}
     }
@@ -301,7 +316,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         work("从保护文件夹恢复") {
             store.restoreProtectionFolder(uri,choice.name){text->mutable.value=mutable.value.copy(progress=text)}
             store.selectProtectionFolder(uri);dismissProtectionSelection();mutable.value=mutable.value.copy(editor=null)
-            message("已校验并恢复全部资料与原件，恢复前资料仍保留，可在设置撤销恢复")
+            message("已校验并恢复全部资料与原件，恢复前资料仍保留，可在“备份与恢复”撤销恢复")
         }
     }
     fun acknowledgeImportWarning()=work("确认已核对原件") {store.acknowledgeImportWarning()}

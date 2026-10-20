@@ -40,7 +40,7 @@ class MediaCollectionUiTest {
                 .putParcelableArrayListExtra(Intent.EXTRA_STREAM,uris)
                 .apply{clipData=ClipData.newUri(c.contentResolver,"测试媒体",uris[0]).apply{addItem(ClipData.Item(uris[1]))}}
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_GRANT_READ_URI_PERMISSION))
-            wait("收录 2 项媒体");click("新建档案");wait("编辑档案");shot("shared-editor-dark")
+            wait("收录 2 项媒体");click("新建档案");wait("新建档案");shot("shared-editor-dark")
             click("保存");wait("档案")
             val persisted=Store(c).load().active.single();assertEquals(2,persisted.photos.size);assertEquals(1,persisted.photos.count{it.isVideo})
             // The real multi-item gallery pipeline retains the bytes for both kinds and suppresses duplicates.
