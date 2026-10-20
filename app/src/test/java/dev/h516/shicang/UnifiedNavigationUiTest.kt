@@ -51,6 +51,10 @@ abstract class UnifiedNavigationFixture {
         val model=AppModel(app);val owners=androidx.lifecycle.ViewModelStore().apply{put("fixture",model)}
         try {
             compose.setContent{ShicangApp(model,true,{},{},{chooseRequests.add(it)},{cameraRequests.add(it)},{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
+            // Store readiness precedes the asynchronous search and lazy-grid placement. Wait for
+            // the real merged, clickable archive node instead of racing its first layout in CI.
+            idle{compose.onAllNodes(hasText(a.name) and hasClickAction()).fetchSemanticsNodes().size==1}
+            compose.onNode(hasText(a.name) and hasClickAction()).assertIsDisplayed()
             check(model,a)
         } finally {owners.clear();idle{model.resourcesClosed};loader.shutdown()}
     }
