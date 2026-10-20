@@ -40,7 +40,22 @@ class MainActivity: FragmentActivity() {
     }
     private val backup=registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) {uri -> if(uri!=null) model.backup(uri)}
     private val restore=registerForActivityResult(ActivityResultContracts.OpenDocument()) {uri -> if(uri!=null) model.restoreBackup(uri)}
-    override fun onResume(){super.onResume();GrowthSession.resume(this)}
+    private val protectionFolder=registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {result ->
+        if(result.resultCode==RESULT_OK) result.data?.data?.let {uri ->
+            try {
+                RecoveryFolder.validateLocalTree(uri)
+                contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                model.chooseProtectionFolder(uri)
+            } catch(e:Exception) {model.message("未开启自动保护：${e.message}，请保留原文件")}
+        }
+    }
+    private fun chooseProtectionLocation() {
+        protectionFolder.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            putExtra(Intent.EXTRA_LOCAL_ONLY,true)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+        })
+    }
+    override fun onResume(){super.onResume();GrowthSession.resume(this);model.retryProtection()}
     override fun onPause(){GrowthSession.pause();super.onPause()}
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge()
@@ -54,7 +69,7 @@ class MainActivity: FragmentActivity() {
         if(savedInstanceState==null) receiveShare(intent)
         setContent {ShicangApp(model,unlocked.value,{authenticate()},::setLock,::choosePhotos,::takePhoto,
             {backup.launch("留册备份-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss",java.util.Locale.ROOT).format(java.util.Date())}.zip")},
-            {restore.launch(arrayOf("application/zip","application/octet-stream"))})}
+            {restore.launch(arrayOf("application/zip","application/octet-stream"))},::chooseProtectionLocation)}
     }
     override fun onNewIntent(intent:Intent) {super.onNewIntent(intent);setIntent(intent);receiveShare(intent)}
     @Suppress("DEPRECATION")

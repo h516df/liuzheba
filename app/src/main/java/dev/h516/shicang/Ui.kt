@@ -54,7 +54,7 @@ private val Ink=Color(0xFF25282B)
 private val Paper=Color(0xFFF4F0E7)
 private val Muted: Color
     @Composable get()=MaterialTheme.colorScheme.onSurfaceVariant
-@Composable fun ShicangApp(model:AppModel, unlocked:Boolean, unlock:()->Unit, setLock:(Boolean)->Unit, choosePhotos:(String)->Unit,takePhoto:(String)->Unit,backup:()->Unit,restore:()->Unit) {
+@Composable fun ShicangApp(model:AppModel, unlocked:Boolean, unlock:()->Unit, setLock:(Boolean)->Unit, choosePhotos:(String)->Unit,takePhoto:(String)->Unit,backup:()->Unit,restore:()->Unit,chooseProtection:()->Unit={}) {
     val s by model.state.collectAsState()
     val scheme=appearanceScheme(s.appearance)
     val dark=scheme.background.red<.2f
@@ -82,6 +82,20 @@ private val Muted: Color
         var zoomPhoto by rememberSaveable{mutableStateOf("")}
         val snackbar=remember{SnackbarHostState()}
         var confirm by remember{mutableStateOf<Pair<String,()->Unit>?>(null)}
+        if(s.protectionSelection!=null) AlertDialog(
+            onDismissRequest=model::dismissProtectionSelection,
+            title={Text("找到已有恢复版本")},
+            text={Column {
+                Text("显示最近 100 个有效版本，旧文件仍保留。请选择要恢复的版本。恢复前会校验全部原件；当前资料保留为可撤销副本。也可继续保护当前资料，不覆盖旧版本。")
+                LazyColumn(Modifier.heightIn(max=320.dp)) {items(s.recoveryChoices,key={it.name}) {choice ->
+                    TextButton(onClick={confirm="将恢复所选版本的 ${choice.archives} 份档案、${choice.media} 项原件。当前资料会保留为可撤销副本。继续吗？" to {model.recoverProtection(choice)}},enabled=!s.busy) {
+                        Text("${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(choice.time))}\n${choice.archives} 份档案 · ${choice.media} 项原件")
+                    }
+                }}
+            }},
+            confirmButton={TextButton(onClick=model::useProtectionFolder,enabled=!s.busy){Text("保护当前资料")}},
+            dismissButton={TextButton(onClick=model::dismissProtectionSelection,enabled=!s.busy){Text("取消")}}
+        )
         val context=LocalContext.current
         val updater=model.updater
         val owner=LocalLifecycleOwner.current
@@ -173,6 +187,11 @@ private val Muted: Color
                         TextButton(onClick=updater::dismissPrompt){Text("稍后")}
                     }
                 }
+                if(unlocked && s.ready && !editing && route=="library") {
+                    TextButton(onClick={openSettings()},modifier=Modifier.fillMaxWidth()) {
+                        Text(if(s.protection.protected) "已保护 · ${s.protection.mediaCount} 项原件" else "${s.protection.status} · ${if(s.protection.location.isEmpty()) "自动保护尚未开启" else "最新资料尚未完成外部保护"}",style=MaterialTheme.typography.labelMedium)
+                    }
+                }
                 if(s.busy){LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(horizontal=24.dp,vertical=4.dp),fontSize=12.sp);if(s.progress.contains("备份")||s.progress.contains("恢复")||s.progress.contains("导入")||s.progress.contains("打包")||s.progress.contains("写入")) TextButton(onClick=model::cancelOperation){Text("取消")}}}
             }},bottomBar={if(!immersive && !editing && route=="library" && unlocked) NavigationBar(containerColor=scheme.background,tonalElevation=0.dp) {
                 NavigationBarItem(selected=false,onClick={route="frame"},icon={FrameGlyph("发现",scheme.onSurfaceVariant)},label={Text("发现")})
@@ -198,7 +217,7 @@ private val Muted: Color
 
                     route=="library"->libraryState.SaveableStateProvider("library") {LibraryV19(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})}
                     route=="detail"->{val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}})}
-                    route=="settings"->Settings(model,s,setLock,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{route=it},{title,action->confirm=title to action})
+                    route=="settings"->Settings(model,s,setLock,chooseProtection,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{route=it},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
                     route=="labels"->LabelsScreen(model,s){title,action->confirm=title to action}
                     route=="updates"->UpdateScreen(updater,PaddingValues(0.dp))
@@ -309,7 +328,7 @@ private val Muted: Color
         items(a.fields,key={it.id}){f->Surface(shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.surface){Column(Modifier.fillMaxWidth().padding(16.dp)){Text(f.name,fontSize=12.sp,color=Muted);Text(f.value.ifBlank{"未填写"},Modifier.padding(top=5.dp),fontSize=16.sp);if(f.value.startsWith("https://")||f.value.startsWith("http://")) TextButton(onClick={runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(f.value)).addCategory(Intent.CATEGORY_BROWSABLE))}.onFailure{model.message("没有可打开此链接的应用")}}){Text("打开链接")}}}}
     }
 }
-@Composable private fun Settings(model:AppModel,s:AppState,setLock:(Boolean)->Unit,backup:()->Unit,restore:()->Unit,navigate:(String)->Unit,confirm:(String,()->Unit)->Unit) {
+@Composable private fun Settings(model:AppModel,s:AppState,setLock:(Boolean)->Unit,chooseProtection:()->Unit,backup:()->Unit,restore:()->Unit,navigate:(String)->Unit,confirm:(String,()->Unit)->Unit) {
     val c=MaterialTheme.colorScheme
     var appearance by rememberSaveable{mutableStateOf(false)}
     var backups by rememberSaveable{mutableStateOf(false)}
@@ -326,6 +345,7 @@ private val Muted: Color
             }
         }
         item {
+            ProtectionPanel(s.protection,s.busy,{confirm(PROTECTION_SETUP_NOTICE,chooseProtection)},model::retryProtection,{confirm("请确认：你已核对导入失败或中断的原文件，知道这些原文件不在当前保护范围内，并会继续保留或重新导入。",model::acknowledgeImportWarning)})
             Text("资料与备份",Modifier.padding(start=4.dp,bottom=10.dp),style=MaterialTheme.typography.titleSmall,color=c.onSurfaceVariant)
             Column(Modifier.clip(RoundedCornerShape(20.dp)).background(c.surface).animateContentSize(tween(220)).padding(horizontal=16.dp)) {
                 SettingButton("备份与恢复",if(model.store.lastBackup()>0) "上次备份 ${java.text.DateFormat.getDateInstance().format(java.util.Date(model.store.lastBackup()))}" else "还没有备份"){backups=!backups}
