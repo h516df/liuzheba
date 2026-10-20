@@ -1,0 +1,96 @@
+{
+  "packageName": "dev.h516.shicang",
+  "versionName": "0.15",
+  "versionCode": 16,
+  "certificateSha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26",
+  "nativeAbis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "debuggable": false,
+  "signatureV2": true,
+  "zipAlignmentVerified": true,
+  "packagedReleaseNotesMatchSource": true,
+  "privateKeyPathFindings": 0,
+  "bytes": 105461559,
+  "sha256": "0667b1305b0e940842295efcb8130b53730e532d87a2fa731b40013e1b68e0ec",
+  "buildHead": "77ebbfc8a4a0fcc0212b95bfaab850c83daae9f1",
+  "sourceTree": "22d64d72f8328698ec8cef46b0460fdd0b756ed8",
+  "featureHead": "61ed05b30046bf3599ae8d82bb523a21757d7711",
+  "featureTree": "2ddcf6d3036bded81673ff0db85b06763c147edf",
+  "minSdk": 24,
+  "targetSdk": 36,
+  "phoneInstalled": false,
+  "deviceAcceptance": false,
+  "unsignedApkSha256": "80f804d9788572410595e2ba3198a7877a3aaefa960c1008366cbd600f1b79c5",
+  "repo": "h516df/liuzheba",
+  "repositoryId": 1422110562,
+  "visibility": "public",
+  "releaseCommit": "e7993e6b09f5bc02ab94c9b5bd210e2dde3c2619",
+  "releaseTree": "22d64d72f8328698ec8cef46b0460fdd0b756ed8",
+  "buildRun": "https://github.com/h516df/liuzheba/actions/runs/39372508169",
+  "buildAttempt": 2,
+  "artifactId": 12241727890,
+  "artifactZipSha256": "39b96d46f3efcfef094edc769ba368edb950b8020500bd9bba84a0defca1a65d",
+  "finalInputChecks": [
+    {
+      "name": "dev.h516.shicang.ArchiveUiSnapshotTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "dev.h516.update.EmbeddedReleaseNotesTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "pr": "https://github.com/h516df/liuzheba/pull/22",
+  "finalPrAndroidRun": "https://github.com/h516df/liuzheba/actions/runs/39372723792",
+  "finalSecretRun": "https://github.com/h516df/liuzheba/actions/runs/39372723828",
+  "reusedFeatureEvidence": {
+    "coreTests": 161,
+    "immersiveUiTests": 20,
+    "playbackUpdateTests": 37,
+    "exactPr21AndroidRun": 39370417556
+  },
+  "runtimeFeatureCodeUnchangedFromPr21": true,
+  "assets": [
+    {
+      "path": "shicang-v0.15-universal.apk",
+      "bytes": 105461559,
+      "sha256": "0667b1305b0e940842295efcb8130b53730e532d87a2fa731b40013e1b68e0ec"
+    },
+    {
+      "path": "shicang-v0.15-release-notes.json",
+      "bytes": 1410,
+      "sha256": "251a58839b2b32d7d5893134e3424916925790c323bd29234ad6343432b78aeb"
+    },
+    {
+      "path": "shicang-v0.15-SHA256.txt",
+      "bytes": 195,
+      "sha256": "a4045e744c022cdce6ff3ed909a9d86adf2050c3f1ec7990acb29aab303e19c3"
+    }
+  ],
+  "published": false,
+  "mirrorWritten": false,
+  "unverified": [
+    "四平台实际匿名成功率及平台App接管",
+    "设备音频焦点、耳机拔出与旋转",
+    "系统覆盖安装与升级数据保留",
+    "实体ARM64模型加载、推理和性能",
+    "旧版更新源仓库更名重定向路径；可能需从新Release手动覆盖迁移"
+  ],
+  "sourceCommit": "e7993e6b09f5bc02ab94c9b5bd210e2dde3c2619",
+  "apk": "shicang-v0.15-universal.apk",
+  "notes": "shicang-v0.15-release-notes.json",
+  "branch": "release/delivery-v0.15-20261020",
+  "workflow": ".github/workflows/local-signed-release.yml",
+  "publicRelease": true,
+  "buildToolsVersion": "36.0.0",
+  "reconstructionSha256": "41f2b49d7952b677655298c9f9f0f6e38adec6141a3368de5f3e753356db1ebb",
+  "literalsSha256": "098174ee9fc326ee342f54bb5f8c4b4e22d631d59a87ea8eec4129c4a0462add"
+}
