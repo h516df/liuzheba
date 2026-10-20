@@ -152,11 +152,14 @@ class Store(private val context: Context) {
     suspend fun backup(uri: Uri, progress: (String)->Unit)=withContext(Dispatchers.IO) { gate.withLock {
         val operation=coroutineContext
         val l=loadUnsafe();val ps=photos(l);val appearance=rows("settings").firstOrNull() ?: Appearance().json()
-        val manifest=Codec.library(l).put("appearance",appearance)
+        val manifest=Codec.library(l).put("appearance",appearance).toString().toByteArray(Charsets.UTF_8)
+        // Reject unrestorable archives before creating a zip or touching a previous backup.
+        BackupLimits.DEFAULT.validateExport(manifest.size.toLong(),ps.asSequence().map { it.bytes })
         val tmp=File(context.cacheDir,"backup-${uid()}.zip")
+        var destinationOpened=false
         try {
             ZipOutputStream(tmp.outputStream().buffered()).use { zip ->
-                zip.putNextEntry(ZipEntry("manifest.json"));zip.write(manifest.toString().toByteArray(Charsets.UTF_8));zip.closeEntry()
+                zip.putNextEntry(ZipEntry("manifest.json"));zip.write(manifest);zip.closeEntry()
                 ps.forEachIndexed { i,p ->
                     operation.ensureActive()
                     val f=File(photoDir,p.file);require(f.length()==p.bytes && sha(f)==p.sha256) { "照片校验失败，备份未完成" }
@@ -165,12 +168,12 @@ class Store(private val context: Context) {
             }
             progress("写入所选位置")
             operation.ensureActive()
-            context.contentResolver.openOutputStream(uri,"w").use { out -> requireNotNull(out);tmp.inputStream().use {copyChecked(it,out){operation.ensureActive()}} }
+            context.contentResolver.openOutputStream(uri,"w").use { out -> requireNotNull(out);destinationOpened=true;tmp.inputStream().use {copyChecked(it,out){operation.ensureActive()}} }
             // Read back the destination, not just the temporary zip.
             val actual=context.contentResolver.openInputStream(uri).use { requireNotNull(it);hashStream(it) }
             require(actual==sha(tmp)) { "备份位置校验失败，请重新备份" }
             prefs.edit().putLong("lastBackup",System.currentTimeMillis()).putString("backupLocation",uri.toString()).apply()
-        } catch(e:Exception) { runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver,uri) };throw e }
+        } catch(e:Exception) { if(destinationOpened) runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver,uri) };throw e }
         finally {tmp.delete()}
     } }
     suspend fun restore(uri: Uri, progress: (String)->Unit)=withContext(Dispatchers.IO) { gate.withLock {
@@ -183,10 +186,10 @@ class Store(private val context: Context) {
                 while(true) {
                     operation.ensureActive()
                     val entry=zip.nextEntry ?: break;val n=entry.name
-                    require(!entry.isDirectory && entries.add(n) && entries.size<=100001 && (n=="manifest.json" || n.matches(Regex("photos/[a-f0-9-]{36}\\.original")))) { "备份包含异常或重复条目" }
-                    val max=if(n=="manifest.json") 32L*1024*1024 else Codec.MAX_MEDIA_BYTES
+                    require(!entry.isDirectory && entries.add(n) && entries.size<=BackupLimits.DEFAULT.entries && (n=="manifest.json" || n.matches(Regex("photos/[a-f0-9-]{36}\\.original")))) { "备份包含异常或重复条目" }
+                    val max=if(n=="manifest.json") BackupLimits.DEFAULT.manifestBytes else BackupLimits.DEFAULT.mediaBytes
                     val dst=if(n=="manifest.json") File(stage,"manifest.json") else File(dir,n.removePrefix("photos/"))
-                    dst.outputStream().use {out ->var size=0L;val buf=ByteArray(65536);while(true){operation.ensureActive();val k=zip.read(buf);if(k<0) break;size+=k;total+=k;require(size<=max && total<=20L*1024*1024*1024) {"备份展开容量超限"};out.write(buf,0,k)}}
+                    dst.outputStream().use {out ->var size=0L;val buf=ByteArray(65536);while(true){operation.ensureActive();val k=zip.read(buf);if(k<0) break;size+=k;total+=k;require(size<=max && total<=BackupLimits.DEFAULT.totalBytes) {"备份展开容量超限"};out.write(buf,0,k)}}
                     if(n=="manifest.json") manifest=JSONObject(dst.readText(Charsets.UTF_8))
                     progress("校验恢复文件 ${entries.size}");zip.closeEntry()
                 }
