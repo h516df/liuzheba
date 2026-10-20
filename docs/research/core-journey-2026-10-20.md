@@ -1,7 +1,7 @@
 # Tag-first, direct-action collection workflow
 
 Research date: 2026-10-20. Starting point: merged `079b904` (0.16/code 17).
-This change does not change a published asset, release identifier, media format, or backup format.
+This change does not change a published asset, media format, or backup format. The next candidate is 0.17/code 18; published 0.16/code 17 remains untouched.
 
 ## Observed friction, not a feature wishlist
 
@@ -50,7 +50,7 @@ Explicit media imports still use the existing busy-operation model and hold the 
 
 - The integrated full suite passed all 277 tests across 55 suites, with no failures, errors, or skips. After the final success-state wording refinement, all 7 protection-state/component tests passed again.
 - `lintDebug` passed with no errors. It still reports 75 warnings and one hint; this is not a zero-warning project. The regular debug application and instrumentation APKs compiled successfully.
-- The final wording was also built with `-I tools/verification.init.gradle`; the APK package is `dev.h516.shicang.verification`, and its test APK targets that isolated package. Version 0.16/code 17 and release configuration remain unchanged. This is a debug verification build, not a published update.
+- The final wording was also built with `-I tools/verification.init.gradle`; the APK package is `dev.h516.shicang.verification`, and its test APK targets that isolated package. That initial feature validation used 0.16/code 17. The subsequent release-metadata-only commit advances the candidate to 0.17/code 18; signing configuration remains unchanged. Debug verification is not a published update.
 - The new native Compose journey tests cover tag defaults, inline selection, category preservation, first-tag creation, one-tap filtering and navigation return, direct picker callbacks, long-press selection, System Back, and 200% text.
 - `app/build/outputs/unified-navigation/` contains full app journey renders, including `tag-first-picker.png`, `tag-one-tap-filter.png`, `direct-media-actions.png`, `direct-media-font200.png`, and `selection-font200.png`.
 - `app/build/outputs/protection-ui/` contains **isolated ProtectionPanel component fixtures**, not a full backup navigation page. The success, failure, import warning, and narrow/200% dark renders distinguish routine state from required attention.
