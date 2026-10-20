@@ -31,3 +31,9 @@ For integration, preserve the long-note editor's active-page gate at both Archiv
 - Inspected the native-rendered 320 dp synthetic discovery screenshot: current media, fixed-cover mode and next-round controls fit. No user media or screenshot is committed/uploaded.
 - Still required in the integrated batch: actual-phone gestures/return/lock, real video codecs, process-death/low-memory behavior, and long-note/video-edit overlay pause gates. This PR neither releases nor changes the app version.
 - `lintDebug`: passed independently with a 768 MiB Gradle heap.
+
+### CI return-test diagnosis
+
+The first push CI run reported 183/184 passing; its return/cover test timed out, while the sibling PR run passed. The fixture used PAUSED Looper mode but did not drain the main queue when awaiting asynchronous media callbacks. A longer sleep is not the remedy: the wait predicates now explicitly idle the main queue, matching the existing AppModel readiness/cleanup waits.
+
+A controlled re-run of the **unchanged production source** passed with a forced non-cover initial selection. Temporary production changes considered during diagnosis (mode-generation keys/loading placeholders) were withdrawn. The final regression fixture clears the old callback before returning, waits for a fresh callback, forces the cover to be neither the initial media nor item zero, and checks the actual displayed page number as well as the callback. The final 11-test group passes with these stronger assertions.

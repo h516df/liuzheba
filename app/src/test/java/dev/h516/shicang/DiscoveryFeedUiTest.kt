@@ -29,27 +29,33 @@ abstract class DiscoveryFeedUiFixture {
     @After fun reset(){Dispatchers.resetMain()}
     protected fun stableRandomPreviewReturnsFromDetailsAndSwitchesToCover()=fixture {model,a->
         var inFeed by mutableStateOf(true)
+        var displayed by mutableStateOf(a)
         val seen=mutableMapOf<String,String>()
         compose.setContent {
             MaterialTheme {
                 val state=rememberSaveableStateHolder()
                 if(inFeed) state.SaveableStateProvider("discovery") {
-                    ArchiveFeed(listOf(a),"",model,Appearance(),emptyMap(),{id,p->seen[id]=p},{}, {},{inFeed=false},{},{},{},{},false)
+                    ArchiveFeed(listOf(displayed),"",model,Appearance(),emptyMap(),{id,p->seen[id]=p},{}, {},{inFeed=false},{},{},{},{},false)
                 } else TextButton(onClick={inFeed=true}){Text("返回发现")}
             }
         }
-        compose.waitUntil(10000){seen[a.id]!=null}
+        compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=null}
         val first=seen[a.id]!!
+        val fixedCover=a.photos.drop(1).first {it.id!=first}.id
+        compose.runOnIdle {displayed=a.copy(cover=fixedCover)}
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("随机预览 · 已开启").assertExists()
         compose.onNodeWithText("查看资料").performClick()
         compose.onNodeWithText("打开完整档案").performClick()
+        compose.runOnIdle {seen.clear()}
         compose.onNodeWithText("返回发现").performClick()
-        compose.waitForIdle()
+        compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=null}
         assertEquals(first,seen[a.id])
+        compose.onNodeWithText("${a.photos.indexOfFirst{it.id==first}+1} / ${a.photos.size}").assertExists()
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("随机预览 · 已开启").performClick()
-        compose.waitUntil(10000){seen[a.id]==a.cover}
+        compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]==fixedCover}
+        compose.onNodeWithText("${a.photos.indexOfFirst{it.id==fixedCover}+1} / ${a.photos.size}").assertExists()
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("固定封面 · 已开启").assertExists()
         val output=File("build/outputs/discovery-ui/fixed-cover-menu.png");output.parentFile?.mkdirs()
@@ -58,11 +64,11 @@ abstract class DiscoveryFeedUiFixture {
     protected fun singleArchiveNextVisitUsesDifferentMedia()=fixture {model,a->
         val seen=mutableMapOf<String,String>()
         compose.setContent {MaterialTheme {ArchiveFeed(listOf(a),"",model,Appearance(),emptyMap(),{id,p->seen[id]=p},{},{},{},{},{},{},{},false)}}
-        compose.waitUntil(10000){seen[a.id]!=null}
+        compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=null}
         val first=seen[a.id]
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("下一份").performClick()
-        compose.waitUntil(10000){seen[a.id]!=first}
+        compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=first}
         assertTrue(seen[a.id] in a.photos.map{it.id})
     }
     protected fun missingFilesAreNotSelected()=fixture {model,a->
@@ -70,7 +76,7 @@ abstract class DiscoveryFeedUiFixture {
         model.photoFile(a.photos[1]).delete()
         val seen=mutableMapOf<String,String>()
         compose.setContent {MaterialTheme {ArchiveFeed(listOf(a),"",model,Appearance(),emptyMap(),{id,p->seen[id]=p},{},{},{},{},{},{},{},false)}}
-        compose.waitUntil(10000){seen[a.id]!=null}
+        compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=null}
         assertEquals(a.photos.last().id,seen[a.id])
     }
     protected fun videoPreviewWaitsForTapAndDoesNotPlayWhenInactive()=fixture {model,a->
@@ -78,7 +84,7 @@ abstract class DiscoveryFeedUiFixture {
         var enabled by mutableStateOf(true)
         val seen=mutableMapOf<String,String>()
         compose.setContent {MaterialTheme {ArchiveFeed(listOf(video),"",model,Appearance(),emptyMap(),{id,p->seen[id]=p},{},{},{},{},{},{},{},false,enabled)}}
-        compose.waitUntil(10000){seen[a.id]!=null}
+        compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=null}
         compose.onNodeWithText("播放视频").assertExists()
         compose.runOnIdle{enabled=false}
         compose.onNodeWithText("播放视频").assertDoesNotExist()
