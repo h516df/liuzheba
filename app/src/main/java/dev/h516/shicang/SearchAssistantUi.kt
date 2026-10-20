@@ -8,13 +8,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-@Composable internal fun SearchRulesDialog(library:Library,busy:Boolean,save:(SearchPreferences)->Unit,dismiss:()->Unit) {
+@Composable internal fun SearchRulesPage(library:Library,busy:Boolean,save:(SearchPreferences)->Unit,dismiss:()->Unit) {
     var draft by remember(library.searchPreferences){mutableStateOf(library.searchPreferences)}
     var phrase by remember{mutableStateOf("")};var target by remember{mutableStateOf("")}
     var category by remember{mutableStateOf("")};var error by remember{mutableStateOf("")}
     val rule=draft.rule(category).copy(category=category)
     fun update(value:SuggestionRule){draft=draft.copy(rules=draft.rules.filter{it.category!=category}+value)}
-    AlertDialog(onDismissRequest=dismiss,title={Text("搜索与标签规则")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    androidx.activity.compose.BackHandler(onBack=dismiss)
+    Column(Modifier.fillMaxSize().imePadding()) {
+        PageBar("搜索与标签规则",dismiss)
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+            TextButton(onClick=dismiss){Text("取消")}
+            TextButton(enabled=!busy,onClick={runCatching{SearchPreferences.read(draft.json())}.onSuccess{save(it);dismiss()}.onFailure{error=it.message.orEmpty()}}){Text("保存规则")}
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("只在本机使用。别名不改档案、不合并标签；建议须逐项接受，手动标签不会被覆盖。")
         Text("搜索别名（单向，整条查询匹配）",style=MaterialTheme.typography.titleSmall)
         OutlinedTextField(phrase,{phrase=it.take(100)},label={Text("我习惯搜的词")},singleLine=true)
@@ -35,7 +42,8 @@ import androidx.compose.ui.unit.dp
         if(category.isNotEmpty()) TextButton(onClick={draft=draft.copy(rules=draft.rules.filter{it.category!=category})}){Text("此分类恢复默认规则")}
         if(draft.rejections.isNotEmpty())TextButton(onClick={draft=draft.copy(rejections=emptyList())}){Text("清除 ${draft.rejections.size} 条单档案拒绝记录")}
         if(error.isNotEmpty())Text(error,color=MaterialTheme.colorScheme.error)
-    }},confirmButton={TextButton(enabled=!busy,onClick={runCatching{SearchPreferences.read(draft.json())}.onSuccess{save(it);dismiss()}.onFailure{error=it.message.orEmpty()}}){Text("保存规则")}},dismissButton={TextButton(onClick=dismiss){Text("取消")}})
+    }
+    }
 }
 
 @Composable internal fun TagSuggestionsPanel(model:AppModel,s:AppState,a:Archive) {

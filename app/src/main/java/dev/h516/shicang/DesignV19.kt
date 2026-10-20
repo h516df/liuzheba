@@ -90,6 +90,10 @@ import kotlinx.coroutines.withContext
     }
     val searching=results==null || completedQuery!=selection
     fun clear(){query="";category="";tags=emptyList();recent=0L;focus.clearFocus()}
+    if(rules) {
+        SearchRulesPage(s.library,s.busy,model::searchPreferences){rules=false}
+        return
+    }
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             TextField(query,{query=it},Modifier.weight(1f).semantics{contentDescription="搜索档案"},singleLine=true,
@@ -155,7 +159,6 @@ import kotlinx.coroutines.withContext
         }
     }
     deleteTarget?.let{a->AlertDialog(onDismissRequest={deleteTarget=null},title={Text("移入回收站？")},text={Text("「${a.name}」的资料和媒体可以从回收站恢复。")},confirmButton={TextButton(onClick={deleteTarget=null;model.trash(a)}){Text("移入回收站")}},dismissButton={TextButton(onClick={deleteTarget=null}){Text("取消")}})}
-    if(rules) SearchRulesDialog(s.library,s.busy,model::searchPreferences){rules=false}
     if(filters) LabelPicker(s.library,selection.category,selection.tags,{category=it.first;tags=it.second;filters=false},{filters=false},"筛选档案")
 }
 

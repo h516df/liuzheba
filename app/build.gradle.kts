@@ -75,6 +75,7 @@ android.testOptions.unitTests.apply {
     isIncludeAndroidResources = true
     all {
         it.maxHeapSize = "2g"
+        it.systemProperty("java.io.tmpdir", rootProject.file(".gradle/test-tmp").also { it.mkdirs() }.absolutePath)
         it.systemProperty("user.home", rootProject.file(".gradle/task-home").also { it.mkdirs() }.absolutePath)
         it.systemProperty("roborazzi.test.record", "true")
         it.systemProperty("robolectric.pixelCopyRenderMode", "hardware")
