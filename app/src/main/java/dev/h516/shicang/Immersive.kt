@@ -62,6 +62,7 @@ import java.io.File
     var controls by rememberSaveable {mutableStateOf(true)}
     var menu by remember {mutableStateOf(false)}
     var information by remember {mutableStateOf(false)}
+    var editingVideo by remember {mutableStateOf<Photo?>(null)}
     var activity by remember {mutableIntStateOf(0)}
     val context=LocalContext.current
     val accessibility=remember {context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager}
@@ -109,7 +110,7 @@ import java.io.File
                     val width=minOf((maxWidth-40.dp).coerceAtLeast(1.dp),(maxHeight-140.dp).coerceAtLeast(1.dp)*ratio)
                     val canvas=if(framed) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
-                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
+                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && editingVideo==null && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
                 else {
                     // Keep the renderer and its decoded image stable across the pager midpoint.
                     val imageState=rememberZoomableImageState()
@@ -145,6 +146,7 @@ import java.io.File
                         DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
                         if(a.photos.isNotEmpty()) DropdownMenuItem(text={Text("全部照片")},onClick={menu=false;allPhotos()})
                         if(current!=null) {
+                            if(current.isVideo) DropdownMenuItem(text={Text("编辑视频")},onClick={menu=false;editingVideo=current},enabled=!busy)
                             DropdownMenuItem(text={Text("保存到相册")},onClick={menu=false;model.requestExport(a,listOf(current))})
                             DropdownMenuItem(text={Text("分享原件")},onClick={menu=false;model.shareMedia(a,listOf(current))})
                         }
@@ -170,6 +172,7 @@ import java.io.File
         }
 
     }
+    editingVideo?.let { video -> VideoEditorDialog(a,video,model){editingVideo=null;touch()} }
     if(information) {
         val state by model.state.collectAsState()
         ModalBottomSheet(onDismissRequest={information=false;touch()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {

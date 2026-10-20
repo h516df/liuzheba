@@ -257,6 +257,35 @@ class Store(private val context: Context) {
         check(prefs.edit().putString("protectionPendingMedia",org.json.JSONArray(pending.distinct()).toString()).putString("protectionPriorWarning",warning).putString("protectionImportWarning",if(warning.isNotEmpty()) warning else "有已导入媒体尚未完整写入档案").commit())
         ImportResult(good,errors)
     } }
+    /** Append a separate derivative to the current archive, never replace its source or stale metadata. */
+    internal suspend fun appendEditedVideo(archiveId:String,original:Photo,source:File,edited:File):Photo=withContext(Dispatchers.IO) { gate.withLock {
+        val library=loadUnsafe()
+        val archive=library.active.firstOrNull{it.id==archiveId} ?: error("原档案已变更，请重新打开视频")
+        require(archive.photos.any{it==original} && source.canonicalFile==File(photoDir,original.file).canonicalFile){"原视频已变更，请重新打开"}
+        require(source.isFile && source.length()==original.bytes && sha(source)==original.sha256){"原视频已变更，未保存编辑副本"}
+        require(library.drafts.none{it.id==archiveId}){"该档案有未保存草稿，请先保存再编辑视频"}
+        require(edited.isFile && edited.length() in 1..Codec.MAX_MEDIA_BYTES){"编辑副本不完整或超过 1GB"}
+        require(photoDir.usableSpace>edited.length()+32L*1024*1024){"空间不足，尚未保存副本"}
+        val id=uid();val pending=File(photoDir,"$id.pending");val final=File(photoDir,"$id.original")
+        var committed=false
+        try {
+            val operation=coroutineContext
+            edited.inputStream().use{input->pending.outputStream().use{output->copyChecked(input,output){operation.ensureActive()}}}
+            require(pending.length()==edited.length() && sha(pending)==sha(edited)){"副本校验失败"}
+            val metadata=inspectMedia(pending,"video/mp4")
+            require(metadata.first.startsWith("video/") && metadata.second>0){"副本不是有效视频"}
+            val photo=Photo(id,final.name,pending.length(),sha(pending),metadata.first,metadata.second)
+            operation.ensureActive()
+            withContext(kotlinx.coroutines.NonCancellable) {
+                check(pending.renameTo(final)){"副本保存失败"}
+                db.beginTransaction()
+                try {put("archive",archive.id,Codec.archive(archive.copy(photos=archive.photos+photo,updated=System.currentTimeMillis())));db.setTransactionSuccessful()}
+                finally {db.endTransaction()}
+                committed=true
+            }
+            photo
+        } finally {pending.delete();if(!committed)final.delete()}
+    } }
     private fun photos(l: Library)=(l.archives+l.drafts).flatMap { it.photos }.plus(l.photoTrash.map {it.photo}).distinctBy {it.file}
     suspend fun space()=withContext(Dispatchers.IO) { gate.withLock { mapOf("照片与视频" to photoDir.walkTopDown().filter{it.isFile}.sumOf{it.length()},"图片缓存" to File(context.cacheDir,"previews").walkTopDown().filter{it.isFile}.sumOf{it.length()},"恢复前副本" to File(context.filesDir,"libraries").listFiles().orEmpty().filter{it.name!=generation}.sumOf { f -> f.walkTopDown().filter{it.isFile}.sumOf{it.length()} }) } }
     suspend fun purge()=withContext(Dispatchers.IO) { gate.withLock {
