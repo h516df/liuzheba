@@ -310,5 +310,14 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun restoreBackup(uri: Uri)=work("准备恢复") {store.restore(uri){s -> mutable.value=mutable.value.copy(progress=s)};mutable.value=mutable.value.copy(editor=null);message("资料已恢复，恢复前副本保留，可撤销恢复")}
     fun undoRestore()=work("还原恢复前资料") {store.undoRestore();message("已切换回恢复前资料")}
     fun clearCache()=work("清理图片缓存") {store.clearCache();message("图片缓存已清理，原照片与资料保留")}
+    internal suspend fun saveEditedVideo(a:Archive,p:Photo,source:File,edited:File):Photo = withContext(NonCancellable) {
+        require(mutable.value.ready && !mutable.value.busy && mutable.value.editor==null){"请先结束当前资料编辑"}
+        mutable.update{it.copy(busy=true,progress="保存独立视频副本")}
+        try {
+            val result=store.appendEditedVideo(a.id,p,source,edited)
+            reload();message("已另存到原档案，原视频和作者关联保留")
+            result
+        } finally {mutable.update{it.copy(busy=false,progress="")}}
+    }
     fun photoFile(p: Photo)=File(store.photoDir,p.file)
 }

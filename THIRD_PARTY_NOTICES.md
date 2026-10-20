@@ -33,3 +33,7 @@ Seal、YTDLnis、XHS-Downloader、DouK、Ketch 只用于调研，没有复制其
 
 ONNX Runtime Android 1.25.0, Microsoft, MIT: https://github.com/microsoft/onnxruntime/blob/v1.25.0/LICENSE .
 BGE-small-zh-v1.5, BAAI, MIT: https://huggingface.co/BAAI/bge-small-zh-v1.5 . Optional user-requested download, not bundled. Fixed Xenova ONNX export and verified hashes are documented in docs/LOCAL_SEARCH_ASSISTANT.md. No private text is transmitted for inference.
+
+## Media3 视频编辑
+
+视频裁剪和固定遮挡使用 AndroidX Media3 Transformer / Effect 1.11.1，Apache License 2.0。与现有 ExoPlayer 保持同版本。官方源码与许可：https://github.com/androidx/media/tree/1.11.1 。本项目实现自有编辑交互，未引入 FFmpegKit 或第三方编辑器应用源码。
