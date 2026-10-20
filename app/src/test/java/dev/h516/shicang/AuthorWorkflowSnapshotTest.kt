@@ -76,6 +76,20 @@ class AuthorWorkflowSnapshotTest {
         assertEquals("",runBlocking{model.store.load()}.authors.single().name)
         compose.onNodeWithText("未填写称呼的作者").performScrollTo().assertExists()
     }
+    @Test fun unresolvedShareStaysEditableAndOpensOriginalHttpsWithoutCreatingAuthor()=render("author-unresolved-share") {model,archive->
+        val source="https://xhslink.cn/o/SyntheticFixture"
+        val text="@合成作者 分享主页 $source"
+        compose.runOnIdle{model.openAuthors(archive.id,text);model.message("已识别小红书分享链接，但未取得作者主页")}
+        compose.onNodeWithText("粘贴作者主页分享链接").assertTextContains(text)
+        compose.onNodeWithText("打开原链接").performScrollTo().performClick()
+        val intent=org.robolectric.Shadows.shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity
+        assertEquals(android.content.Intent.ACTION_VIEW,intent.action)
+        assertEquals(source,intent.dataString)
+        assertTrue(intent.hasCategory(android.content.Intent.CATEGORY_BROWSABLE))
+        assertNull(model.state.value.authorPreview)
+        assertTrue(runBlocking{model.store.load()}.authors.isEmpty())
+        compose.onNodeWithText("粘贴作者主页分享链接").assertTextContains(text)
+    }
     private fun fixtureAuthor()=Author(name="合成作者",identities=listOf(AuthorProfiles.parse("https://weibo.com/u/123456789")!!.copy(nickname="候选昵称",publicAccount="测试公开账号")))
     private fun wait(predicate:()->Boolean){compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();predicate()}}
     private fun shot(name:String){compose.waitForIdle();val file=File("build/outputs/author-workflow/$name.png");file.parentFile!!.mkdirs();compose.onRoot().captureRoboImage(file.absolutePath)}

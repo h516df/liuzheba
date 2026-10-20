@@ -104,7 +104,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun importAuthor() {
         val input=mutable.value.authorInput
         work("正在读取公开作者主页") {
-            val result=withContext(Dispatchers.IO){AuthorProfiles.resolve(input)} ?: error("未识别作者主页，请粘贴小红书、抖音、快手或微博主页链接，不是作品链接")
+            val result=withContext(Dispatchers.IO){AuthorProfiles.resolve(input)}
             mutable.update{it.copy(authorPreview=it.authorBase?.let{base->base.copy(identities=base.identities+result.identity)} ?: Author(name=result.identity.nickname,identities=listOf(result.identity)),authorNotice=result.message)}
         }
     }

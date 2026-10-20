@@ -7,7 +7,7 @@ import java.util.Locale
 object Links {
     fun normalize(input:String):String? {
         val raw=input.trim()
-        val embedded=Regex("https?://[^\\s<>\"，。！？；【】]+",RegexOption.IGNORE_CASE).find(raw)?.value
+        val embedded=Regex("https?://[^\\s<>\"，。！？；【】“”‘’「」『』\u200B\uFEFF]+",RegexOption.IGNORE_CASE).find(raw)?.value
         val candidate=(embedded ?: raw).trimEnd('.',',',';',')','）',']','】','!','。')
         val url=if(candidate.startsWith("https://",true) || candidate.startsWith("http://",true)) candidate else "https://$candidate"
         return runCatching {
@@ -25,7 +25,7 @@ object Links {
             belongs("douyin.com")->"抖音"
             belongs("kuaishou.com") || belongs("gifshow.com")->"快手"
             belongs("bilibili.com") || belongs("b23.tv")->"哔哩哔哩"
-            belongs("xiaohongshu.com") || belongs("xhslink.com")->"小红书"
+            belongs("xiaohongshu.com") || belongs("xhslink.com") || belongs("xhslink.cn")->"小红书"
             belongs("weibo.com") || belongs("weibo.cn")->"微博"
             else->"打开网站"
         }

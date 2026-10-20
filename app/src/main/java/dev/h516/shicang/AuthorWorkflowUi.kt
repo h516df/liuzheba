@@ -62,6 +62,8 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
 
 @Composable internal fun AuthorWorkflowUi(model:AppModel,s:AppState) {
     if(!s.authorsOpen)return
+    val context=LocalContext.current
+    val source=AuthorProfiles.sourceLink(s.authorInput)
     val preview=s.authorPreview
     var leavePreview by remember{mutableStateOf(false)}
     var associate by remember{mutableStateOf<Author?>(null)}
@@ -81,6 +83,11 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
                         Text("小红书、抖音、快手、微博。只读取公开资料，不使用登录状态。",style=MaterialTheme.typography.bodySmall)
                         OutlinedTextField(s.authorInput,model::authorInput,Modifier.fillMaxWidth().padding(top=12.dp),label={Text("粘贴作者主页分享链接")},enabled=!s.busy,minLines=2,maxLines=4)
                         Button(onClick=model::importAuthor,enabled=!s.busy && s.authorInput.isNotBlank(),modifier=Modifier.padding(top=8.dp)){Text("导入并预览")}
+                        if(source!=null) {
+                            TextButton(onClick={runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(source)).addCategory(Intent.CATEGORY_BROWSABLE))}
+                                .onFailure{model.message("没有可打开链接的应用，请保留分享文字后使用浏览器打开")}},enabled=!s.busy){Text("打开原链接")}
+                            Text("这是原始分享链接，尚不代表已验证作者主页。",style=MaterialTheme.typography.bodySmall)
+                        }
                         if(s.authorNotice.isNotBlank())Text(s.authorNotice,style=MaterialTheme.typography.bodySmall)
                     }
                     if(s.library.authors.isEmpty() && s.authorBase==null)item{Text("还没有作者。资料不足时会保留已验证的主页，缺少的信息可手动补充。")}
