@@ -74,6 +74,9 @@ dependencies {
 android.testOptions.unitTests.apply {
     isIncludeAndroidResources = true
     all {
+        // Robolectric native SQLite finalizers can outlive a sandbox. Do not reuse
+        // one JVM across classes which select different SQLite/graphics modes.
+        it.forkEvery = 1
         it.maxHeapSize = "2g"
         it.systemProperty("java.io.tmpdir", rootProject.file(".gradle/test-tmp").also { it.mkdirs() }.absolutePath)
         it.systemProperty("user.home", rootProject.file(".gradle/task-home").also { it.mkdirs() }.absolutePath)
