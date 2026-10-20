@@ -66,7 +66,7 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
             UpdateState.Unsupported -> Text("当前是测试版或非官方签名版本，公开更新已停用。正式版资料不会被替换。",color=MaterialTheme.colorScheme.onSurfaceVariant)
             UpdateState.Verifying -> Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp);Spacer(Modifier.width(10.dp));Text("正在重新校验安装包…")}
             UpdateState.NeedsInstallPermission -> Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text("安装已验证的新版，需要你在系统设置里允许留册安装应用。返回后会继续打开系统安装确认。")
+                Text("安装已验证的新版，需要你在系统设置里允许留着吧安装应用。返回后会继续打开系统安装确认。")
                 Text("此许可用于打开更新安装，可随时在系统设置关闭；不会读取或上传档案。你也可以取消，继续使用当前版本。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick=updater::openInstallPermission){Text("前往系统设置")}
                 TextButton(onClick=updater::cancel){Text("暂不安装")}

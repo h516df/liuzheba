@@ -164,8 +164,8 @@ private val Muted: Color
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
-                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"留册";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留册"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
-                        if(route=="frame" && !editing) Text("留册 · 私人档案",fontSize=11.sp,color=Muted)}
+                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"留着吧";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route=="library") 27.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
+                        if(route=="frame" && !editing) Text("留着吧 · 私人档案",fontSize=11.sp,color=Muted)}
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
                         FilledTonalIconButton(onClick={model.openDownloads()},modifier=Modifier.size(48.dp).semantics{contentDescription="链接下载"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("保存到相册",scheme.onSurfaceVariant)}
                         FilledTonalIconButton(onClick={openSettings()},modifier=Modifier.size(48.dp).semantics{contentDescription="设置"},colors=IconButtonDefaults.filledTonalIconButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurfaceVariant)){FrameGlyph("设置",scheme.onSurfaceVariant)}
@@ -201,7 +201,7 @@ private val Muted: Color
                 when {
                     editing && unlocked->Unit // The full-page editor owns navigation and accessibility while open.
                     !s.ready->Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally){CircularProgressIndicator();Text(if(s.message.isNotEmpty()) s.message else "正在打开资料",Modifier.padding(16.dp))}
-                    !unlocked->Column(Modifier.align(Alignment.Center).padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally){Text("你的留册，妥善留存",fontSize=23.sp);Text("解锁后查看私人档案",Modifier.padding(20.dp),color=Muted);Button(onClick=unlock){Text("解锁留册")}}
+                    !unlocked->Column(Modifier.align(Alignment.Center).padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally){Text("你的留着吧，妥善留存",fontSize=23.sp);Text("解锁后查看私人档案",Modifier.padding(20.dp),color=Muted);Button(onClick=unlock){Text("解锁留着吧")}}
 
                     route=="frame" && !editing && zoomPhoto.isEmpty()->{
                         val active=remember(s.library.archives){s.library.active}
@@ -216,7 +216,7 @@ private val Muted: Color
                         else Empty("照片集已不存在","返回档案"){route="library"}}
 
                     route=="library"->libraryState.SaveableStateProvider("library") {LibraryV19(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})}
-                    route=="detail"->{val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}})}
+                    route=="detail"->{val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}},::openDetails)}
                     route=="settings"->Settings(model,s,setLock,chooseProtection,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{route=it},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
                     route=="labels"->LabelsScreen(model,s){title,action->confirm=title to action}
@@ -385,7 +385,7 @@ private val Muted: Color
             }
         }
         item {GrowthEntry(collectionGrowth(s.library))}
-        item {SettingButton("关于与检查更新",model.updater.hint() ?: "留册 v${BuildConfig.VERSION_NAME}"){navigate("updates")}}
+        item {SettingButton("关于与检查更新",model.updater.hint() ?: "留着吧 v${BuildConfig.VERSION_NAME}"){navigate("updates")}}
     }
 }
 @Composable private fun Choice(title:String,choices:List<String>,selected:String,onSelect:(String)->Unit) {Column {Text(title,fontSize=12.sp,color=Muted);Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){choices.forEach{FilterChip(selected=it==selected,onClick={onSelect(it)},label={Text(it)})}}}}

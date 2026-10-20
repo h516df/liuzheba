@@ -48,6 +48,17 @@ class ProtectionStoreTest {
     }
     private fun externalFiles()=provider.base.walkTopDown().filter{it.isFile}.associate{it.relativeTo(provider.base).path to it.readBytes()}
     private fun snapshots()=provider.base.walkTopDown().filter{it.name.startsWith("liuce-v1-")}.toList()
+    @Test fun searchRulesAreProtectedRestoredAndUndoable()=runBlocking {
+        val a=protect()
+        val preferences=SearchPreferences(aliases=listOf(SearchAlias("旧称呼","合成档案")))
+        store.searchPreferences(preferences);assertEquals("待保护",store.protection.value.status)
+        store.protectNow();assertTrue(store.protection.value.protected)
+        val version=store.inspectProtectionFolder(tree).first()
+        store.searchPreferences(SearchPreferences());store.restoreProtectionFolder(tree,version.name){}
+        assertEquals(preferences,store.load().searchPreferences)
+        assertEquals(a.id,store.load().active.single().id)
+        store.undoRestore();assertEquals(SearchPreferences(),store.load().searchPreferences)
+    }
     @Test fun createsOwnFolderAndVerifiesAllOriginalBytes()=runBlocking {
         val a=protect()
         assertTrue(File(provider.base,RecoveryFolder.DIRECTORY).isDirectory)

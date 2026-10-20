@@ -46,6 +46,7 @@ chaquopy {
     }
 }
 dependencies {
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.25.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("androidx.media3:media3-ui:1.11.1")

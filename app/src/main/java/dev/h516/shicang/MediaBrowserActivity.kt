@@ -25,7 +25,7 @@ class MediaBrowserActivity:ComponentActivity() {
         if(url==null){finish();return}
         if(getSharedPreferences("device",0).getBoolean("appLock",false))window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-        root.addView(Button(this).apply{text="返回留册 · 完成验证后重新解析";setOnClickListener{finish()}})
+        root.addView(Button(this).apply{text="返回留着吧 · 完成验证后重新解析";setOnClickListener{finish()}})
         val label=TextView(this).apply{text=Links.host(url);setPadding(20,8,20,12)};root.addView(label)
         web=WebView(this).apply {
             settings.javaScriptEnabled=true;settings.domStorageEnabled=true

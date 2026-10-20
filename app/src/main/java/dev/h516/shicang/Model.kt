@@ -18,7 +18,7 @@ data class Archive(
 }
 data class Label(val id: String, val kind: String, val name: String)
 data class PhotoTrash(val id: String = uid(), val archiveId: String, val photo: Photo, val index: Int, val removed: Long)
-data class Library(val archives: List<Archive> = emptyList(), val drafts: List<Archive> = emptyList(), val labels: List<Label> = emptyList(), val photoTrash: List<PhotoTrash> = emptyList(), val templates: List<FieldTemplate> = emptyList()) {
+data class Library(val archives: List<Archive> = emptyList(), val drafts: List<Archive> = emptyList(), val labels: List<Label> = emptyList(), val photoTrash: List<PhotoTrash> = emptyList(), val templates: List<FieldTemplate> = emptyList(), val searchPreferences:SearchPreferences = SearchPreferences()) {
     val active get() = archives.filter { it.deleted == 0L }
     fun labelName(id: String) = labels.firstOrNull { it.id == id }?.name.orEmpty()
     fun searchable(a: Archive) = listOf(a.name, labelName(a.category), a.tags.joinToString(" ") { labelName(it) }, a.fields.joinToString(" ") { "${it.name} ${it.value}" }).joinToString(" ")
@@ -46,15 +46,15 @@ object Codec {
         require(fs.all { validId(it.id) && it.type in Templates.types }) { "字段格式不支持" }
         return Archive(id,o.getString("name"),o.optString("category"),o.getJSONArray("tags").strings(),fs,o.getJSONArray("photos").objects().map(::photo),o.optString("cover"),o.optBoolean("fill"),o.getLong("updated"),o.optLong("deleted"))
     }
-    fun library(l: Library) = JSONObject().put("format",3).put("templates",JSONArray(l.templates.map(Templates::json))).put("archives",JSONArray(l.archives.map(::archive))).put("drafts",JSONArray(l.drafts.map(::archive)))
+    fun library(l: Library) = JSONObject().put("format",4).put("searchPreferences",l.searchPreferences.json()).put("templates",JSONArray(l.templates.map(Templates::json))).put("archives",JSONArray(l.archives.map(::archive))).put("drafts",JSONArray(l.drafts.map(::archive)))
         .put("labels",JSONArray(l.labels.map { JSONObject().put("id",it.id).put("kind",it.kind).put("name",it.name) }))
         .put("photoTrash",JSONArray(l.photoTrash.map { JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",photo(it.photo)).put("index",it.index).put("removed",it.removed) }))
     fun library(o: JSONObject): Library {
-        require(o.getInt("format") in 1..3) { "备份版本不支持" }
+        require(o.getInt("format") in 1..4) { "备份版本不支持" }
         val l=Library(o.getJSONArray("archives").objects().map(::archive),o.getJSONArray("drafts").objects().map(::archive),
             o.getJSONArray("labels").objects().map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
             o.getJSONArray("photoTrash").objects().map { PhotoTrash(it.getString("id"),it.getString("archiveId"),photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) },
-            if(o.getInt("format")>=2) (o.optJSONArray("templates") ?: JSONArray()).objects().map(Templates::read) else emptyList())
+            if(o.getInt("format")>=2) (o.optJSONArray("templates") ?: JSONArray()).objects().map(Templates::read) else emptyList(), SearchPreferences.read(if(o.getInt("format")>=4)o.getJSONObject("searchPreferences") else o.optJSONObject("searchPreferences")))
         require(l.templates.size<=500 && l.templates.map{it.id}.distinct().size==l.templates.size && l.templates.map{normalizedLabel(it.name)}.distinct().size==l.templates.size) {"模板重复或数量过大"}
         require(l.archives.size<=100000 && l.drafts.size<=100000) { "备份档案数量过大" }
         require(l.labels.all { validId(it.id) && it.kind in listOf("category","tag") && it.name.isNotBlank() }) { "分类或标签无效" }

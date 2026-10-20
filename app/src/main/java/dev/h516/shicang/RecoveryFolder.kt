@@ -139,7 +139,7 @@ internal class RecoveryFolder(private val context: Context, val tree: Uri) {
         return snapshot.library
     }
     companion object {
-        const val DIRECTORY="留册自动保护"
+        const val DIRECTORY="留册自动保护" // Stable recovery path across the public-name change.
         private val SNAPSHOT=Regex("liuce-v1-([0-9]{13})-([a-f0-9]{64})\\.json")
         private val BLOB=Regex("[a-f0-9]{64}(-[a-f0-9-]{36})?\\.original")
         fun validateLocalTree(uri:Uri) {

@@ -20,7 +20,7 @@ data class MediaExportRequest(val archive:Archive,val photos:List<Photo>)
 object MediaExport {
     fun extension(mime:String)=android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
         ?: if(mime.startsWith("video/")) "mp4" else "jpg"
-    private fun name(a:Archive,p:Photo)=a.name.replace(Regex("[^\\p{L}\\p{N} _-]"),"_").take(50).ifBlank{"留册"}+"-${p.id.take(8)}.${extension(p.mime)}"
+    private fun name(a:Archive,p:Photo)=a.name.replace(Regex("[^\\p{L}\\p{N} _-]"),"_").take(50).ifBlank{"留着吧"}+"-${p.id.take(8)}.${extension(p.mime)}"
     suspend fun save(context:Context,request:MediaExportRequest,file:(Photo)->File,progress:(String)->Unit):Int=withContext(Dispatchers.IO) {
         val operation=coroutineContext
         val resolver=context.contentResolver

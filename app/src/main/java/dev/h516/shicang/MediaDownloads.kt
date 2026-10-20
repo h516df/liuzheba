@@ -50,7 +50,7 @@ object MediaLinks {
             CookieManager.getInstance().getCookie(cookieUrl).orEmpty()
         }
         try {read(Python.getInstance().getModule("liuce_media").callAttr("resolve",url,cookies).toString())}
-        catch(e:Exception) {throw IllegalStateException("暂时无法解析。可先打开网页完成验证后重试，或从其他 App 分享图片、视频到留册。",e)}
+        catch(e:Exception) {throw IllegalStateException("暂时无法解析。可先打开网页完成验证后重试，或从其他 App 分享图片、视频到留着吧。",e)}
     }
 }
 
@@ -79,7 +79,7 @@ class MediaDownloads(private val context:Context) {
             items.forEach {item ->
                 val id=uid()
                 val request=DownloadManager.Request(Uri.parse(MediaLinks.validUrl(item.url)))
-                    .setTitle("留册媒体下载").setDescription(if(item.kind=="video") "视频" else "图片")
+                    .setTitle("留着吧媒体下载").setDescription(if(item.kind=="video") "视频" else "图片")
                     .setAllowedOverRoaming(false).setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     .setDestinationInExternalFilesDir(context,Environment.DIRECTORY_DOWNLOADS,"$id.download")
                 item.headers.forEach{(key,value)->request.addRequestHeader(key,value)}
