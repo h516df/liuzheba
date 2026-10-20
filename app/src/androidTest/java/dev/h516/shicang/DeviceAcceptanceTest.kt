@@ -144,22 +144,114 @@ class DeviceAcceptanceTest {
             val reader = MediaMetadataRetriever()
             try {
                 reader.setDataSource(output.path)
-                assertEquals(info.width / 2, reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt())
-                assertEquals(info.height, reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt())
+                val rawWidth = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt()
+                val rawHeight = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt()
+                val rotation = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toInt()
+                val metadata = "rawWidth=$rawWidth rawHeight=$rawHeight rotation=$rotation"
+                File(context.filesDir, "device-acceptance-media3.txt").appendText("case=trim_crop_mask $metadata\n")
+                // Transformer normally encodes portrait output in landscape with rotation metadata.
+                // Check the displayed crop, not just one coded dimension or a blindly swapped pair.
+                assertTrue(metadata, rotation in setOf(0, 90, 180, 270))
+                val displaySize = when (rotation) {
+                    0, 180 -> rawWidth to rawHeight
+                    90, 270 -> rawHeight to rawWidth
+                    else -> error("Unsupported output orientation: $metadata")
+                }
+                assertEquals(metadata, info.width / 2, displaySize.first)
+                assertEquals(metadata, info.height, displaySize.second)
                 val duration = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)!!.toLong()
+                File(context.filesDir, "device-acceptance-media3.txt").appendText(
+                    "case=trim_crop_mask display=${displaySize.first}x${displaySize.second} durationMs=$duration\n")
                 assertTrue("Trim duration was $duration ms", duration in 1700..2300)
                 val frame = checkNotNull(reader.getFrameAtTime(500000, MediaMetadataRetriever.OPTION_CLOSEST))
                 try {
+                    // MediaMetadataRetriever supplies the presentation-oriented bitmap on this API.
+                    // Assert that contract before sampling the displayed central mask.
+                    assertEquals("Decoded frame width; $metadata", displaySize.first, frame.width)
+                    assertEquals("Decoded frame height; $metadata", displaySize.second, frame.height)
                     val pixel = frame.getPixel(frame.width / 2, frame.height / 2)
+                    val unmasked = frame.getPixel(frame.width / 10, frame.height / 10)
+                    File(context.filesDir, "device-acceptance-media3.txt").appendText(
+                        "case=trim_crop_mask decoded=${frame.width}x${frame.height} " +
+                            "centerRGB=${rgb(pixel)} unmaskedRGB=${rgb(unmasked)}\n")
                     assertTrue("Fixed mask must render black",
                         android.graphics.Color.red(pixel) < 35 &&
                             android.graphics.Color.green(pixel) < 35 &&
                             android.graphics.Color.blue(pixel) < 35)
+                    // The synthetic source is blue-grey. An unmasked point must retain content,
+                    // rather than passing because the encoder returned an entirely black frame.
+                    assertTrue("Unmasked crop region must retain content; $metadata",
+                        android.graphics.Color.blue(unmasked) > 45)
                 } finally { frame.recycle() }
             } finally { reader.release() }
             val edited = store.appendEditedVideo(archive.id, photo, original, output)
             assertEquals(listOf(photo, edited), store.load().active.single().photos)
             assertEquals(sha(output), edited.sha256)
+            assertEquals(photo.sha256, sha(original))
+        } finally { output.delete() }
+    }
+
+    @Test fun media3CropRetainsTheSelectedColorBarsAndMasksDisplayCenter() = runBlocking {
+        val (photo, _) = importVideo("sample-video.mp4")
+        val original = File(store.photoDir, photo.file)
+        val info = VideoEditEngine.inspect(original, photo)
+        assertEquals(540, info.width)
+        assertEquals(960, info.height)
+        val plan = VideoEditPlan(1000, 2000,
+            crop = VideoRect(.25f, 0f, .75f, 1f),
+            mask = VideoRect(.4f, .3f, .6f, .7f))
+        val output = withTimeout(90000) {
+            VideoEditEngine.export(context, original, photo, plan, info) {}
+        }
+        try {
+            val reader = MediaMetadataRetriever()
+            try {
+                reader.setDataSource(output.path)
+                val rawWidth = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt()
+                val rawHeight = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt()
+                val rotation = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toInt()
+                val metadata = "ROI rawWidth=$rawWidth rawHeight=$rawHeight rotation=$rotation"
+                File(context.filesDir, "device-acceptance-media3.txt").appendText("case=color_bar_roi $metadata\n")
+                assertTrue(metadata, rotation in setOf(0, 90, 180, 270))
+                val displaySize = when (rotation) {
+                    0, 180 -> rawWidth to rawHeight
+                    90, 270 -> rawHeight to rawWidth
+                    else -> error("Unsupported output orientation: $metadata")
+                }
+                assertEquals(metadata, 270, displaySize.first)
+                assertEquals(metadata, 960, displaySize.second)
+                val duration = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)!!.toLong()
+                File(context.filesDir, "device-acceptance-media3.txt").appendText(
+                    "case=color_bar_roi display=${displaySize.first}x${displaySize.second} durationMs=$duration\n")
+                assertTrue("ROI trim duration was $duration ms; $metadata", duration in 800..1200)
+                // Output 0.5 s maps to source 1.5 s. This row avoids the synthetic moving pattern.
+                val frame = checkNotNull(reader.getFrameAtTime(500000, MediaMetadataRetriever.OPTION_CLOSEST))
+                try {
+                    assertEquals("ROI decoded frame width; $metadata", displaySize.first, frame.width)
+                    assertEquals("ROI decoded frame height; $metadata", displaySize.second, frame.height)
+                    fun sample(x: Float) = frame.getPixel((frame.width * x).toInt(), (frame.height * .4f).toInt())
+                    val left = sample(.1f)
+                    val right = sample(.9f)
+                    val center = sample(.5f)
+                    File(context.filesDir, "device-acceptance-media3.txt").appendText(
+                        "case=color_bar_roi decoded=${frame.width}x${frame.height} " +
+                            "leftRGB=${rgb(left)} rightRGB=${rgb(right)} centerRGB=${rgb(center)}\n")
+                    // crop maps output x=.1/.9 to source x=.3/.7: green / magenta.
+                    // 45/180 thresholds allow H.264/YUV rounding but not an adjacent color bar.
+                    assertTrue("Crop left must be green; pixel=$left; $metadata",
+                        android.graphics.Color.red(left) < 45 &&
+                            android.graphics.Color.green(left) > 180 &&
+                            android.graphics.Color.blue(left) < 45)
+                    assertTrue("Crop right must be magenta; pixel=$right; $metadata",
+                        android.graphics.Color.red(right) > 180 &&
+                            android.graphics.Color.green(right) < 45 &&
+                            android.graphics.Color.blue(right) > 180)
+                    assertTrue("Display center must be masked black; pixel=$center; $metadata",
+                        android.graphics.Color.red(center) < 35 &&
+                            android.graphics.Color.green(center) < 35 &&
+                            android.graphics.Color.blue(center) < 35)
+                } finally { frame.recycle() }
+            } finally { reader.release() }
             assertEquals(photo.sha256, sha(original))
         } finally { output.delete() }
     }
@@ -284,12 +376,12 @@ class DeviceAcceptanceTest {
         assertEquals(before, store.load())
     }
 
-    private suspend fun importVideo(): Pair<Photo, File> {
+    private suspend fun importVideo(asset: String = "sample-long-video.mp4"): Pair<Photo, File> {
         val input = File(context.cacheDir, "camera/device-${uid()}.mp4").also {
             check(it.parentFile!!.mkdirs() || it.parentFile!!.isDirectory)
             fixtures += it
         }
-        instrumentation.context.assets.open("sample-long-video.mp4").use { source ->
+        instrumentation.context.assets.open(asset).use { source ->
             input.outputStream().use { source.copyTo(it) }
         }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", input)
@@ -298,6 +390,9 @@ class DeviceAcceptanceTest {
         assertTrue(imported.errors.toString(), imported.errors.isEmpty())
         return imported.photos.single() to input
     }
+
+    private fun rgb(pixel: Int) = listOf(android.graphics.Color.red(pixel),
+        android.graphics.Color.green(pixel), android.graphics.Color.blue(pixel)).joinToString(",")
 
     private fun start() {
         activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java)

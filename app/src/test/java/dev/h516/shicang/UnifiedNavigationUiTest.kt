@@ -168,7 +168,9 @@ class UnifiedCreateUiTest:UnifiedNavigationFixture() {
         compose.onNodeWithText("新建档案").assertExists()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("新建合成档案")
         compose.onNodeWithText("保存").performClick()
-        idle{model.state.value.editor==null && model.state.value.library.active.any{it.name=="新建合成档案"}}
+        // Store reload precedes work's busy=false; navigation intentionally waits for completion.
+        idle{!model.state.value.busy && model.state.value.editor==null && model.state.value.library.active.any{it.name=="新建合成档案"}}
+        idle{compose.onAllNodesWithText("档案详情").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("档案详情").assertExists()
         compose.onNodeWithText("新建合成档案").assertExists()
     }

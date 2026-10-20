@@ -13,8 +13,10 @@ the existing host unit tests, APK assembly, lint, or target-phone acceptance.
   use forward/backward seek controls, and verify paused position across Home/return
   and collapse/reopen.
 - Run actual Media3 trim, crop, and fixed-mask export. Decode a resulting frame,
-  verify dimensions, duration, and the mask, and append an independent copy while
-  preserving the source hash.
+  verify presentation dimensions (including explicit rotation metadata), duration,
+  and the mask, and append an independent copy while preserving the source hash.
+  A separate short color-bar fixture verifies the actual crop ROI: retained
+  green/magenta bars and a black center, not merely a resized uniform-color frame.
 - Cancel a running Media3 export and verify temporary output cleanup and unchanged
   source/library.
 - Use the native keyboard while editing an archive, cancel changes, exercise failed
@@ -49,7 +51,10 @@ apply only to the disposable GitHub runner.
 The emulator runner is pinned to official v2.37.0:
 https://github.com/ReactiveCircus/android-emulator-runner/commit/e89f39f1abbbd05b1113a29cf4db69e7540cae5a
 
-Only JUnit XML text results are retained for seven days. This test class neither
+Only JUnit XML text results are retained for seven days. The workflow also prints
+the available fixed text summary of synthetic export dimensions, rotation,
+duration, and sampled RGB values from the isolated package, including after a
+failed test; it preserves the test command's failure status. This test class neither
 takes screenshots nor reads user media. No screenshots, APKs, media fixtures,
 database files, or backups are uploaded. The instrumentation selection excludes
 existing network and screenshot-producing tests.
