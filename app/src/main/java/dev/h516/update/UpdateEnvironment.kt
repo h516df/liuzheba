@@ -24,7 +24,7 @@ internal class AndroidUpdateEnvironment(private val context:Context):UpdateEnvir
     override fun code()=UpdateVerify.installedVersionCode(context)
     override fun version()=context.packageManager.getPackageInfo(context.packageName,0).versionName.orEmpty()
     override fun verify(file:File,record:VerifiedUpdate) {
-        requireUpdate(official(),"仅正式版留册可以使用公开更新")
+        requireUpdate(official(),"仅正式版留着吧可以使用公开更新")
         UpdateVerify.verifyHash(file,record.size,record.sha,record.digest)
         UpdateVerify.verifyArchive(context,file,record.code,record.version)
     }

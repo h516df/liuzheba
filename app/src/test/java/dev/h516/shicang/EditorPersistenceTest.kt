@@ -33,7 +33,8 @@ class EditorPersistenceTest {
         model=AppModel(app);owners.put("editor",model)
         await{model.state.value.ready}
     }
-    @After fun stop(){owners.clear();scheduler.runCurrent();Dispatchers.resetMain()}
+    @After fun stop(){owners.clear();await{model.resourcesClosed};Dispatchers.resetMain()}
+    private suspend fun reopenedLibrary():Library {val store=Store(app);return try{store.load()}finally{store.close()}}
     private fun await(condition:()->Boolean){
         val end=System.nanoTime()+10_000_000_000L
         while(System.nanoTime()<end){scheduler.runCurrent();if(condition())return;Thread.sleep(5)}
@@ -54,19 +55,19 @@ class EditorPersistenceTest {
         if(model.state.value.editor==null)model.edit(a)
         assertEquals(latest.name,model.state.value.editor!!.name)
         scheduler.advanceTimeBy(200);await{model.state.value.draftStatus=="草稿已保存"}
-        assertEquals(latest.name,runBlocking{Store(app).load()}.drafts.single().name)
+        assertEquals(latest.name,runBlocking{reopenedLibrary()}.drafts.single().name)
     }
     @Test fun explicitSaveCommitsLatestAndRemovesDraft(){
         val a=initial();model.change(a.copy(name="已提交"));model.saveEditor()
         await{!model.state.value.busy && model.state.value.editor==null}
-        val reopened=runBlocking{Store(app).load()}
+        val reopened=runBlocking{reopenedLibrary()}
         assertEquals("已提交",reopened.active.single().name);assertTrue(reopened.drafts.isEmpty())
     }
     @Test fun explicitDiscardNeverSavesPendingChanges(){
         val a=initial();model.change(a.copy(name="放弃这段"));model.discardEditor()
         await{!model.state.value.busy && model.state.value.editor==null}
         scheduler.advanceTimeBy(500);scheduler.runCurrent()
-        val reopened=runBlocking{Store(app).load()}
+        val reopened=runBlocking{reopenedLibrary()}
         assertEquals("旧标题",reopened.active.single().name);assertTrue(reopened.drafts.isEmpty())
     }
     @Test fun failedReturnKeepsEditorAndCanRetry(){
@@ -77,10 +78,10 @@ class EditorPersistenceTest {
             db.execSQL("CREATE TRIGGER fail_draft BEFORE INSERT ON objects WHEN NEW.kind='draft' BEGIN SELECT RAISE(ABORT,'fixture write failure'); END")
             model.leaveEditor();await{!model.state.value.busy}
             assertEquals("失败后仍保留",model.state.value.editor?.name)
-            assertEquals("旧标题",runBlocking{Store(app).load()}.drafts.single().name)
+            assertEquals("旧标题",runBlocking{reopenedLibrary()}.drafts.single().name)
             db.execSQL("DROP TRIGGER fail_draft")
             model.leaveEditor();await{!model.state.value.busy && model.state.value.editor==null}
-            assertEquals("失败后仍保留",runBlocking{Store(app).load()}.drafts.single().name)
+            assertEquals("失败后仍保留",runBlocking{reopenedLibrary()}.drafts.single().name)
         }finally{db.close()}
     }
 }

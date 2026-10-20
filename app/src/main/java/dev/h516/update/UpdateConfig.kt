@@ -11,7 +11,7 @@ internal fun requireUpdate(value: Boolean, message: String = "更新资料不完
 
 /** 公开发行入口固定为本项目；fork 必须更换自己的更新仓库和包名。 */
 object UpdateConfig {
-    const val REPO = "h516df/shicang"
+    const val REPO = "h516df/liuzheba"
     const val PACKAGE = "dev.h516.shicang"
     // Public production certificate, recorded in docs/acceptance/v0.13/build.json.
     const val CERTIFICATE_SHA256 = "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26"

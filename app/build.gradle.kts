@@ -16,8 +16,8 @@ android {
         applicationId = "dev.h516.shicang"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.14"
+        versionCode = 16
+        versionName = "0.15"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -46,6 +46,7 @@ chaquopy {
     }
 }
 dependencies {
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.25.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("androidx.media3:media3-ui:1.11.1")
@@ -73,7 +74,11 @@ dependencies {
 android.testOptions.unitTests.apply {
     isIncludeAndroidResources = true
     all {
+        // Robolectric native SQLite finalizers can outlive a sandbox. Do not reuse
+        // one JVM across classes which select different SQLite/graphics modes.
+        it.forkEvery = 1
         it.maxHeapSize = "2g"
+        it.systemProperty("java.io.tmpdir", rootProject.file(".gradle/test-tmp").also { it.mkdirs() }.absolutePath)
         it.systemProperty("user.home", rootProject.file(".gradle/task-home").also { it.mkdirs() }.absolutePath)
         it.systemProperty("roborazzi.test.record", "true")
         it.systemProperty("robolectric.pixelCopyRenderMode", "hardware")

@@ -37,6 +37,7 @@ data class ImportResult(val photos: List<Photo>, val errors: List<String>)
 class Store(private val context: Context) {
     private val prefs=context.getSharedPreferences("device",Context.MODE_PRIVATE)
     private val gate=Mutex()
+    private val protectionGate=Mutex()
     private var generation=prefs.getString("generation","initial")!!
     private var root=File(context.filesDir,"libraries/$generation").apply { mkdirs() }
     private var db=open(root)
@@ -51,13 +52,94 @@ class Store(private val context: Context) {
             execSQL("PRAGMA user_version=1")
         }
     }
+    /** Caller must cancel its jobs first; wait for any active transaction before releasing SQLite. */
+    suspend fun close()=withContext(Dispatchers.IO) {gate.withLock {if(db.isOpen)db.close()}}
     private fun rows(kind: String) = db.rawQuery("SELECT json FROM objects WHERE kind=?",arrayOf(kind)).use { c -> buildList { while(c.moveToNext()) add(JSONObject(c.getString(0))) } }
-    private fun put(kind: String,id: String,json: JSONObject, target: SQLiteDatabase=db) { target.execSQL("INSERT OR REPLACE INTO objects(kind,id,json) VALUES(?,?,?)",arrayOf(kind,id,json.toString())) }
-    private fun remove(kind: String,id: String) { db.execSQL("DELETE FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)) }
+    private val protectionMutable=kotlinx.coroutines.flow.MutableStateFlow(readProtection())
+    val protection: kotlinx.coroutines.flow.StateFlow<ProtectionState> = protectionMutable
+    private val protectionChanges=kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    private var recoveryFolder: RecoveryFolder?=null
+    private fun readProtection():ProtectionState {
+        val location=prefs.getString("protectionLocation","").orEmpty()
+        return ProtectionState(if(location.isEmpty()) "未开启" else "待保护",if(location.isEmpty()) "目前仅保存在 App 内，清除数据或卸载会丢失" else "正在重新检查保护位置",location,prefs.getLong("protectionSuccess",0),prefs.getInt("protectionMedia",0))
+    }
+    private fun markProtectionDirty() {
+        // Persist before a library change. A crash can cause a conservative pending state, never false success.
+        check(prefs.edit().putBoolean("protectionDirty",true).commit()) {"保护状态无法保存，资料未变更"}
+        if(protectionMutable.value.location.isNotEmpty()) protectionMutable.value=protectionMutable.value.copy(status="待保护",detail="最新修改已保存在 App 内，正在等待外部保护")
+        protectionChanges.trySend(Unit)
+    }
+    private fun folder():RecoveryFolder {
+        return recoveryFolder ?: RecoveryFolder(context,Uri.parse(requireNotNull(prefs.getString("protectionTree",null)){"请先选择本机保存位置"})).also{recoveryFolder=it}
+    }
+    suspend fun inspectProtectionFolder(uri:Uri):List<RecoveryChoice> = withContext(Dispatchers.IO) {
+        RecoveryFolder.validateLocalTree(uri)
+        RecoveryFolder(context,uri).choices()
+    }
+    suspend fun selectProtectionFolder(uri:Uri)=withContext(Dispatchers.IO) {gate.withLock {
+        RecoveryFolder.validateLocalTree(uri)
+        val next=RecoveryFolder(context,uri)
+        check(prefs.edit().putString("protectionTree",uri.toString()).putString("protectionLocation",next.location).putBoolean("protectionDirty",true).putLong("protectionSuccess",0).putInt("protectionMedia",0).commit())
+        recoveryFolder=next;protectionMutable.value=readProtection();protectionChanges.trySend(Unit)
+    }}
+    suspend fun runAutomaticProtection() {
+        // Called once by the ViewModel. Sequential collection does not cancel an in-flight copy.
+        if(prefs.contains("protectionTree")) protectNow(forceVerify=true)
+        for(ignored in protectionChanges) {
+            kotlinx.coroutines.delay(3000)
+            while(protectionChanges.tryReceive().isSuccess) kotlinx.coroutines.delay(3000)
+            if(prefs.contains("protectionTree") && prefs.getBoolean("protectionDirty",true)) protectNow()
+        }
+    }
+    suspend fun protectNow(forceVerify:Boolean=false)=withContext(Dispatchers.IO) {
+        if(!protectionGate.tryLock())return@withContext
+        try {gate.withLock {
+        if(!prefs.contains("protectionTree")) return@withLock
+        val old=protectionMutable.value
+        protectionMutable.value=old.copy(status="待保护",detail="正在检查外部保护")
+        try {
+            check(prefs.edit().putBoolean("protectionDirty",true).commit()) {"保护状态无法保存，请检查手机剩余空间"}
+            val library=loadUnsafe();val manifest=Codec.library(library).put("appearance",rows("settings").firstOrNull() ?: Appearance().json()).put("incompleteImport",!prefs.getString("protectionImportWarning","").isNullOrBlank())
+            folder().protect(manifest,{File(photoDir,it.file)},forceVerify) {text->protectionMutable.value=protectionMutable.value.copy(status="待保护",detail=text)}
+            coroutineContext.ensureActive()
+            val now=System.currentTimeMillis();val count=allRecoveryPhotos(library).size
+            check(prefs.edit().putBoolean("protectionDirty",false).putLong("protectionSuccess",now).putInt("protectionMedia",count).commit())
+            val warning=prefs.getString("protectionImportWarning","").orEmpty()
+            protectionMutable.value=protectionMutable.value.copy(status=if(warning.isEmpty()) "已保护" else "待核对",detail=if(warning.isEmpty()) "当前资料与 $count 项原件已在外部保存并校验" else "已保护已收录的 $count 项原件，但$warning。未收录的原文件请勿删除",lastSuccess=now,mediaCount=count)
+        } catch(e:CancellationException) {
+            protectionMutable.value=old.copy(status="待保护",detail="保护中断，重新打开 App 后继续；请先保留原文件")
+            throw e
+        } catch(e:Exception) {
+            protectionMutable.value=old.copy(status="保护失败",detail="${e.message ?: "请检查空间与权限"}。旧恢复版本仍保留，请先保留原文件")
+        }
+    }} finally {protectionGate.unlock()}
+    }
+    suspend fun acknowledgeImportWarning()=withContext(Dispatchers.IO) {gate.withLock {
+        check(prefs.edit().remove("protectionImportWarning").remove("protectionPendingMedia").remove("protectionPriorWarning").commit());markProtectionDirty()
+    }}
+    suspend fun restoreProtectionFolder(uri:Uri,name:String,progress:(String)->Unit)=withContext(Dispatchers.IO) {gate.withLock {
+        RecoveryFolder.validateLocalTree(uri)
+        val newId=uid();val stage=File(context.filesDir,"libraries/$newId").apply{mkdirs()};val dir=File(stage,"photos").apply{mkdirs()}
+        var committed=false
+        try {
+            val json=RecoveryFolder(context,uri).recover(name,dir,progress);val library=Codec.library(json)
+            coroutineContext.ensureActive();markProtectionDirty()
+            installRestoredLibrary(stage,newId,json,library);committed=true
+        } finally {if(!committed && prefs.getString("generation",null)!=newId)stage.deleteRecursively()}
+    }}
+    private fun settleImportedMedia() {
+        val pending=prefs.getString("protectionPendingMedia",null) ?: return
+        val files=org.json.JSONArray(pending).strings()
+        val referenced=allRecoveryPhotos(loadUnsafe()).map{it.file}.toSet()
+        if(files.all{it in referenced}) check(prefs.edit().remove("protectionPendingMedia").putString("protectionImportWarning",prefs.getString("protectionPriorWarning","")).remove("protectionPriorWarning").commit())
+    }
+    private fun put(kind: String,id: String,json: JSONObject, target: SQLiteDatabase=db) { if(target===db)markProtectionDirty();target.execSQL("INSERT OR REPLACE INTO objects(kind,id,json) VALUES(?,?,?)",arrayOf(kind,id,json.toString())) }
+    private fun remove(kind: String,id: String) { markProtectionDirty();db.execSQL("DELETE FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)) }
     private fun loadUnsafe()=Library(rows("archive").map(Codec::archive),rows("draft").map(Codec::archive),
         rows("label").map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
-        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read))
+        rows("photoTrash").map { PhotoTrash(it.getString("id"),it.getString("archiveId"),Codec.photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) }, rows("template").map(Templates::read), SearchPreferences.read(rows("searchPreferences").firstOrNull()), rows("author").map(Codec::author))
     suspend fun load()=withContext(Dispatchers.IO) { gate.withLock { loadUnsafe() } }
+    suspend fun searchPreferences(value:SearchPreferences)=withContext(Dispatchers.IO) {gate.withLock {put("searchPreferences","rules",SearchPreferences.read(value.json()).json())}}
     suspend fun appearance()=withContext(Dispatchers.IO) { gate.withLock { rows("settings").firstOrNull()?.let(Appearance::read) ?: Appearance() } }
     suspend fun appearance(a: Appearance)=withContext(Dispatchers.IO) { gate.withLock { put("settings","appearance",a.json()) } }
     suspend fun saveTemplate(t:FieldTemplate)=withContext(Dispatchers.IO) {gate.withLock {
@@ -67,8 +149,37 @@ class Store(private val context: Context) {
         require(existing.none{it.id!=t.id && normalizedLabel(it.name)==normalizedLabel(t.name)}) {"同名模板已存在"}
         put("template",t.id,Templates.json(t))
     }}
+    suspend fun saveAuthor(input:Author,draft:Archive?=null,linkTo:String?=null)=withContext(Dispatchers.IO) {gate.withLock {
+        val author=Codec.author(Codec.author(input.copy(name=input.name.trim(),updated=System.currentTimeMillis())))
+        require(author.name.isNotBlank() || author.identities.any{it.nickname.isNotBlank() || it.profileUrl.isNotBlank()}) {"请填写作者称呼或主页"}
+        val library=loadUnsafe();val others=library.authors.filter{it.id!=author.id}
+        require(others.size<100000 && author.identities.none{identity->others.any{other->other.identities.any{it.id==identity.id}}}) {"作者或平台身份编号重复"}
+        val target=linkTo?.let{id->library.active.firstOrNull{it.id==id} ?: error("档案已不存在")}
+        if(draft!=null)require(draft.authorIds.all{id->id==author.id || others.any{it.id==id}}){"作者关联已变更"}
+        fun linked(a:Archive)=a.copy(authorIds=(a.authorIds+author.id).distinct(),updated=System.currentTimeMillis())
+        db.beginTransaction();try {
+            put("author",author.id,Codec.author(author))
+            if(draft!=null)put("draft",draft.id,Codec.archive(linked(draft)))
+            else if(target!=null) {
+                put("archive",target.id,Codec.archive(linked(target)))
+                library.drafts.firstOrNull{it.id==target.id}?.let{put("draft",it.id,Codec.archive(linked(it)))}
+            }
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
+    }}
+    suspend fun linkAuthor(authorId:String,archiveId:String,linked:Boolean)=withContext(Dispatchers.IO) {gate.withLock {
+        val library=loadUnsafe()
+        require(library.authors.any{it.id==authorId}) {"作者已不存在"}
+        val archive=library.active.firstOrNull{it.id==archiveId} ?: error("档案已不存在")
+        fun links(a:Archive)=a.copy(authorIds=if(linked)(a.authorIds+authorId).distinct() else a.authorIds-authorId,updated=System.currentTimeMillis())
+        db.beginTransaction();try {
+            put("archive",archive.id,Codec.archive(links(archive)))
+            library.drafts.firstOrNull{it.id==archiveId}?.let{put("draft",it.id,Codec.archive(links(it)))}
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
+    }}
     suspend fun deleteTemplate(id:String)=withContext(Dispatchers.IO) {gate.withLock {remove("template",id)}}
-    suspend fun draft(a: Archive)=withContext(Dispatchers.IO) { gate.withLock { put("draft",a.id,Codec.archive(a)) } }
+    suspend fun draft(a: Archive)=withContext(Dispatchers.IO) { gate.withLock { put("draft",a.id,Codec.archive(a));settleImportedMedia() } }
     suspend fun discard(id: String)=withContext(Dispatchers.IO) { gate.withLock { remove("draft",id) } }
     private fun saveTrash(t: PhotoTrash) { put("photoTrash",t.id,JSONObject().put("id",t.id).put("archiveId",t.archiveId).put("photo",Codec.photo(t.photo)).put("index",t.index).put("removed",t.removed)) }
     suspend fun save(input: Archive)=withContext(Dispatchers.IO) { gate.withLock {
@@ -84,6 +195,7 @@ class Store(private val context: Context) {
         require(a.photos.all { File(photoDir,it.file).isFile }) { "照片尚未保存，请等待导入完成" }
         val library=loadUnsafe()
         require((a.category.isEmpty() || library.labels.any{it.id==a.category && it.kind=="category"}) && a.tags.all{id -> library.labels.any{it.id==id && it.kind=="tag"}}) {"分类或标签已变更，请重新选择"}
+        require(a.authorIds.distinct().size==a.authorIds.size && a.authorIds.all{id->library.authors.any{it.id==id}}) {"作者关联已变更，请重新选择"}
         val old=library.archives.firstOrNull { it.id==a.id }
         db.beginTransaction()
         try {
@@ -91,6 +203,7 @@ class Store(private val context: Context) {
             put("archive",a.id,Codec.archive(a.copy(name=a.name.trim(),cover=a.coverPhoto()?.id.orEmpty(),updated=System.currentTimeMillis(),deleted=0)))
             remove("draft",a.id); db.setTransactionSuccessful()
         } finally { db.endTransaction() }
+        settleImportedMedia()
     } }
     suspend fun trash(id: String, restore: Boolean=false)=withContext(Dispatchers.IO) { gate.withLock {
         val a=loadUnsafe().archives.firstOrNull { it.id==id } ?: return@withLock
@@ -119,6 +232,8 @@ class Store(private val context: Context) {
         } finally {db.endTransaction()}
     } }
     suspend fun importPhotos(uris: List<Uri>): ImportResult=withContext(Dispatchers.IO) { gate.withLock {
+        val priorWarning=prefs.getString("protectionImportWarning","").orEmpty()
+        check(prefs.edit().putString("protectionImportWarning","有一批导入尚未完整结束").commit());markProtectionDirty()
         val good=mutableListOf<Photo>();val errors=mutableListOf<String>()
         val operation=coroutineContext
         try {
@@ -137,6 +252,9 @@ class Store(private val context: Context) {
             catch(e: Exception) {tmp.delete();errors.add("第${index+1}张：${e.message ?: "导入失败"}")}
         }
         } catch(e:CancellationException) {good.forEach{File(photoDir,it.file).delete()};throw e}
+        val pending=org.json.JSONArray(prefs.getString("protectionPendingMedia","[]")).strings()+good.map{it.file}
+        val warning=if(errors.isNotEmpty()) "有 ${errors.size} 项媒体导入失败，请核对原文件并重新导入" else priorWarning
+        check(prefs.edit().putString("protectionPendingMedia",org.json.JSONArray(pending.distinct()).toString()).putString("protectionPriorWarning",warning).putString("protectionImportWarning",if(warning.isNotEmpty()) warning else "有已导入媒体尚未完整写入档案").commit())
         ImportResult(good,errors)
     } }
     private fun photos(l: Library)=(l.archives+l.drafts).flatMap { it.photos }.plus(l.photoTrash.map {it.photo}).distinctBy {it.file}
@@ -144,7 +262,7 @@ class Store(private val context: Context) {
     suspend fun purge()=withContext(Dispatchers.IO) { gate.withLock {
         val l=loadUnsafe();db.beginTransaction();try {
             l.archives.filter {it.deleted!=0L}.forEach {remove("archive",it.id);remove("draft",it.id)}
-            db.execSQL("DELETE FROM objects WHERE kind='photoTrash'");db.setTransactionSuccessful()
+            markProtectionDirty();db.execSQL("DELETE FROM objects WHERE kind='photoTrash'");db.setTransactionSuccessful()
         } finally {db.endTransaction()}
         val used=photos(loadUnsafe()).map{it.file}.toSet();photoDir.listFiles().orEmpty().filter {it.name !in used}.forEach {check(it.delete()) {"文件暂时无法清理，资料已更新，可重试"}}
     } }
@@ -152,11 +270,14 @@ class Store(private val context: Context) {
     suspend fun backup(uri: Uri, progress: (String)->Unit)=withContext(Dispatchers.IO) { gate.withLock {
         val operation=coroutineContext
         val l=loadUnsafe();val ps=photos(l);val appearance=rows("settings").firstOrNull() ?: Appearance().json()
-        val manifest=Codec.library(l).put("appearance",appearance)
+        val manifest=Codec.library(l).put("appearance",appearance).toString().toByteArray(Charsets.UTF_8)
+        // Reject unrestorable archives before creating a zip or touching a previous backup.
+        BackupLimits.DEFAULT.validateExport(manifest.size.toLong(),ps.asSequence().map { it.bytes })
         val tmp=File(context.cacheDir,"backup-${uid()}.zip")
+        var destinationOpened=false
         try {
             ZipOutputStream(tmp.outputStream().buffered()).use { zip ->
-                zip.putNextEntry(ZipEntry("manifest.json"));zip.write(manifest.toString().toByteArray(Charsets.UTF_8));zip.closeEntry()
+                zip.putNextEntry(ZipEntry("manifest.json"));zip.write(manifest);zip.closeEntry()
                 ps.forEachIndexed { i,p ->
                     operation.ensureActive()
                     val f=File(photoDir,p.file);require(f.length()==p.bytes && sha(f)==p.sha256) { "照片校验失败，备份未完成" }
@@ -165,12 +286,12 @@ class Store(private val context: Context) {
             }
             progress("写入所选位置")
             operation.ensureActive()
-            context.contentResolver.openOutputStream(uri,"w").use { out -> requireNotNull(out);tmp.inputStream().use {copyChecked(it,out){operation.ensureActive()}} }
+            context.contentResolver.openOutputStream(uri,"w").use { out -> requireNotNull(out);destinationOpened=true;tmp.inputStream().use {copyChecked(it,out){operation.ensureActive()}} }
             // Read back the destination, not just the temporary zip.
             val actual=context.contentResolver.openInputStream(uri).use { requireNotNull(it);hashStream(it) }
             require(actual==sha(tmp)) { "备份位置校验失败，请重新备份" }
             prefs.edit().putLong("lastBackup",System.currentTimeMillis()).putString("backupLocation",uri.toString()).apply()
-        } catch(e:Exception) { runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver,uri) };throw e }
+        } catch(e:Exception) { if(destinationOpened) runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver,uri) };throw e }
         finally {tmp.delete()}
     } }
     suspend fun restore(uri: Uri, progress: (String)->Unit)=withContext(Dispatchers.IO) { gate.withLock {
@@ -183,10 +304,10 @@ class Store(private val context: Context) {
                 while(true) {
                     operation.ensureActive()
                     val entry=zip.nextEntry ?: break;val n=entry.name
-                    require(!entry.isDirectory && entries.add(n) && entries.size<=100001 && (n=="manifest.json" || n.matches(Regex("photos/[a-f0-9-]{36}\\.original")))) { "备份包含异常或重复条目" }
-                    val max=if(n=="manifest.json") 32L*1024*1024 else Codec.MAX_MEDIA_BYTES
+                    require(!entry.isDirectory && entries.add(n) && entries.size<=BackupLimits.DEFAULT.entries && (n=="manifest.json" || n.matches(Regex("photos/[a-f0-9-]{36}\\.original")))) { "备份包含异常或重复条目" }
+                    val max=if(n=="manifest.json") BackupLimits.DEFAULT.manifestBytes else BackupLimits.DEFAULT.mediaBytes
                     val dst=if(n=="manifest.json") File(stage,"manifest.json") else File(dir,n.removePrefix("photos/"))
-                    dst.outputStream().use {out ->var size=0L;val buf=ByteArray(65536);while(true){operation.ensureActive();val k=zip.read(buf);if(k<0) break;size+=k;total+=k;require(size<=max && total<=20L*1024*1024*1024) {"备份展开容量超限"};out.write(buf,0,k)}}
+                    dst.outputStream().use {out ->var size=0L;val buf=ByteArray(65536);while(true){operation.ensureActive();val k=zip.read(buf);if(k<0) break;size+=k;total+=k;require(size<=max && total<=BackupLimits.DEFAULT.totalBytes) {"备份展开容量超限"};out.write(buf,0,k)}}
                     if(n=="manifest.json") manifest=JSONObject(dst.readText(Charsets.UTF_8))
                     progress("校验恢复文件 ${entries.size}");zip.closeEntry()
                 }
@@ -194,27 +315,39 @@ class Store(private val context: Context) {
             val o=requireNotNull(manifest) { "缺少备份清单" };val l=Codec.library(o);val ps=photos(l)
             require(entries==ps.map { "photos/${it.file}" }.toSet()+"manifest.json") { "备份照片清单不一致" }
             ps.forEach { operation.ensureActive();val f=File(dir,it.file);require(f.length()==it.bytes && sha(f)==it.sha256) {"备份照片损坏"} }
-            val next=open(stage);try {
+            progress("切换到已校验资料")
+            operation.ensureActive();markProtectionDirty()
+            installRestoredLibrary(stage,newId,o,l);committed=true
+        } finally {if(!committed && prefs.getString("generation",null)!=newId) stage.deleteRecursively()}
+    } }
+    private fun installRestoredLibrary(stage:File,newId:String,o:JSONObject,l:Library) {
+        val next=open(stage);var installed=false;try {
                 next.beginTransaction();try {
                     l.archives.forEach{put("archive",it.id,Codec.archive(it),next)};l.drafts.forEach{put("draft",it.id,Codec.archive(it),next)}
                     l.labels.forEach{put("label",it.id,JSONObject().put("id",it.id).put("kind",it.kind).put("name",it.name),next)}
                     l.photoTrash.forEach{put("photoTrash",it.id,JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",Codec.photo(it.photo)).put("index",it.index).put("removed",it.removed),next)}
                     l.templates.forEach{put("template",it.id,Templates.json(it),next)}
+                    l.authors.forEach{put("author",it.id,Codec.author(it),next)}
+                    put("searchPreferences","rules",l.searchPreferences.json(),next)
                     put("settings","appearance",Appearance.read(o.optJSONObject("appearance") ?: JSONObject()).json(),next)
                     next.setTransactionSuccessful()
                 } finally {next.endTransaction()}
-            } finally {next.close()}
-            progress("切换到已校验资料")
-            operation.ensureActive()
-            check(prefs.edit().putString("previousGeneration",generation).putString("generation",newId).commit()) { "恢复状态保存失败" }
-            committed=true;db.close();generation=newId;root=stage;db=open(root)
-        } finally {if(!committed) stage.deleteRecursively()}
-    } }
+        val edit=prefs.edit().putString("previousGeneration",generation).putString("generation",newId)
+        if(o.optBoolean("incompleteImport") && prefs.getString("protectionImportWarning","").isNullOrBlank()) edit.putString("protectionImportWarning","此恢复版本包含未完成或部分失败的导入，请核对未收录的原文件")
+        check(edit.commit()) { "恢复状态保存失败" }
+        val previous=db;db=next;generation=newId;root=stage;installed=true
+        runCatching{previous.close()}
+        } finally {if(!installed)next.close()}
+    }
     fun lastBackup()=prefs.getLong("lastBackup",0)
     suspend fun undoRestore()=withContext(Dispatchers.IO) {gate.withLock {
         val old=prefs.getString("previousGeneration",null) ?: error("没有恢复前副本")
         require(Codec.validId(old)||old=="initial");val next=File(context.filesDir,"libraries/$old");require(File(next,"library.db").isFile)
-        check(prefs.edit().putString("generation",old).putString("previousGeneration",generation).commit());db.close();generation=old;root=next;db=open(root)
+        val prepared=open(next);var installed=false
+        try {
+            markProtectionDirty();check(prefs.edit().putString("generation",old).putString("previousGeneration",generation).commit())
+            val previous=db;db=prepared;generation=old;root=next;installed=true;runCatching{previous.close()}
+        } finally {if(!installed)prepared.close()}
     }}
 }
 fun ByteArray.hex()=joinToString("") {"%02x".format(it)}

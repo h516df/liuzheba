@@ -20,7 +20,7 @@ class LinksMediaTest {
         val video=Photo(id,"$id.original",300L*1024*1024,"a".repeat(64),"video/mp4",4000)
         val library=Library(archives=listOf(Archive(name="混合档案",photos=listOf(video))))
         val json=Codec.library(library)
-        assertEquals(3,json.getInt("format"));assertEquals(library,Codec.library(json))
+        assertEquals(5,json.getInt("format"));assertEquals(library,Codec.library(json))
         val photoId=uid();val p=Photo(photoId,"$photoId.original",10,"b".repeat(64),"image/jpeg")
         val legacy=Codec.library(Library(archives=listOf(Archive(name="旧档案",photos=listOf(p)))))
         legacy.put("format",2).getJSONArray("archives").getJSONObject(0).getJSONArray("photos").getJSONObject(0).remove("duration")

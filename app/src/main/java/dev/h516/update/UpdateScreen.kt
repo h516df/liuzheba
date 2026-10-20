@@ -66,7 +66,7 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
             UpdateState.Unsupported -> Text("当前是测试版或非官方签名版本，公开更新已停用。正式版资料不会被替换。",color=MaterialTheme.colorScheme.onSurfaceVariant)
             UpdateState.Verifying -> Row(verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp);Spacer(Modifier.width(10.dp));Text("正在重新校验安装包…")}
             UpdateState.NeedsInstallPermission -> Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text("安装已验证的新版，需要你在系统设置里允许留册安装应用。返回后会继续打开系统安装确认。")
+                Text("安装已验证的新版，需要你在系统设置里允许留着吧安装应用。返回后会继续打开系统安装确认。")
                 Text("此许可用于打开更新安装，可随时在系统设置关闭；不会读取或上传档案。你也可以取消，继续使用当前版本。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick=updater::openInstallPermission){Text("前往系统设置")}
                 TextButton(onClick=updater::cancel){Text("暂不安装")}
@@ -79,6 +79,11 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
                 Text("正在检查…", fontSize = 14.sp)
             }
 
+            is UpdateState.Installed -> {
+                Text("已更新到 ${state.version}", fontSize = 15.sp)
+                Button(onClick = { updater.check() }) { Text("检查更新") }
+            }
+
             is UpdateState.Latest -> {
                 Text("已是最新版本", fontSize = 15.sp)
                 Button(onClick = { updater.check() }) { Text("再检查一次") }
@@ -87,7 +92,7 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
             is UpdateState.Available -> {
                 Text("发现新版本 ${state.candidate.notes.version}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    text = "安装包约 ${state.candidate.apk.size / 1024 / 1024 + 1} MB，装之前会校验签名和版本号",
+                    text = "安装包约 ${state.candidate.apk.size / 1024 / 1024 + 1} MB，校验通过后将打开系统安装确认",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -127,7 +132,7 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
             Text("新版本提醒",Modifier.weight(1f))
             androidx.compose.material3.Switch(checked=updater.autoCheckEnabled,onCheckedChange=updater::changeAutoCheckEnabled)
         }
-        Text("开启提醒后，解锁并回到前台时至多每天匿名检查一次。只访问更新源，不发送档案、照片或账号；下载由你决定。关闭后仅手动检查，无需登录 GitHub。", fontSize = 12.sp,
+        Text("默认开启提醒，已有关闭选择保持不变。开启时，解锁并回到前台时至多每天匿名检查一次。只访问更新源，不发送档案、照片或账号；下载由你决定。关闭后仅手动检查，无需登录 GitHub。", fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = { openBrowser(context, "https://github.com/" + UpdateConfig.REPO) }) {
             Text("查看开源项目")

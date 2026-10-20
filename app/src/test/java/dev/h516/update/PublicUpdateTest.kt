@@ -51,4 +51,14 @@ class PublicUpdateTest {
         val releases = "[" + listOf(release("v0.5", ""), release("v0.6", "\"draft\":true,"), release("v0.7", "\"prerelease\":true,")).joinToString(",") + "]"
         assertEquals("0.5", UpdateCatalog.newest(UpdateCatalog.parse(releases))?.version)
     }
+    @Test fun renamedRepositoryUsesOnlyNewOfficialApiWithoutChangingIdentity(){
+        assertEquals("h516df/liuzheba",UpdateConfig.REPO)
+        assertEquals("dev.h516.shicang",UpdateConfig.PACKAGE)
+        assertEquals("shicang",UpdateConfig.APK_PREFIX)
+        assertTrue(UpdateConfig.apiUrl("https://api.github.com/repos/h516df/liuzheba/releases"))
+        assertFalse(UpdateConfig.apiUrl("https://api.github.com/repos/h516df/shicang/releases"))
+        assertFalse(UpdateConfig.apiUrl("https://api.github.com/repos/h516df/liuzheba-other/releases"))
+        assertFalse(UpdateConfig.apiUrl("https://api.github.com/repos/attacker/liuzheba/releases"))
+        assertFalse(UpdateConfig.apiUrl("https://api.github.com/repos/h516df/liuzheba/%2e%2e/releases"))
+    }
 }
