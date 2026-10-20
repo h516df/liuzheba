@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-data class AppState(val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
+data class AppState(val protection:ProtectionState=ProtectionState(),val recoveryChoices:List<RecoveryChoice> = emptyList(),val protectionSelection:Uri?=null,val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
     val exportRequest:MediaExportRequest?=null,val downloadsOpen:Boolean=false,val downloadInput:String="",
     val resolving:Boolean=false,val downloadError:String="",val mediaPlan:MediaPlan?=null,val downloads:List<MediaDownload> = emptyList())
 class AppModel(app: Application): AndroidViewModel(app) {
@@ -32,6 +32,8 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private val mediaDownloads by lazy {MediaDownloads(app)}
     init {viewModelScope.launch {
         try { store=withContext(Dispatchers.IO) {Store(app)};reload();mutable.value=mutable.value.copy(ready=true)
+            launch {store.protection.collect {value->mutable.value=mutable.value.copy(protection=value)}}
+            launch {store.runAutomaticProtection()}
             launch {while(true) {runCatching{withContext(Dispatchers.IO){mediaDownloads.list()}}.onSuccess{jobs->mutable.value=mutable.value.copy(downloads=jobs)};delay(1200)}} }
         catch(e:Exception) {mutable.value=mutable.value.copy(message="资料打开失败：${e.message}")}
     }}
@@ -160,7 +162,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         work("保存编辑草稿") {store.draft(a);mutable.value=mutable.value.copy(editor=null,draftStatus="草稿已保存")}
     }
     fun discardEditor() {val a=mutable.value.editor ?: return;draftJob?.cancel();work("放弃编辑") {store.discard(a.id);mutable.value=mutable.value.copy(editor=null)} }
-    fun saveEditor() {val a=mutable.value.editor ?: return;draftJob?.cancel();work("保存资料") {store.save(a);mutable.value=mutable.value.copy(editor=null);message("已保存「${a.name.trim()}」")} }
+    fun saveEditor() {val a=mutable.value.editor ?: return;draftJob?.cancel();work("保存资料") {store.save(a);mutable.value=mutable.value.copy(editor=null);message("已保存「${a.name.trim()}」到 App，外部保护状态请看上方提示")} }
     fun importPhotos(id: String,uris: List<Uri>) {
         if(uris.isEmpty()) return
         if(!mutable.value.ready || mutable.value.busy) {viewModelScope.launch {state.first{it.ready && !it.busy};importPhotos(id,uris)};return}
@@ -198,6 +200,27 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun deleteTemplate(t:FieldTemplate)=work("删除模板") {store.deleteTemplate(t.id);message("模板已删除，档案保留")}
     fun reuse(a: Archive) {mutable.value.editor?.let {change(it.copy(fields=it.fields+a.fields.map{f -> f.copy(id=uid(),value="")}))}}
     fun appearance(a: Appearance)=work("保存外观") {store.appearance(a)}
+    fun chooseProtectionFolder(uri:Uri)=work("检查保护文件夹") {
+        val choices=store.inspectProtectionFolder(uri)
+        if(choices.isEmpty()) {store.selectProtectionFolder(uri);message("留册将自动创建保护文件夹并保存原件，请等待“已保护”")}
+        else mutable.value=mutable.value.copy(recoveryChoices=choices,protectionSelection=uri)
+    }
+    fun dismissProtectionSelection(){mutable.value=mutable.value.copy(recoveryChoices=emptyList(),protectionSelection=null)}
+    fun useProtectionFolder() {
+        val uri=mutable.value.protectionSelection ?: return
+        work("启用自动保护") {store.selectProtectionFolder(uri);dismissProtectionSelection();message("开始保护当前资料，已有恢复版本仍保留")}
+    }
+    fun recoverProtection(choice:RecoveryChoice) {
+        val uri=mutable.value.protectionSelection ?: return
+        draftJob?.cancel()
+        work("从保护文件夹恢复") {
+            store.restoreProtectionFolder(uri,choice.name){text->mutable.value=mutable.value.copy(progress=text)}
+            store.selectProtectionFolder(uri);dismissProtectionSelection();mutable.value=mutable.value.copy(editor=null)
+            message("已校验并恢复全部资料与原件，恢复前资料仍保留，可在设置撤销恢复")
+        }
+    }
+    fun acknowledgeImportWarning()=work("确认已核对原件") {store.acknowledgeImportWarning()}
+    fun retryProtection() {if(mutable.value.ready)viewModelScope.launch {store.protectNow(forceVerify=true)}}
     fun backup(uri: Uri)=work("准备备份") {store.backup(uri){s -> mutable.value=mutable.value.copy(progress=s)};message("完整备份已保存并校验，可在所选文件位置找到")}
     fun restoreBackup(uri: Uri)=work("准备恢复") {store.restore(uri){s -> mutable.value=mutable.value.copy(progress=s)};mutable.value=mutable.value.copy(editor=null);message("资料已恢复，恢复前副本保留，可撤销恢复")}
     fun undoRestore()=work("还原恢复前资料") {store.undoRestore();message("已切换回恢复前资料")}

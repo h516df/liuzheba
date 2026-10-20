@@ -24,7 +24,7 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 @org.robolectric.annotation.SQLiteMode(org.robolectric.annotation.SQLiteMode.Mode.LEGACY)
-@Config(sdk=[34], application=Application::class, qualifiers="zh-rCN-w412dp-h915dp-xhdpi")
+@Config(sdk=[35], application=Application::class, qualifiers="zh-rCN-w412dp-h915dp-xhdpi")
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ArchiveUiSnapshotTest {
     // Each Robolectric sandbox owns a fresh Android looper; never reuse a previous test's Main handler.
