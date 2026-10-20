@@ -80,7 +80,7 @@ class AuthorProfilesTest {
         val author=Author(name="本地称呼",identities=listOf(i))
         val a=Archive(name="作品",authorIds=listOf(author.id))
         val l=Library(archives=listOf(a),drafts=listOf(a.copy(id=uid())),authors=listOf(author))
-        assertEquals(5,Codec.library(l).getInt("format"));assertEquals(l,Codec.library(Codec.library(l)))
+        assertEquals(6,Codec.library(l).getInt("format"));assertEquals(l,Codec.library(Codec.library(l)))
         val renamed=author.copy(name="改名",identities=listOf(i.copy(nickname="新昵称")))
         assertEquals(author.id,renamed.id);assertEquals(i.id,renamed.identities.single().id)
         assertEquals(author.copy(name=""),Codec.author(Codec.author(author.copy(name=""))))
