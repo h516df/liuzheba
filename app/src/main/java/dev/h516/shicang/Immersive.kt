@@ -142,6 +142,8 @@ import java.io.File
                 Box {
                     GalleryIcon("更多",Color.White){touch();menu=true}
                     DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
+                        DropdownMenuItem(text={Text("写档案笔记")},onClick={menu=false;model.noteEditor.open("archive",a.id,a.name)})
+                        current?.let{p->DropdownMenuItem(text={Text("写这项媒体的笔记")},onClick={menu=false;model.noteEditor.open("media",p.id,"${a.name} · ${if(p.isVideo) "视频" else "照片"}")})}
                         DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
                         if(a.photos.isNotEmpty()) DropdownMenuItem(text={Text("全部照片")},onClick={menu=false;allPhotos()})
                         if(current!=null) {

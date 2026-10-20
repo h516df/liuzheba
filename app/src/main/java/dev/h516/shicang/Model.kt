@@ -18,10 +18,10 @@ data class Archive(
 }
 data class Label(val id: String, val kind: String, val name: String)
 data class PhotoTrash(val id: String = uid(), val archiveId: String, val photo: Photo, val index: Int, val removed: Long)
-data class Library(val archives: List<Archive> = emptyList(), val drafts: List<Archive> = emptyList(), val labels: List<Label> = emptyList(), val photoTrash: List<PhotoTrash> = emptyList(), val templates: List<FieldTemplate> = emptyList(), val searchPreferences:SearchPreferences = SearchPreferences(), val authors: List<Author> = emptyList()) {
+data class Library(val archives: List<Archive> = emptyList(), val drafts: List<Archive> = emptyList(), val labels: List<Label> = emptyList(), val photoTrash: List<PhotoTrash> = emptyList(), val templates: List<FieldTemplate> = emptyList(), val searchPreferences:SearchPreferences = SearchPreferences(), val authors: List<Author> = emptyList(), val notes:List<LongNote> = emptyList(), val noteDrafts:List<LongNote> = emptyList()) {
     val active get() = archives.filter { it.deleted == 0L }
     fun labelName(id: String) = labels.firstOrNull { it.id == id }?.name.orEmpty()
-    fun searchable(a: Archive) = listOf(a.name, labelName(a.category), a.tags.joinToString(" ") { labelName(it) }, a.fields.joinToString(" ") { "${it.name} ${it.value}" }, authors.filter { it.id in a.authorIds }.joinToString(" ") { author -> author.name + " " + author.identities.joinToString(" ") { "${it.platform} ${it.nickname} ${it.publicAccount}" } }).joinToString(" ")
+    fun searchable(a: Archive) = listOf(a.name, labelName(a.category), a.tags.joinToString(" ") { labelName(it) }, a.fields.joinToString(" ") { "${it.name} ${it.value}" }, authors.filter { it.id in a.authorIds }.joinToString(" ") { author -> author.name + " " + author.identities.joinToString(" ") { "${it.platform} ${it.nickname} ${it.publicAccount}" } }, notesFor(a).joinToString("\n") { "${it.title}\n${it.body}" }).joinToString(" ")
     fun find(query: String, category: String = "", tag: String = "") = active.filter {
         (category.isEmpty() || it.category == category) && (tag.isEmpty() || tag in it.tags) && searchable(it).contains(query.trim(), ignoreCase = true)
     }
@@ -62,15 +62,16 @@ object Codec {
         require(fs.all { validId(it.id) && it.type in Templates.types }) { "字段格式不支持" }
         return Archive(id,o.getString("name"),o.optString("category"),o.getJSONArray("tags").strings(),fs,o.getJSONArray("photos").objects().map(::photo),o.optString("cover"),o.optBoolean("fill"),o.getLong("updated"),o.optLong("deleted"),(o.optJSONArray("authorIds") ?: JSONArray()).strings().also { ids -> require(ids.size<=1000 && ids.all(::validId) && ids.distinct().size==ids.size) { "作者关联无效" } })
     }
-    fun library(l: Library) = JSONObject().put("format",5).put("authors",JSONArray(l.authors.map(::author))).put("searchPreferences",l.searchPreferences.json()).put("templates",JSONArray(l.templates.map(Templates::json))).put("archives",JSONArray(l.archives.map(::archive))).put("drafts",JSONArray(l.drafts.map(::archive)))
+    fun library(l: Library) = JSONObject().put("format",6).put("notes",JSONArray(l.notes.map{it.json()})).put("noteDrafts",JSONArray(l.noteDrafts.map{it.json()})).put("authors",JSONArray(l.authors.map(::author))).put("searchPreferences",l.searchPreferences.json()).put("templates",JSONArray(l.templates.map(Templates::json))).put("archives",JSONArray(l.archives.map(::archive))).put("drafts",JSONArray(l.drafts.map(::archive)))
         .put("labels",JSONArray(l.labels.map { JSONObject().put("id",it.id).put("kind",it.kind).put("name",it.name) }))
         .put("photoTrash",JSONArray(l.photoTrash.map { JSONObject().put("id",it.id).put("archiveId",it.archiveId).put("photo",photo(it.photo)).put("index",it.index).put("removed",it.removed) }))
     fun library(o: JSONObject): Library {
-        require(o.getInt("format") in 1..5) { "备份版本不支持" }
+        require(o.getInt("format") in 1..6) { "备份版本不支持" }
         val l=Library(o.getJSONArray("archives").objects().map(::archive),o.getJSONArray("drafts").objects().map(::archive),
             o.getJSONArray("labels").objects().map { Label(it.getString("id"),it.getString("kind"),it.getString("name")) },
             o.getJSONArray("photoTrash").objects().map { PhotoTrash(it.getString("id"),it.getString("archiveId"),photo(it.getJSONObject("photo")),it.getInt("index"),it.getLong("removed")) },
-            if(o.getInt("format")>=2) (o.optJSONArray("templates") ?: JSONArray()).objects().map(Templates::read) else emptyList(), SearchPreferences.read(if(o.getInt("format")>=4)o.getJSONObject("searchPreferences") else o.optJSONObject("searchPreferences")), if(o.getInt("format")>=5) o.getJSONArray("authors").objects().map(::author) else emptyList())
+            if(o.getInt("format")>=2) (o.optJSONArray("templates") ?: JSONArray()).objects().map(Templates::read) else emptyList(), SearchPreferences.read(if(o.getInt("format")>=4)o.getJSONObject("searchPreferences") else o.optJSONObject("searchPreferences")), if(o.getInt("format")>=5) o.getJSONArray("authors").objects().map(::author) else emptyList(), if(o.getInt("format")>=6)o.getJSONArray("notes").objects().map(LongNote::read) else emptyList(), if(o.getInt("format")>=6)o.getJSONArray("noteDrafts").objects().map(LongNote::read) else emptyList())
+        require(listOf(l.notes,l.noteDrafts).all{it.size<=100000 && it.map{n->n.key}.distinct().size==it.size}) {"笔记重复或数量过大"}
         require(l.authors.size<=100000 && l.authors.map{it.id}.distinct().size==l.authors.size) { "作者编号重复或数量过大" }
         val identityIds=l.authors.flatMap{it.identities}.map{it.id}
         require(identityIds.distinct().size==identityIds.size) { "平台身份编号重复" }
