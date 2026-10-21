@@ -1,3 +1,42 @@
+# 当前接续记录（2026-10-21）
+
+本节是会话接续入口；长期规则见 [AGENTS.md](AGENTS.md)，工具链和检查命令见 [CLOUD_DEVELOPMENT.md](CLOUD_DEVELOPMENT.md)。后续任务更新本节，下面已有历史保留。
+
+- **本轮目标**：将项目约定、进度和续接方式保存到 GitHub，使新 Codex 会话可以继续工作。
+- **核对的主线基线**：`5dce51f98664e3b1c4674f8b62a5a17290e24943`（main 的日期快照，继续前重新读取；不是永远最新提交）。
+- **本轮分支**：`codex/session-continuity-20261021`。此分支仅修改协作与交接文档，PR 和实际合并状态以 GitHub 为准。
+- **已准备**：新会话阅读顺序、结束保存流程、远端提交核对及续接提示；保留原项目规则、既有历史和云端开发配置。
+- **验证范围**：本轮检查文档差异、仓库内链接、原文保留及远端读回；业务测试/构建/设备/发布为 **not run**，历史证据不能重标成本轮结果。实际检查结果与远端提交见本轮 PR。
+- **配置与边界**：只使用独立 verification 调试包验收；原正式签名、手机升级与个人资料保护沿用现有规则。 其他配置键名、初始化入口及限制仍以云端说明和任务相关文档为准。
+- **下一步**：核对下面 PR 快照及当前 main；按用户的具体目标选择主线或指定分支，读对应 PR 的最新交接后继续。尚未完成的业务工作不因本轮文档完善而视作已完成。
+
+## 打开的 PR 快照
+
+以下仅为 2026-10-21 读取到的列表，不判断是否仍需实施、能否合并，或是否已由其他提交包含；不批量合并、关闭或重复搬运。
+
+| PR | 分支 | 读取时 head | 状态 |
+| --- | --- | --- | --- |
+| [#28: 标签优先与一步媒体操作，降低自动保护和整库读写卡顿](https://github.com/h516df/liuzheba/pull/28) | `feat/core-journey-20261020` | `031d816e752bf26e6ab13ac63dc4579f91b6877e` | 草稿 |
+| [#26: feat: 发现页按档案随机预览图片与视频](https://github.com/h516df/liuzheba/pull/26) | `feat/discovery-random-previews` | `222a3174287c910ba4057b2ce7b3a297cbfe9535` | 草稿 |
+| [#25: feat: 独立长笔记、持久草稿及安全恢复](https://github.com/h516df/liuzheba/pull/25) | `feat/long-notes` | `682d30eac9e9009a58b56170e7b9ffedbe4afa79` | 草稿 |
+| [#24: 新增直播录屏视频编辑：裁剪、固定遮挡与独立副本](https://github.com/h516df/liuzheba/pull/24) | `feat/video-editor-main` | `ff89075f94cecf8acf5747e52b378ba4bf32b9e2` | 草稿 |
+| [#21: fix: 保留播放意图与前台一键更新](https://github.com/h516df/liuzheba/pull/21) | `fix/playback-foreground-update` | `61ed05b30046bf3599ae8d82bb523a21757d7711` | 草稿 |
+| [#20: feat: 媒体沉浸浏览与原位返回](https://github.com/h516df/liuzheba/pull/20) | `feat/immersive-media` | `776207aac3a7f6733dfd7f9ab180ed7d435aa737` | 草稿 |
+| [#19: feat: 作者主页导入与统一档案编辑闭环](https://github.com/h516df/liuzheba/pull/19) | `feat/author-archive-workflow` | `d7959c7f12f7f11978ae6ee5ea6835fa232ea3d2` | 草稿 |
+| [#18: feat: 留着吧本机文字 AI、可解释搜索与定制规则](https://github.com/h516df/liuzheba/pull/18) | `feat/local-search-assistant` | `db8b2c1f0ab6c8ac48df8ee35e36ed74c751c9ad` | 草稿 |
+| [#17: feat: 留册自动创建本机保护目录、校验与恢复](https://github.com/h516df/liuzheba/pull/17) | `feat/automatic-local-protection` | `7681690a70dfcb256c3ab6b107258494d6f68282` | 草稿 |
+| [#16: fix: 导出前校验恢复容量上限并保留已有备份](https://github.com/h516df/liuzheba/pull/16) | `fix/backup-restore-limits` | `a02b0efb8a10eac097bc66943fd6e7c006ee3ead` | 草稿 |
+
+## 下一次交接时更新
+
+请在本节写清本轮目标、完成/待办、工作分支和 PR、所验证的提交 SHA、实际命令与 passed / failed / not run、阻塞、下一步；代码和交接一起推送，再给用户已核实的远端提交链接。未合并时须交代指定分支，不能让新会话只读 main。
+
+---
+
+## 原有交接历史
+
+以下原文保留；其中旧路径、候选版本与测试结论需按日期和源码重新核对。
+
 
 
 ## 2026-10-18 用户纠正后的继续任务（实施中）
