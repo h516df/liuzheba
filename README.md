@@ -73,3 +73,7 @@ v0.5 延续 v0.4 的资料与界面。更新资料从本项目公开 Release 匿
 解析组件为固定版本 Chaquopy 17.0.0 + Python 3.12 + yt-dlp 2026.8.19；首次源码构建还需要 Python 3.12（可用 `SHICANG_BUILD_PYTHON` 指定可执行文件）。本版原生运行时包含 arm64-v8a 和 x86_64，需要 64 位设备、Android 7.0 及以上；APK 仍使用原包名和正式签名覆盖升级。
 
 离线解析适配测试：安装固定版本 `yt-dlp==2026.8.19` 后执行 `python tools/tests/test_media_bridge.py`，全部使用合成图集/格式元数据。
+
+## 云端开发入口
+
+后续开发默认使用云端：[打开开发工作区](https://codespaces.new/h516df/liuzheba) · [环境、检查命令与迁移边界](CLOUD_DEVELOPMENT.md)。
