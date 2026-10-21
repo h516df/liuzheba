@@ -35,14 +35,14 @@ class ArchiveUiSnapshotTest {
     @Test fun libraryDark()=render("library-dark",dark=true)
     @Test fun detailLight()=render("detail-light",detail=true)
     @Test fun settingsLight()=render("settings-light",settings=true)
-    @Test fun finalReleaseNotesOpenFromSettings()=render("v016-update-notes",settings=true,verify={model->
+    @Test fun finalReleaseNotesOpenFromSettings()=render("v017-update-notes",settings=true,verify={model->
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于与检查更新"))
         compose.onNodeWithText("关于与检查更新").performClick()
         compose.onNodeWithText("检查更新").assertExists()
-        compose.onNodeWithText("本版说明 0.16").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("本版说明 0.17").performScrollTo().assertIsDisplayed()
         val notes=model.updater.currentNotes()!!
-        org.junit.Assert.assertEquals("0.16",notes.version)
-        org.junit.Assert.assertEquals(17,notes.code)
+        org.junit.Assert.assertEquals("0.17",notes.version)
+        org.junit.Assert.assertEquals(18,notes.code)
         notes.sections.flatMap{it.second}.forEach {line->
             compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
         }
@@ -65,6 +65,8 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun appliedCategoryCanBeRemoved()=render("filtered",verify={
         compose.onNodeWithContentDescription("筛选").performClick()
+        compose.onNodeWithText("标签 · 0").assertIsSelected()
+        compose.onNodeWithContentDescription("分类（可选）").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
@@ -73,6 +75,8 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun deletingActiveCategoryWhileAwayRestoresLibrary()=render("deleted-filter-return",verify={model->
         compose.onNodeWithContentDescription("筛选").performClick()
+        compose.onNodeWithText("标签 · 0").assertIsSelected()
+        compose.onNodeWithContentDescription("分类（可选）").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
@@ -196,6 +200,7 @@ class ArchiveUiSnapshotTest {
         compose.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText("山间的一个下午"))
         val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
         compose.onNodeWithText("返回").assertExists().performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("山间的一个下午").fetchSemanticsNodes().isNotEmpty()}
@@ -207,14 +212,14 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.loadedPhotoWithControls()
         compose.onNodeWithText("返回").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").assertIsDisplayed()
     })
     private fun verifyImmersiveViewer() {
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
         // Fixtures use the default 全幅/铺满 appearance, so the renderer exposes its crop-mode label.
-        val photo=compose.onNodeWithContentDescription("全幅照片，双击或双指缩放")
-        compose.waitUntil(10000){compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"照片已显示")).fetchSemanticsNodes().isNotEmpty()}
+        val photo=compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("更多").assertExists()
         compose.onNodeWithText("保存到相册").assertDoesNotExist()
         compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-tools.png").absolutePath)
@@ -281,6 +286,9 @@ class ArchiveUiSnapshotTest {
             check(model.state.value.message.isEmpty()){model.state.value.message}
             model.state.value.ready
         }
+        // Ready data is not yet a placed search result; await the rendered shelf before input.
+        compose.waitUntil(10000){compose.onAllNodesWithText(if(empty) "把值得记住的，留在这里" else if(longLibrary) "28 份档案" else "4 份档案").fetchSemanticsNodes().isNotEmpty()}
+        if(!empty && !longLibrary && fontScale<=1.4f) compose.waitUntil(10000){compose.onAllNodes(hasText("山间的一个下午") and hasClickAction()).fetchSemanticsNodes().size==1}
         compose.waitForIdle()
         if(detail){compose.onNodeWithText("山间的一个下午").performClick();compose.waitForIdle()}
         if(settings){compose.onNodeWithTag("nav-settings").performClick();compose.waitForIdle()}

@@ -29,6 +29,7 @@ class ProtectionUiSnapshotTest {
     @get:Rule val compose=createComposeRule()
     @Test fun setupNotice()=render("protection-setup",ProtectionState())
     @Test fun protectedWithLocalPath()=render("protection-verified",ProtectionState("已保护","当前资料与 12 项原件已在外部保存并校验","primary:Documents/留册自动保护",1792464000000,12))
+    @Test fun importWarningIsNeverHidden()=render("protection-warning",ProtectionState("待核对","部分原件未收录，请保留原文件","primary:Documents/留册自动保护",1792464000000,12))
     @Test fun failedKeepsLastGoodVisible()=render("protection-failed",ProtectionState("保护失败","文件夹权限已失效。旧恢复版本仍保留，请先保留原文件","primary:Documents/留册自动保护",1792464000000,12))
     @Test @Config(qualifiers="zh-rCN-w320dp-h900dp-xhdpi")
     fun narrowLargeDark() {RuntimeEnvironment.setFontScale(2f);render("protection-320-font200-dark",ProtectionState("待保护","最新修改已保存在 App 内，正在等待外部保护","primary:Documents/留册自动保护"),true)}
@@ -41,9 +42,15 @@ class ProtectionUiSnapshotTest {
             }}
         }}
         compose.onNodeWithText("自动保护 · ${state.status}").assertExists()
+        if(state.location.isNotEmpty()) {
+            compose.onNodeWithText("立即校验保护").assertDoesNotExist()
+            compose.onNodeWithText("更换保存位置").assertDoesNotExist()
+            if(state.needsAttention) compose.onNodeWithText(state.detail).assertExists()
+            if(state.status=="保护失败") compose.onNodeWithText("重试保护").assertExists()
+        }
+        val output=File("build/outputs/protection-ui/$name.png");output.parentFile.mkdirs();compose.onRoot().captureRoboImage(output.absolutePath)
+        if(state.location.isNotEmpty()) compose.onNodeWithText("保护范围与注意事项").performScrollTo().performClick()
         compose.onNodeWithText(if(state.location.isEmpty())"开启自动保护" else "更换保存位置").performScrollTo().performClick()
         org.junit.Assert.assertEquals(1,requested)
-        compose.onNodeWithText("自动保护 · ${state.status}").performScrollTo()
-        val output=File("build/outputs/protection-ui/$name.png");output.parentFile.mkdirs();compose.onRoot().captureRoboImage(output.absolutePath)
     }
 }

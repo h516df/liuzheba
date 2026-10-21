@@ -207,7 +207,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private fun work(text: String, block: suspend ()->Unit) {
         if(!mutable.value.ready || mutable.value.busy) return
         mutable.value=mutable.value.copy(busy=true,progress=text)
-        operation=viewModelScope.launch { try {block();reload()}
+        operation=viewModelScope.launch { try {block()}
             catch(e:CancellationException) {message("操作已停止，当前资料已重新读取")}
             catch(e: Exception) {message(e.message ?: "操作未完成，请重试")}
             finally {withContext(NonCancellable){runCatching{reload()};mutable.value=mutable.value.copy(busy=false,progress="")}}}
@@ -224,7 +224,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         invalidateTagSuggestions()
         mutable.value=mutable.value.copy(editor=a,draftStatus="正在保存草稿")
         draftJob?.cancel()
-        draftJob=viewModelScope.launch {delay(200);try{store.draft(a);mutable.value=mutable.value.copy(draftStatus="草稿已保存");reload()}catch(e:CancellationException){throw e}catch(e:Exception){mutable.value=mutable.value.copy(draftStatus="草稿保存失败");message(e.message ?: "草稿保存失败")}}
+        draftJob=viewModelScope.launch {delay(200);try{store.draft(a);mutable.update{current->current.copy(draftStatus="草稿已保存",library=current.library.copy(drafts=current.library.drafts.filterNot{it.id==a.id}+a))}}catch(e:CancellationException){throw e}catch(e:Exception){mutable.value=mutable.value.copy(draftStatus="草稿保存失败");message(e.message ?: "草稿保存失败")}}
     }
     fun leaveEditor() {
         invalidateTagSuggestions()
@@ -241,14 +241,28 @@ class AppModel(app: Application): AndroidViewModel(app) {
         if(!mutable.value.ready || mutable.value.busy) {viewModelScope.launch {state.first{it.ready && !it.busy};importPhotos(id,uris)};return}
         draftJob?.cancel()
         work("正在导入 ${uris.size} 项照片与视频") {
-            val a=mutable.value.editor?.takeIf{it.id==id} ?: store.load().drafts.firstOrNull{it.id==id} ?: error("原编辑草稿不存在，请重新选择照片")
-            val result=store.importPhotos(uris);val next=a.copy(photos=a.photos+result.photos)
-            store.draft(next);if(mutable.value.editor?.id==id) mutable.value=mutable.value.copy(editor=next,draftStatus="草稿已保存")
-            if(result.errors.isNotEmpty()) message("已导入${result.photos.size}项；${result.errors.joinToString("；")}")
+            val editor=mutable.value.editor?.takeIf{it.id==id}
+            val committed=java.util.concurrent.atomic.AtomicReference<Archive?>()
+            try {
+                val (result,_)=store.importIntoArchive(id,uris,editor,
+                    progress={text->mutable.update{it.copy(progress=text)}},onLinked=committed::set)
+                if(result.errors.isNotEmpty()) message("已导入${result.photos.size}项；${result.errors.joinToString("；")}")
+                else if(editor==null)message("已添加 ${result.photos.size} 项照片与视频")
+            } finally {
+                // This non-suspending finalizer runs on Main even when the IO return is cancelled.
+                // Publish committed media before a later edit can overwrite it, without cross-thread editor writes.
+                committed.get()?.let{next->if(editor!=null)mutable.update{current->if(current.editor?.id==id)current.copy(editor=next,draftStatus="草稿已保存")else current}}
+            }
         }
     }
     fun preparePhotos(id: String,launch:()->Unit) {
-        val a=mutable.value.editor?.takeIf{it.id==id} ?: return
+        if(!mutable.value.ready || mutable.value.busy)return
+        val a=mutable.value.editor?.takeIf{it.id==id}
+        if(a==null) {
+            if(mutable.value.library.active.any{it.id==id})launch()
+            else message("原档案已不存在，请重新打开")
+            return
+        }
         draftJob?.cancel();work("保存编辑草稿") {store.draft(a);launch()}
     }
     fun trash(a: Archive) = work("移入回收站") {store.trash(a.id);message("已移入回收站，可从设置恢复")}
@@ -330,6 +344,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         }
     }
     fun acknowledgeImportWarning()=work("确认已核对原件") {store.acknowledgeImportWarning()}
+    fun resumeProtection() {if(mutable.value.ready)viewModelScope.launch {store.resumeProtection()}}
     fun retryProtection() {if(mutable.value.ready)viewModelScope.launch {store.protectNow(forceVerify=true)}}
     fun prepareBackup(launch:()->Unit)=work("检查备份容量") {store.validateBackupCapacity();launch()}
     fun backup(uri: Uri)=work("准备备份") {store.backup(uri){s -> mutable.value=mutable.value.copy(progress=s)};message("完整备份已保存并校验，可在所选文件位置找到")}

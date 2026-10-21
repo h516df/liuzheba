@@ -16,15 +16,25 @@ internal const val PROTECTION_RECOVERY_NOTICE="请选择以前保存资料的本
     Card(Modifier.fillMaxWidth().padding(bottom=20.dp),colors=CardDefaults.cardColors(containerColor=colors.surfaceContainer)) {
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("自动保护 · ${state.status}",style=MaterialTheme.typography.titleMedium)
-            Text(state.detail,style=MaterialTheme.typography.bodyMedium)
-            if(state.location.isNotEmpty()) Text("保存位置：${state.location}",style=MaterialTheme.typography.bodySmall)
-            if(state.lastSuccess>0) Text("最近成功校验 ${state.mediaCount} 项原件：${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(state.lastSuccess))}",style=MaterialTheme.typography.bodySmall)
+            val configured=state.location.isNotEmpty()
+            if(!configured || state.needsAttention) {
+                Text(state.detail,style=MaterialTheme.typography.bodyMedium,color=if(state.needsAttention) colors.error else colors.onSurface)
+                if(state.lastSuccess>0) Text("最近成功校验 ${state.mediaCount} 项原件：${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(state.lastSuccess))}",style=MaterialTheme.typography.bodySmall)
+            } else Text(if(state.protected) "修改后会自动尝试保护，无需反复手动导出。" else "自动保护进行中，完成前请先保留原文件。",style=MaterialTheme.typography.bodyMedium)
             if(state.status=="待核对") TextButton(onClick=acknowledge,enabled=!busy){Text("我已核对未收录的原文件")}
-            Button(onClick=if(state.location.isEmpty()) choose else retry,enabled=!busy,modifier=Modifier.fillMaxWidth()) {
-                Text(if(state.location.isEmpty()) "开启自动保护" else "立即校验保护")
+            if(!configured || state.status=="保护失败") Button(onClick=if(!configured) choose else retry,enabled=!busy,modifier=Modifier.fillMaxWidth()) {
+                Text(if(!configured) "开启自动保护" else "重试保护")
             }
-            if(state.location.isNotEmpty())TextButton(onClick=choose,enabled=!busy){Text("更换保存位置")}
             TextButton(onClick={details=!details}){Text(if(details) "收起保护说明" else "保护范围与注意事项")}
+            if(details && configured) {
+                Text("保存位置：${state.location}",style=MaterialTheme.typography.bodySmall)
+                if(!state.needsAttention) {
+                    Text(state.detail,style=MaterialTheme.typography.bodySmall)
+                    if(state.lastSuccess>0) Text("最近成功校验 ${state.mediaCount} 项原件：${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(state.lastSuccess))}",style=MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick=retry,enabled=!busy){Text("立即校验保护")}
+                TextButton(onClick=choose,enabled=!busy){Text("更换保存位置")}
+            }
             if(details)Text("保存档案、笔记、草稿、回收站及已收录的原件；未完成导入的文件不在保护范围内。离开页面仍会尝试继续，系统中断后下次打开续做，旧版本不自动清理。\n\nApp 内保存不等于外部保护。只有显示“已保护”后才考虑删除原文件；同一手机损坏或丢失仍可能一起丢失。保护文件未加密，应用锁不保护外部文件。",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
         }
     }

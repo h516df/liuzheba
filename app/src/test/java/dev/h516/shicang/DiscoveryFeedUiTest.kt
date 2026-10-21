@@ -43,6 +43,7 @@ abstract class DiscoveryFeedUiFixture {
         val first=seen[a.id]!!
         val fixedCover=a.photos.drop(1).first {it.id!=first}.id
         compose.runOnIdle {displayed=a.copy(cover=fixedCover)}
+        compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("随机预览 · 已开启").assertExists()
         compose.onNodeWithText("查看资料").performClick()
@@ -52,10 +53,12 @@ abstract class DiscoveryFeedUiFixture {
         compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=null}
         assertEquals(first,seen[a.id])
         compose.onNodeWithText("${a.photos.indexOfFirst{it.id==first}+1} / ${a.photos.size}").assertExists()
+        compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("随机预览 · 已开启").performClick()
         compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]==fixedCover}
         compose.onNodeWithText("${a.photos.indexOfFirst{it.id==fixedCover}+1} / ${a.photos.size}").assertExists()
+        compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("固定封面 · 已开启").assertExists()
         val output=File("build/outputs/discovery-ui/fixed-cover-menu.png");output.parentFile?.mkdirs()
@@ -66,6 +69,7 @@ abstract class DiscoveryFeedUiFixture {
         compose.setContent {MaterialTheme {ArchiveFeed(listOf(a),"",model,Appearance(),emptyMap(),{id,p->seen[id]=p},{},{},{},{},{},{},{},false)}}
         compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=null}
         val first=seen[a.id]
+        compose.loadedPhotoWithControls()
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("下一份").performClick()
         compose.waitUntil(10000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();seen[a.id]!=first}

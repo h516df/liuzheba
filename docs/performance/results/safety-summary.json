@@ -1,0 +1,91 @@
+{
+  "environment": "Host Robolectric API 28, legacy SQLite; synthetic data only; not device performance",
+  "suites": [
+    {
+      "name": "dev.h516.shicang.BackupStoreTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.39"
+    },
+    {
+      "name": "dev.h516.shicang.DirectMediaImportTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "4.553"
+    },
+    {
+      "name": "dev.h516.shicang.EditorPersistenceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.138"
+    },
+    {
+      "name": "dev.h516.shicang.LargeMediaIoTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "25.508"
+    },
+    {
+      "name": "dev.h516.shicang.LargeMediaStoreTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "16.147"
+    },
+    {
+      "name": "dev.h516.shicang.MediaResponsivenessSafetyTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "3.211"
+    },
+    {
+      "name": "dev.h516.shicang.ProtectionStoreTest",
+      "tests": "20",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "4.54"
+    },
+    {
+      "name": "dev.h516.shicang.UnifiedBackupStoreTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "3.399"
+    }
+  ],
+  "tests": 52,
+  "failures": 0,
+  "final_editor_recheck": [
+    {
+      "name": "dev.h516.shicang.DirectMediaImportTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "3.585"
+    },
+    {
+      "name": "dev.h516.shicang.EditorPersistenceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.239"
+    }
+  ],
+  "final_editor_recheck_tests": 9,
+  "final_editor_recheck_failures": 0
+}

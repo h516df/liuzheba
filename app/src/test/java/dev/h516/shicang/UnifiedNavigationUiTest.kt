@@ -23,6 +23,8 @@ import java.io.File
 @OptIn(ExperimentalCoroutinesApi::class,coil3.annotation.DelicateCoilApi::class)
 abstract class UnifiedNavigationFixture {
     @get:Rule val compose=createComposeRule()
+    protected val chooseRequests=mutableListOf<String>()
+    protected val cameraRequests=mutableListOf<String>()
     @Before fun bind(){Dispatchers.setMain(android.os.Handler(android.os.Looper.getMainLooper()).asCoroutineDispatcher().immediate)}
     @After fun reset(){Dispatchers.resetMain();RuntimeEnvironment.setFontScale(1f)}
     protected fun idle(check:()->Boolean){compose.waitUntil(15000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();check()}}
@@ -48,7 +50,11 @@ abstract class UnifiedNavigationFixture {
         val loader=coil3.ImageLoader.Builder(app).components{add(coil3.decode.BitmapFactoryDecoder.Factory())}.build();coil3.SingletonImageLoader.setUnsafe(loader)
         val model=AppModel(app);val owners=androidx.lifecycle.ViewModelStore().apply{put("fixture",model)}
         try {
-            compose.setContent{ShicangApp(model,true,{},{},{},{},{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
+            compose.setContent{ShicangApp(model,true,{},{},{chooseRequests.add(it)},{cameraRequests.add(it)},{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
+            // Store readiness precedes the asynchronous search and lazy-grid placement. Wait for
+            // the real merged, clickable archive node instead of racing its first layout in CI.
+            idle{compose.onAllNodes(hasText(a.name) and hasClickAction()).fetchSemanticsNodes().size==1}
+            compose.onNode(hasText(a.name) and hasClickAction()).assertIsDisplayed()
             check(model,a)
         } finally {owners.clear();idle{model.resourcesClosed};loader.shutdown()}
     }
@@ -61,6 +67,7 @@ abstract class UnifiedNavigationFixture {
 class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
     @Test fun discoveryNoteDraftSaveAndReturnKeepsOriginalMedia()=fixture {model,a->
         compose.onNodeWithTag("nav-frame").performClick().assertIsSelected()
+        compose.loadedPhotoWithControls()
         val first=mediaNumber(3)
         compose.onNodeWithTag("nav-library").assertIsDisplayed();compose.onNodeWithTag("nav-settings").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").performClick();compose.onNodeWithText("查看资料").performClick();compose.onNodeWithText("打开完整档案").performClick()
@@ -78,8 +85,10 @@ class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
         screenshot("archive-note-reader")
         compose.onNodeWithText("返回").performClick()
         compose.onNodeWithContentDescription("返回").performClick()
+        compose.loadedPhotoWithControls()
         assertEquals(first,mediaNumber(3));compose.onNodeWithTag("nav-frame").assertIsSelected()
         compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithTag("nav-frame").performClick()
+        compose.loadedPhotoWithControls()
         assertEquals(first,mediaNumber(3))
         val saved=runBlocking{model.store.load()};assertEquals(a.authorIds,saved.active.single().authorIds);assertEquals(a.photos,saved.active.single().photos)
         screenshot("discovery-return")
