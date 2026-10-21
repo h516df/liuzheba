@@ -3,15 +3,15 @@
 本节是会话接续入口；长期规则见 [AGENTS.md](AGENTS.md)，工具链和检查命令见 [CLOUD_DEVELOPMENT.md](CLOUD_DEVELOPMENT.md)。后续任务更新本节，下面已有历史保留。
 
 - **本轮目标**：用户要求重构准备和网上灵感，并询问 GitHub 发布能力；随后明确“整体布局混乱、功能难找”，喜欢苹果，要求先做 UI 看效果。当前优先交付视觉稿，不擅自进入全面代码重写。
-- **核对的主线基线**：`a9854163e4746a1285eadf799bdb3022b2370722`，本轮 clone / fetch / ls-remote 一致；源码为 0.16 / code17，远端最新正式 Release 为 v0.16。继续前重读远端状态。
-- **本轮分支**：`codex/experience-refactor-prep-20261021`，包含研究方案、生成的三屏视觉概念与本节；对应草稿 PR 以 GitHub 分支关联为准。不改其他任务分支，不合并、不发版。
+- **核对的主线基线**：研究和视觉稿基于 `a9854163e4746a1285eadf799bdb3022b2370722`，源码为 0.16 / code17。收尾时远端 main 已到 `0bfc3cea38d651bb1dfa9a2fa8977297e54f7c1d`，本轮 fetch 后确认仅 AGENTS / CLOUD_DEVELOPMENT / HANDOFF 三份通用工作流文档变化；没有把别的任务合并进本分支。已读新增的通用入口与其 workflow/README.md，继续时重新核对。
+- **本轮分支 / PR**：`codex/experience-refactor-prep-20261021` / [草稿 PR #31](https://github.com/h516df/liuzheba/pull/31)。设计交付提交 `c9af227e93c4aed638c01d02eef7ebf675ac040a` 已推送并 ls-remote 核对；收尾反馈以本次后续提交为准。不改其他任务分支，不合并、不发版。
 - **已完成**：云端 SDK 初始化、Gradle 9.1.0/JDK21 启动核对；读取 AGENTS / CLAUDE / CLOUD_DEVELOPMENT / HANDOFF 与相关规则；核实源码关键流程，检索并阅读 Eagle、mymind、Anytype、Ente 官方说明；形成 [体验重构准备](docs/research/experience-refactor-2026-10-21.md)，包含问题证据、参考取舍、目标路径、P0–P4、验收和发布边界。
-- **视觉稿**：[档案/详情/收录](docs/design/ui-preview-2026-10-21.png)，由图像工具生成，使用虚构物品示例。已在会话展示；不是 Android 实际截图、交互原型或已认可方案。偏苹果的浅底/黑字/蓝色动作与明确索引；实施时仍遵循 Android 行为。发现/我的尚未出视觉稿。
-- **待完成**：用户已确认最痛的是“整体布局混乱、功能难找”。按方案 P0 清点入口，P1 先做档案/笔记/作者文字索引、收录和我的分组原生小样，再审查复用 #28 并打通流程；具体布局仍是代理建议。业务工作未因研究文档完成而完成。
+- **视觉稿与反馈**：[档案/详情/收录](docs/design/ui-preview-2026-10-21.png)，由图像工具生成，使用虚构物品示例。用户看后反馈“还行”，并要求“先收尾”；记录为首版方向初步可接受，不是最终定稿或全面实施授权。视觉稿不是 Android 实际截图或交互原型。实施时仍遵循 Android 行为；发现/我的尚未出视觉稿。
+- **当前停点 / 待完成**：按用户要求收尾，停在研究与三屏视觉稿阶段。后续继续时围绕“整体布局混乱、功能难找”，按 P0 清点入口、P1 原生小样，再审查复用 #28 并打通流程。业务工作未因研究文档完成而完成。
 - **已有候选核对**：#28 为 open/draft，head `031d816e752bf26e6ab13ac63dc4579f91b6877e`。GitHub 返回 mergeable false，但 `git merge-tree --write-tree origin/main origin/feat/core-journey-20261020` 成功，树 `e0ae6a1f4af0072dd8a6d8b32a7183991f1b539f`；仅对象模拟，不是实际合并或验收。#24/#25/#26 原 head 不是 main 祖先，而主线已有对应功能，需按文件/行为核对，不能因旧 PR 还开着就重新实施。
-- **验证范围**：本轮是文档检查与远端读回；业务测试/完整 APK 构建/原生/实体手机/正式发布均 **not run**。文档检查实际结果与本轮提交见对应 PR；原历史测试不可重标成本轮结果。
+- **验证范围**：设计提交 `c9af227` 的 `git diff --cached --check`、10 个本地文档/图片链接、代码围栏、HANDOFF 历史保留和 PNG 格式/1536×1024 尺寸检查 **passed**，远端 SHA 核对 **passed**；收尾提交复核文档与远端。业务测试/完整 APK 构建/原生/实体手机/正式发布均 **not run**；原历史测试不可重标成本轮结果。
 - **配置与阻塞**：开发入口 `source .cloud/env.sh`、`bash cloud/check.sh`；工具通过 `.devcontainer/setup.sh` 恢复。GitHub 连接返回 admin/push，云端 gh 认证和 Release 列表读取成功；源码写入以实际推送和 SHA 读回为准。当前未注入原正式签名 `SHICANG_SIGNING_PROPERTIES` / `SHICANG_KEYSTORE`，申请/配置位置见 `docs/RELEASING.md` 与云端环境 Secrets；不读取或迁移旧电脑密钥，不把 unsigned/debug APK 发布为官方包。
-- **下一步与续接提示**：先收集用户对已展示三屏视觉稿的反馈，不假定已认可；再清点入口并做原生小样。打开本分支关联 PR 读取本节及研究方案，核对 main/#28，并复核“追加媒体、名称建档、浏览返回、找回内容”。保存本轮源码与交接并核对远端 SHA；不要自动合并旧 PR 或把概念稿称作体验已改善。
+- **下一步与续接提示**：用户下次要求继续留着吧时，代理自行找到 #31，读取本节、视觉稿及研究方案；沿用首版初步可接受的方向，再依据具体请求细化或实现。重新核对 main/#28，复核“追加媒体、名称建档、浏览返回、找回内容”；不要要求用户记住分支名，不自动合并旧 PR，不把概念稿称作体验已改善。
 
 ## 打开的 PR 快照
 

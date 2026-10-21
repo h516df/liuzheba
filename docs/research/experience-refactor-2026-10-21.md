@@ -12,6 +12,8 @@
 
 用户补充：整体 UI/UX 不像正常能使用的 App，喜欢苹果，要求先做 UI 看效果。本轮因此先提供档案首页、详情与收录面板三屏设计预览，后续先根据视觉反馈迭代，再进入原生实现。
 
+收尾反馈：用户看过首版后说“还行”，要求“你先收尾吧”。记录为视觉方向初步可接受，尚未最终定稿；本轮停在设计预览，不开始产品实施。设计稿和研究已保存于 [草稿 PR #31](https://github.com/h516df/liuzheba/pull/31)。
+
 ![留着吧第一版设计预览：档案、详情和收录面板](../design/ui-preview-2026-10-21.png)
 
 这是生成的视觉概念，图片内容为虚构示例，并非真实 Android 截图或可点击原型。图中 iPhone 风格系统栏仅表达视觉参考；正式实现继续使用 Android 的系统栏、返回、权限和文件选择器行为，不迁移为 iOS 项目。
@@ -24,6 +26,7 @@
 ## 基线与已有工作
 
 - 主线：[`a9854163e4746a1285eadf799bdb3022b2370722`](https://github.com/h516df/liuzheba/commit/a9854163e4746a1285eadf799bdb3022b2370722)，已用 `git ls-remote` 与本地 HEAD 核对。
+- 收尾时 main 已到 `0bfc3cea38d651bb1dfa9a2fa8977297e54f7c1d`，fetch 后确认只有三份通用工作流文档变化；上述源码分析仍固定到原研究基线，不冒充已验证新主线。
 - 当前源码版本为 0.16 / code17；本轮 `gh release list` 读到最新正式版 v0.16。当前没有发布新版本，也不预占下一个版本号。
 - [PR #28](https://github.com/h516df/liuzheba/pull/28) 仍是 open / draft，head 为 `031d816e752bf26e6ab13ac63dc4579f91b6877e`，提供标签优先、直接追加媒体和存储响应改进。它是第一批可复用候选，不能当成已上线，也不要重新写一遍。
 - GitHub 元数据本轮返回 `mergeable: false`，但本地 `git merge-tree --write-tree origin/main origin/feat/core-journey-20261020` 成功，候选树为 `e0ae6a1f4af0072dd8a6d8b32a7183991f1b539f`。两种观察不一致；实施前重新核对 GitHub 和实际合并树，不能直接宣布有冲突或可发布。该命令没有合并分支或改变工作区。
@@ -132,10 +135,10 @@ bash cloud/check.sh
 
 ## GitHub 交付能力
 
-本轮 GitHub 连接返回仓库 admin/push 权限，云端 `gh api user` 与仓库元数据读取成功，`gh release list` 可读发行记录。因此可以在已有仓库推送独立分支、建立 PR，并通过已认证 CLI 执行 Release 工作流；本轮会用实际分支推送验证源码写入，而不是创建一个空 Release 测权限。用户此次问的是能力，未要求立即发版。
+本轮 GitHub 连接返回仓库 admin/push 权限，云端 `gh api user` 与仓库元数据读取成功，`gh release list` 可读发行记录。已实际推送设计交付提交 `c9af227e93c4aed638c01d02eef7ebf675ac040a`，ls-remote 核对一致并创建草稿 PR #31。可通过已认证 CLI 执行 Release 工作流；本轮没有创建 Release 测权限。用户此次问的是能力，未要求立即发版。
 
 当前云端未配置原正式签名。创建 GitHub Release 与交付官方 APK 是不同步骤：后者必须按 [发布约定](../RELEASING.md) 注入 `SHICANG_SIGNING_PROPERTIES` / `SHICANG_KEYSTORE`，同签名且 versionCode 递增，绑定最终源码和校验值；未经这些检查不能发布 unsigned/debug 包冒充官方版本。
 
 ## 下一步
 
-当前先向用户展示上面的 UI 视觉稿，等待视觉方向反馈，不把稿件当成已认可方案或已完成产品。之后做 P0 入口清点与 P1 原生小样，围绕“整体布局混乱、功能难找”验收。对照 main 与 #28 的四条路径，已有工作先核对再复用。方案、视觉稿和本轮交接一起推送，下一会话从对应 PR 读取，不只读 main。
+按用户要求，本轮在已展示的 UI 视觉稿阶段收尾。后续继续时沿用首版初步可接受的方向，按具体请求做 P0 入口清点与 P1 原生小样，围绕“整体布局混乱、功能难找”验收。对照 main 与 #28 的四条路径，已有工作先核对再复用。方案、视觉稿和反馈一起保存到 #31；代理自行发现相关 PR，不要求用户记分支名。
