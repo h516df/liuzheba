@@ -1,3 +1,31 @@
+# 当前接续记录（2026-10-21 · 统一通用入口）
+
+- **目标**：适应用户经常新开云端 Codex 的方式；每个项目默认分支都指向同一通用工作流，并保留本地可执行简版，用户无需记启动语或分支名。
+- **通用入口**：[vibe-ui-quality-kit/workflow](https://github.com/h516df/vibe-ui-quality-kit/blob/main/workflow/README.md)。简版修订 2026-10-21-r1；项目 AGENTS/CLAUDE 的特有约束继续适用。
+- **本轮基线 / 分支**：`a9854163e4746a1285eadf799bdb3022b2370722` / `codex/shared-workflow-entry-20261021`。本轮只改规则与交接文档，不改业务源码、安装器、签名、数据、服务或发布权限。准确提交与 PR 以本次远端记录为准。
+- **已完成**：统一入口、清理有效入口里的失效 agent-rules 引用、独立简版与自动发现相关任务的约定；保留下方项目历史和原检查入口。
+- **验证**：本轮文档范围/简版一致性/项目约束保留/失效入口检查 passed；业务构建、设备、生产发布 not run。通用模板另在工具库验证。新 CI 结果以对应 PR 的实际运行记录为准。
+- **当前任务发现**：下面是本轮开始前的未合并 PR 快照，不是建议合并清单。代理根据用户任务自行核对实时 head、依赖和相关分支交接；不要求用户逐个记住，也不能把最新 PR 自动当主线。
+- **下一步**：新任务先读本仓库 AGENTS、云端说明与本记录，再按用户目标接续相关成果。完整私有规则暂不可读时先沿用本地简版；不能把存档视为账户级配置。
+
+## 未合并任务快照（2026-10-21）
+
+| PR | 任务分支 | 目标分支 | 读取时 head |
+| --- | --- | --- | --- |
+| [#31: design: 先预览档案、详情与收录 UI，再推进体验重构](https://github.com/h516df/liuzheba/pull/31) | `codex/experience-refactor-prep-20261021` | `main` | `c9af227e93c4aed638c01d02eef7ebf675ac040a` |
+| [#28: 标签优先与一步媒体操作，降低自动保护和整库读写卡顿](https://github.com/h516df/liuzheba/pull/28) | `feat/core-journey-20261020` | `main` | `031d816e752bf26e6ab13ac63dc4579f91b6877e` |
+| [#26: feat: 发现页按档案随机预览图片与视频](https://github.com/h516df/liuzheba/pull/26) | `feat/discovery-random-previews` | `main` | `222a3174287c910ba4057b2ce7b3a297cbfe9535` |
+| [#25: feat: 独立长笔记、持久草稿及安全恢复](https://github.com/h516df/liuzheba/pull/25) | `feat/long-notes` | `main` | `682d30eac9e9009a58b56170e7b9ffedbe4afa79` |
+| [#24: 新增直播录屏视频编辑：裁剪、固定遮挡与独立副本](https://github.com/h516df/liuzheba/pull/24) | `feat/video-editor-main` | `main` | `ff89075f94cecf8acf5747e52b378ba4bf32b9e2` |
+| [#21: fix: 保留播放意图与前台一键更新](https://github.com/h516df/liuzheba/pull/21) | `fix/playback-foreground-update` | `feat/immersive-media` | `61ed05b30046bf3599ae8d82bb523a21757d7711` |
+| [#20: feat: 媒体沉浸浏览与原位返回](https://github.com/h516df/liuzheba/pull/20) | `feat/immersive-media` | `feat/author-archive-workflow` | `776207aac3a7f6733dfd7f9ab180ed7d435aa737` |
+| [#19: feat: 作者主页导入与统一档案编辑闭环](https://github.com/h516df/liuzheba/pull/19) | `feat/author-archive-workflow` | `feat/local-search-assistant` | `d7959c7f12f7f11978ae6ee5ea6835fa232ea3d2` |
+| [#18: feat: 留着吧本机文字 AI、可解释搜索与定制规则](https://github.com/h516df/liuzheba/pull/18) | `feat/local-search-assistant` | `feat/automatic-local-protection` | `db8b2c1f0ab6c8ac48df8ee35e36ed74c751c9ad` |
+| [#17: feat: 留册自动创建本机保护目录、校验与恢复](https://github.com/h516df/liuzheba/pull/17) | `feat/automatic-local-protection` | `fix/backup-restore-limits` | `7681690a70dfcb256c3ab6b107258494d6f68282` |
+| [#16: fix: 导出前校验恢复容量上限并保留已有备份](https://github.com/h516df/liuzheba/pull/16) | `fix/backup-restore-limits` | `main` | `a02b0efb8a10eac097bc66943fd6e7c006ee3ead` |
+
+## 之前的交接（历史保留）
+
 # 当前接续记录（2026-10-21）
 
 本节是会话接续入口；长期规则见 [AGENTS.md](AGENTS.md)，工具链和检查命令见 [CLOUD_DEVELOPMENT.md](CLOUD_DEVELOPMENT.md)。后续任务更新本节，下面已有历史保留。
