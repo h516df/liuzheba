@@ -1,4 +1,19 @@
-# 当前接续记录（2026-10-22 · 导入失败与覆盖安装数据保护）
+# 当前接续记录（2026-10-22 · v0.17 云端候选已构建）
+
+- **用户指令与范围**：用户要求“做”，继续推进正式覆盖更新准备，不再让用户寻找签名配置。本批使用已授权的现有GitHub/Make连接，自行查明配置和构建候选；不把缺少原私钥解释成需要新签名或卸载原App。
+- **分支 / PR**：独立整合分支`codex/release/v0.17-cloud-20261022` / [PR #33](https://github.com/h516df/liuzheba/pull/33)，基于PR #31最终head`9993abeba616b22764968935edc966114b5f206d`；已用祖先检查确认完整包含该成员。候选源码`df9bc2ba5ebe6b57ecf3f44b48956ab8bc5720f5`，根树`811c4db884ccac28cd32a7d48ffbad472a8084b8`，app树`850cc7a4ec5739ea6fd8f8a94347e54ea0fdcc0d`。实际CLI push并ls-remote读回成功；本轮没有合并main。
+- **版本与候选**：0.17/code18；原正式包名、原证书公钥固定值、schema与备份格式保持。更新说明与设置页对应测试已更新，现有CI适配`codex/release/`以构建unsigned。[push release构建](https://github.com/h516df/liuzheba/actions/runs/39755897668)及[PR release构建](https://github.com/h516df/liuzheba/actions/runs/39756105135)success。APK为105641307字节、SHA256 `a08113ce69c789946f17f8ab4752ba187cd78455ea2bd276edee8009cd147da3`；unsigned，不是用户可安装的正式覆盖包。附件ID12416360775，已通过连接器下载并核对归档摘要，保存于`/workspace/scratch/liuzheba-v017-candidate`。gh下载在Azure临时重定向处403后，合法既有连接器下载成功；不混同签名权限问题。
+- **检查**：下载XML核实release说明读取/设置展示2/2、零失败/错误/跳过；actionlint1.7.7语义校验与Python语法passed。新`tools/release/verify_apk.py`校验APK真实原证书、正式包名、递增code、说明版本、非debug及更新大小上限；使用真实旧正式APK、verification调试APK及本轮unsigned候选确认同版本、错误证书、未签名三种情况均被拒绝。三个负向检查passed不等于候选已具备升级资格；metadata_passed也不能冒充真实安装/保数据验收。
+- **设备与CI**：[API35 device](https://github.com/h516df/liuzheba/actions/runs/39756105215)success，下载XML核实6/6、零失败/错误/跳过，只有verification隔离模拟器与合成媒体；[Secret checks](https://github.com/h516df/liuzheba/actions/runs/39756105362)success。PR合成merge`35aa3732c7291f0b1af34d28dc04f9cf988471f9`根树与候选811c4db一致。完整[Cloud development](https://github.com/h516df/liuzheba/actions/runs/39756105127)也已读回completed/success；本轮未下载其完整JVM XML重新计数，不把旧23项数量写成本版完整数量。
+- **原正式基线**：已下载正式v0.16/code17，真实证书摘要与固定值`67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26`一致，资产SHA256与GitHub发布元数据相符；基线APK及拒绝回执保存在`/workspace/scratch/liuzheba-release-inputs`。
+- **签名核查的新结论**：通过现有Make GitHub OAuth管理员连接成功GET本仓库Actions Secrets，明确`total_count=0`；仓库environments=0，当前managed cloud无Secret绑定；按release/签名名称检索现有Make场景无匹配。此前GH_TOKEN的403仅是该连接限制，现已核实仓库配置为空，不再重复以403当作唯一阻塞说明。未读取或输出任何密钥值。
+- **仍未完成**：原私钥在当前已接入渠道不可用，不能从旧APK/公钥恢复它。未生成替代正式密钥、未签名、未发布正式/预发行Release、未安装/卸载/清数据。原签名旧→新覆盖与实体手机保数据尚未验，正式latest仍为v0.16。候选及交接不是正式覆盖更新完成的声明。
+- **协调与接续**：原工作成员`experience-refactor-20261022`冻结在ready；新整合任务`release-v017-cloud-20261022`、owner`codex-91839c4ac19c-release`、workspace`cloud-25a5cd9e84b3-release-v017`，同批已sealed。后续沿PR33、先读登记，不回写PR31或绕过成员冻结；签名阻塞时保存候选与交接并pause，原签名恢复后才能验证安装及发布。
+- **详情**：[v0.17候选记录](docs/acceptance/v0.17/README.md)、[发布与覆盖校验](docs/RELEASING.md)。用户强调数据安全，数据保护23项继承证据仍见下节，不能把该宿主结果改称正式APK覆盖验收。
+
+---
+
+# 上一批记录（2026-10-22 · 导入失败与覆盖安装数据保护）
 
 - **用户指令**：“推送吧先”；强调覆盖安装保留资料、导入图片/视频失败不丢数据。用户明确“你自己搞，别问我”，签名配置由代理自行核查，不再要求用户寻找位置或发送密钥正文。
 - **源码已推送**：继续[草稿PR #31](https://github.com/h516df/liuzheba/pull/31) / `codex/experience-refactor-prep-20261021`。实现远端`e021dca8640369134594ba6718ac76a924cdf276`对应本地`2636a456fc2ca78ef501be30df8cc0540bdfa8ef`，根树均`14a5749fa015bd4357f7d4e05ab37fc8e862d909`，app树`8bb2132ea2c573b9ecd835699528432323ea5a29`。通过连接器expected-head更新，未合并main，未发正式更新。

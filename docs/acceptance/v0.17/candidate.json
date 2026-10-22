@@ -1,0 +1,52 @@
+{
+  "source_sha": "df9bc2ba5ebe6b57ecf3f44b48956ab8bc5720f5",
+  "source_tree": "811c4db884ccac28cd32a7d48ffbad472a8084b8",
+  "app_tree": "850cc7a4ec5739ea6fd8f8a94347e54ea0fdcc0d",
+  "included_member_sha": "9993abeba616b22764968935edc966114b5f206d",
+  "package": "dev.h516.shicang",
+  "version": "0.17",
+  "version_code": 18,
+  "candidate": {
+    "name": "shicang-v0.17-universal-unsigned.apk",
+    "bytes": 105641307,
+    "sha256": "a08113ce69c789946f17f8ab4752ba187cd78455ea2bd276edee8009cd147da3",
+    "signed": false,
+    "installable_official_update": false,
+    "artifact_id": 12416360775,
+    "artifact_archive_sha256": "eae6dde7f1033d4f4ccef38cd4f6cfd5a0d55bac8ff2f902db9f122bb4bc61fe"
+  },
+  "checks": {
+    "release_build": "passed",
+    "release_notes_tests": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "device_tests": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "cloud_development": "passed",
+    "secret_check": "passed",
+    "actionlint": "passed",
+    "python_syntax": "passed",
+    "rejection_cases": [
+      "same_version_code",
+      "wrong_signing_certificate",
+      "unsigned_candidate"
+    ]
+  },
+  "signing": {
+    "repository_secrets_count": 0,
+    "repository_environments_count": 0,
+    "runtime_signing_binding_available": false,
+    "original_private_key_available": false,
+    "expected_certificate_sha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26"
+  },
+  "publication": "not_published",
+  "official_upgrade_installation": "not_run",
+  "physical_device_data_preservation": "not_run"
+}
