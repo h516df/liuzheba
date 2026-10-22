@@ -13,7 +13,7 @@ GitHub Actions 的 **Cloud development** 在 PR、main 推送及手动运行时�
 
 ## 当前边界
 
-正式签名原密钥尚未接入本环境；当前工作流生成独立 verification 调试包。正式签名、安装升级与资料保留需另行验证。
+原证书已接入受保护的 `android-signing` 环境，普通检查不读取正式密钥。普通 debug 为 `.dev`，原生合成验证包为 `.verification`；正式包名不变。真实产品签名与可移植恢复入口及验收边界见 [SIGNING_PREPARATION](docs/SIGNING_PREPARATION.md)。安装升级与资料保留仍需单独验证。
 
 原 README、AGENTS 与交接文件中的 Windows 路径作为历史恢复线索保留；云端开发不依赖这些路径。生产运行与发布步骤按本节边界处理，不自动运行旧的本机派发、安装、隧道或签名脚本。凭据通过平台 Secrets 注入，不能进入源码、日志或构建附件；私有项目继续保持私有。
 
@@ -63,3 +63,7 @@ GitHub Actions 的 **Cloud development** 在 PR、main 推送及手动运行时�
 通用约定与模板统一维护在 [vibe-ui-quality-kit/workflow](https://github.com/h516df/vibe-ui-quality-kit/blob/main/workflow/README.md)。开始任务由代理主动读取；本仓库 AGENTS 内保留可独立执行的简版，跨仓库读取暂不可用时先沿用，不要求用户重复说明工作流或添加仓库。具体工具链、数据、签名、生产与设备保护仍以本项目约束为准。
 
 新任务从默认分支开始时，代理应按用户描述核对相关未合并 PR、依赖和对应分支交接，不能直接把 main 当作所有最新成果；不根据旧快照自动合并业务 PR。这里的仓库配置不代表 Codex 账户级环境已发布。
+
+## 2026-10-22 原签名准备
+
+当前准备分支见 [SIGNING_PREPARATION](docs/SIGNING_PREPARATION.md)。历史未迁移状态由本轮实际运行结果更新；PR 未合并不代表 main 已启用。

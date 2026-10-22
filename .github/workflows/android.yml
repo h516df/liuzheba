@@ -31,7 +31,7 @@ jobs:
         run: chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
       - name: Final release inputs and unsigned package
         if: startsWith(github.head_ref || github.ref_name, 'release/')
-        run: chmod +x gradlew && ./gradlew --no-daemon --max-workers=1 testDebugUnitTest --tests dev.h516.update.EmbeddedReleaseNotesTest --tests dev.h516.shicang.ArchiveUiSnapshotTest.finalReleaseNotesOpenFromSettings assembleRelease
+        run: chmod +x gradlew && ./gradlew --no-daemon --max-workers=1 testDebugUnitTest --tests dev.h516.update.EmbeddedReleaseNotesTest --tests dev.h516.shicang.ArchiveUiSnapshotTest.finalReleaseNotesOpenFromSettings assembleRelease -PunsignedRelease=true
       - name: Preserve unsigned release for local official signing
         if: startsWith(github.head_ref || github.ref_name, 'release/')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

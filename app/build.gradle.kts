@@ -1,14 +1,10 @@
-import java.util.Properties
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.chaquo.python")
 }
-val signingProperties=Properties().apply {
-    val source=rootProject.file(System.getenv("SHICANG_SIGNING_PROPERTIES") ?: "keystore.properties")
-    if(source.exists()) source.inputStream().use {load(it)}
-}
+
 android {
     namespace = "dev.h516.shicang"
     compileSdk = 36
@@ -27,15 +23,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true; buildConfig = true }
-    signingConfigs {
-        if(signingProperties.isNotEmpty()) create("release") {
-            storeFile=rootProject.file(System.getenv("SHICANG_KEYSTORE") ?: "keystore/shicang.jks")
-            storePassword=signingProperties.getProperty("storePassword")
-            keyAlias="shicang"
-            keyPassword=signingProperties.getProperty("keyPassword")
-        }
+
+    buildTypes {
+        debug { applicationIdSuffix = ".dev" }
+        release { isMinifyEnabled = true; isShrinkResources=true;proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"));signingConfig=null }
     }
-    buildTypes { release { isMinifyEnabled = true; isShrinkResources=true;proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"));signingConfig=signingConfigs.findByName("release") } }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 chaquopy {
@@ -109,4 +101,12 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("io.github.takahirom.roborazzi:roborazzi:1.76.0")
     testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.76.0")
+}
+
+// Fail closed: unsigned candidates require an explicit opt-in; final signing is external.
+gradle.taskGraph.whenReady {
+    val releaseRequested = allTasks.any { it.project == project && it.name in setOf("assembleRelease", "packageRelease", "bundleRelease") }
+    if (releaseRequested && providers.gradleProperty("unsignedRelease").orNull != "true") {
+        throw GradleException("Official signing requires original injected credentials via cloud/sign_apk.py. Use -PunsignedRelease=true only for an unsigned build candidate.")
+    }
 }
