@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 9,
+  "revision": 10,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -20,13 +20,13 @@
         "docs/research"
       ],
       "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
-      "head": "38e286894c5e1899cdc7284b9cb9ae077d67f7e4",
-      "status": "active",
+      "head": "9993abeba616b22764968935edc966114b5f206d",
+      "status": "ready",
       "generation": 1,
-      "lease_until": 1792666749,
-      "updated_at": 1792659549,
+      "lease_until": 0,
+      "updated_at": 1792660220,
       "history": [],
-      "handoff": "PR31接续完成发现页苹果风调整：全屏媒体、轻量浮动导航、圆形工具、标题直达详情及视频进度避让。实现83a2f66，同树本地12/12定向UI通过，Android/Cloud/device/Secret CI全部success。最终head 38e286894c5e1899cdc7284b9cb9ae077d67f7e4仅补HANDOFF，app树2ae294e0e7c23b76fbbf49923871988ebcaa43cf。合成预览已保存，真机与正式升级未验；未合并、未发布。"
+      "handoff": "导入失败保护已推送PR31，实现e021dca，最终文档head 9993abeba616b22764968935edc966114b5f206d，app树8bb2132ea2c573b9ecd835699528432323ea5a29；同树23/23宿主数据检查通过。部分失败/新输入选择保留，既有PNG/视频/草稿SQL失败+重开摘要一致。正式覆盖更新未发布：云端无签名绑定、仓库环境0、Secrets元数据403，原签名不可用；不能将verification测试APK当正式覆盖包。用户要求代理自行处理，不再问签名位置；后续按HANDOFF核对可访问配置与原签名通道。"
     }
   },
   "batches": {
