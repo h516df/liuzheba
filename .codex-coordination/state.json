@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 7,
+  "revision": 8,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -20,13 +20,13 @@
         "docs/research"
       ],
       "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
-      "head": "bba2171786c7a88d2a1cf6860cee3817616049db",
-      "status": "active",
+      "head": "38e286894c5e1899cdc7284b9cb9ae077d67f7e4",
+      "status": "ready",
       "generation": 1,
-      "lease_until": 1792664715,
-      "updated_at": 1792657515,
+      "lease_until": 0,
+      "updated_at": 1792658725,
       "history": [],
-      "handoff": "首轮收录/页面重构已保存至PR31，最终文档head bba2171786c7a88d2a1cf6860cee3817616049db，受测实现9611ebc，app树0bd89633e09f7d661fcd368b25bdbb1fb8594d84。CI267/267、API35模拟器6/6、安全扫描和构建/lint通过；本地最终画面5/5。未合并、未正式发布，真机与正式升级未验。下一步按HANDOFF查看实际合成预览并接续已列待办；用户尚未认可新外观。"
+      "handoff": "PR31接续完成发现页苹果风调整：全屏媒体、轻量浮动导航、圆形工具、标题直达详情及视频进度避让。实现83a2f66，同树本地12/12定向UI通过，Android/Cloud/device/Secret CI全部success。最终head 38e286894c5e1899cdc7284b9cb9ae077d67f7e4仅补HANDOFF，app树2ae294e0e7c23b76fbbf49923871988ebcaa43cf。合成预览已保存，真机与正式升级未验；未合并、未发布。"
     }
   },
   "batches": {
