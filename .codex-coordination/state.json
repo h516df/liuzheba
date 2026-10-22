@@ -1,7 +1,34 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 0,
-  "tasks": {},
-  "batches": {}
+  "revision": 1,
+  "tasks": {
+    "experience-refactor-20261022": {
+      "owner": "codex-91839c4ac19c",
+      "workspace": "cloud-25a5cd9e84b3",
+      "batch": "experience-refactor-20261022",
+      "role": "work",
+      "branch": "codex/experience-refactor-prep-20261021",
+      "scopes": [
+        "AGENTS.md",
+        "HANDOFF.md",
+        "app/src/main/java/dev/h516/shicang",
+        "app/src/test/java/dev/h516/shicang",
+        "docs/design",
+        "docs/research"
+      ],
+      "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
+      "head": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792657068,
+      "updated_at": 1792649868,
+      "history": []
+    }
+  },
+  "batches": {
+    "experience-refactor-20261022": {
+      "status": "open"
+    }
+  }
 }
