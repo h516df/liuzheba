@@ -95,6 +95,100 @@ class DirectMediaImportTest {
         assertEquals(1,result.errors.size)
         assertEquals(1,model.store.load().active.single().photos.size)
     }
+    @Test fun partialIncomingAppendRetainsFailedSourceAndRetryDoesNotDuplicateSuccess() {
+        val retry=File(app.cacheDir,"retry-${uid()}.mp4")
+        val missing=Uri.fromFile(retry)
+        try {
+            model.receiveMedia(listOf(uri,missing));model.importIncoming(formal.id);await{!model.state.value.busy}
+            assertEquals(listOf(missing),model.state.value.incomingMedia)
+            val first=runBlocking{model.store.load()}.active.single().photos.single()
+            assertEquals(sha(source),sha(model.photoFile(first)))
+            source.copyTo(retry)
+            model.importIncoming(formal.id);await{!model.state.value.busy}
+            val saved=runBlocking{model.store.load()}.active.single()
+            assertEquals(2,saved.photos.size);assertEquals(first,saved.photos.first())
+            assertTrue(model.state.value.incomingMedia.isEmpty())
+            assertEquals("synthetic video source untouched",source.readText())
+            assertEquals(sha(source),sha(retry))
+        }finally{retry.delete()}
+    }
+    @Test fun partialNewCollectionRetainsFailedSourceAndItsSuccessfulDraft() {
+        val missing=Uri.fromFile(File(app.cacheDir,"missing-${uid()}.mp4"))
+        model.receiveMedia(listOf(missing,uri));model.importIncoming();await{!model.state.value.busy}
+        val saved=runBlocking{model.store.load()}
+        assertEquals(listOf(missing),model.state.value.incomingMedia)
+        assertEquals(formal.id,saved.active.single().id)
+        assertEquals(formal.name,saved.active.single().name)
+        assertTrue(saved.active.single().photos.isEmpty())
+        assertEquals(1,saved.drafts.single().photos.size)
+        assertEquals(saved.drafts.single(),model.state.value.editor)
+        assertEquals(sha(source),sha(model.photoFile(saved.drafts.single().photos.single())))
+    }
+    @Test fun allIncomingFailuresPreserveExistingMediaAndRetrySelection() {
+        model.importPhotos(formal.id,listOf(uri));await{!model.state.value.busy}
+        val before=runBlocking{model.store.load()}
+        val original=before.active.single().photos.single();val digest=sha(model.photoFile(original))
+        val missing=Uri.fromFile(File(app.cacheDir,"missing-${uid()}.mp4"))
+        model.receiveMedia(listOf(missing));model.importIncoming(formal.id);await{!model.state.value.busy}
+        assertEquals(before,runBlocking{model.store.load()})
+        assertEquals(digest,sha(model.photoFile(original)))
+        assertEquals(listOf(missing),model.state.value.incomingMedia)
+        assertEquals("synthetic video source untouched",source.readText())
+    }
+    @Test fun mediaReceivedDuringImportIsNotClearedWithTheCompletedBatch() {
+        val entered=java.util.concurrent.CountDownLatch(1)
+        val release=java.util.concurrent.CountDownLatch(1)
+        val stream=object:java.io.FilterInputStream(source.inputStream()) {
+            override fun read(b:ByteArray,off:Int,len:Int):Int {
+                entered.countDown();check(release.await(10,java.util.concurrent.TimeUnit.SECONDS))
+                return super.read(b,off,len)
+            }
+        }
+        org.robolectric.Shadows.shadowOf(app.contentResolver).registerInputStream(uri,stream)
+        val later=Uri.fromFile(File(app.cacheDir,"later-${uid()}.mp4"))
+        try {
+            model.receiveMedia(listOf(uri));model.importIncoming(formal.id);scheduler.runCurrent()
+            assertTrue(entered.await(10,java.util.concurrent.TimeUnit.SECONDS))
+            model.receiveMedia(listOf(later));release.countDown();await{!model.state.value.busy}
+            assertEquals(listOf(later),model.state.value.incomingMedia)
+            assertEquals(1,runBlocking{model.store.load()}.active.single().photos.size)
+        }finally{release.countDown()}
+    }
+    @Test fun failedLinkPreservesExistingImageVideoDraftAndAllSourceBytes() {
+        val image=File(app.cacheDir,"${uid()}.png")
+        android.graphics.Bitmap.createBitmap(8,8,android.graphics.Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.BLUE)
+            image.outputStream().use{assertTrue(compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))};recycle()
+        }
+        try {
+            model.importPhotos(formal.id,listOf(Uri.fromFile(image),uri));await{!model.state.value.busy}
+            val existing=runBlocking{model.store.load()}.active.single()
+            assertEquals(setOf("image/png","video/mp4"),existing.photos.map{it.mime}.toSet())
+            runBlocking{model.store.draft(existing.copy(name="待保存标题"))}
+            val before=runBlocking{model.store.load()}
+            val bytes=existing.photos.associate{it.file to sha(model.photoFile(it))}
+            val generation=app.getSharedPreferences("device",0).getString("generation",null)
+            val db=SQLiteDatabase.openDatabase(File(app.filesDir,"libraries/$generation/library.db").path,null,SQLiteDatabase.OPEN_READWRITE)
+            try {
+                db.execSQL("CREATE TRIGGER reject_media_link BEFORE INSERT ON objects WHEN NEW.kind='draft' BEGIN SELECT RAISE(ABORT,'fixture link failure'); END")
+                model.receiveMedia(listOf(Uri.fromFile(image),uri));model.importIncoming(formal.id);await{!model.state.value.busy}
+                assertEquals(before,runBlocking{model.store.load()})
+                assertEquals(listOf(Uri.fromFile(image),uri),model.state.value.incomingMedia)
+                assertEquals(bytes,existing.photos.associate{it.file to sha(model.photoFile(it))})
+                assertEquals(bytes.keys,model.store.photoDir.listFiles().orEmpty().map{it.name}.toSet())
+                assertEquals(bytes[existing.photos.first().file],sha(image))
+                assertEquals("synthetic video source untouched",source.readText())
+            }finally{db.close()}
+            owners.clear();await{model.resourcesClosed}
+            runBlocking {
+                val reopened=Store(app)
+                try {
+                    assertEquals(before,reopened.load())
+                    assertEquals(bytes,existing.photos.associate{it.file to sha(File(reopened.photoDir,it.file))})
+                }finally{reopened.close()}
+            }
+        }finally{image.delete()}
+    }
     private fun downloadedBatch():Pair<MediaDownloads,List<MediaDownload>> {
         val downloads=MediaDownloads(app)
         val media=(1..2).map{RemoteMedia("https://example.com/$it.mp4","video","mp4")}

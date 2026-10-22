@@ -144,6 +144,11 @@ class AppModel(app: Application): AndroidViewModel(app) {
         if(uris.isNotEmpty()) mutable.value=mutable.value.copy(incomingMedia=(mutable.value.incomingMedia+uris).distinct().take(100))
     }
     fun dismissMedia(){mutable.value=mutable.value.copy(incomingMedia=emptyList())}
+    private fun settleIncomingMedia(uris:List<Uri>,result:ImportResult) {
+        val linked=result.sourceIndices.mapNotNull{uris.getOrNull(it)}.toSet()
+        // A partial import must retain failed selections and any media received during the copy.
+        mutable.update{it.copy(incomingMedia=it.incomingMedia.filterNot{uri->uri in linked})}
+    }
     fun importIncoming(targetId:String?=null) {
         val uris=mutable.value.incomingMedia;if(uris.isEmpty())return
         draftJob?.cancel()
@@ -155,15 +160,16 @@ class AppModel(app: Application): AndroidViewModel(app) {
                 try {
                     val (result,_)=store.importIntoArchive(targetId,uris,editor,onLinked=linked::set)
                     require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
-                    mutable.update{it.copy(incomingMedia=emptyList())}
+                    settleIncomingMedia(uris,result)
                     message("已添加 ${result.photos.size} 项"+if(result.errors.isEmpty()) "" else "；${result.errors.joinToString("；")}")
                 } finally {linked.get()?.let{next->if(editor!=null)mutable.update{it.copy(editor=next,draftStatus="草稿已保存")}}}
             } else {
                 val base=Archive(name="新收录")
                 val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
                 val result=try{store.importIntoArchive(base.id,uris,base,onLinked=linked::set).first}
-                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,incomingMedia=emptyList(),draftStatus="已存为草稿 · 保存后完成收录")}}}
+                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,draftStatus="已存为草稿 · 保存后完成收录")}}}
                 require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
+                settleIncomingMedia(uris,result)
                 if(result.errors.isNotEmpty())message("部分媒体未收录：${result.errors.joinToString("；")}")
             }
         }
