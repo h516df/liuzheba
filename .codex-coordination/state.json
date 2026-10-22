@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 6,
+  "revision": 7,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -21,10 +21,10 @@
       ],
       "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
       "head": "bba2171786c7a88d2a1cf6860cee3817616049db",
-      "status": "ready",
+      "status": "active",
       "generation": 1,
-      "lease_until": 0,
-      "updated_at": 1792656071,
+      "lease_until": 1792664715,
+      "updated_at": 1792657515,
       "history": [],
       "handoff": "首轮收录/页面重构已保存至PR31，最终文档head bba2171786c7a88d2a1cf6860cee3817616049db，受测实现9611ebc，app树0bd89633e09f7d661fcd368b25bdbb1fb8594d84。CI267/267、API35模拟器6/6、安全扫描和构建/lint通过；本地最终画面5/5。未合并、未正式发布，真机与正式升级未验。下一步按HANDOFF查看实际合成预览并接续已列待办；用户尚未认可新外观。"
     }
