@@ -1,4 +1,16 @@
-# 当前接续记录（2026-10-22 · 发现页苹果风）
+# 当前接续记录（2026-10-22 · 导入失败与覆盖安装数据保护）
+
+- **用户指令**：“推送吧先”；强调覆盖安装保留资料、导入图片/视频失败不丢数据。用户明确“你自己搞，别问我”，签名配置由代理自行核查，不再要求用户寻找位置或发送密钥正文。
+- **源码已推送**：继续[草稿PR #31](https://github.com/h516df/liuzheba/pull/31) / `codex/experience-refactor-prep-20261021`。实现远端`e021dca8640369134594ba6718ac76a924cdf276`对应本地`2636a456fc2ca78ef501be30df8cc0540bdfa8ef`，根树均`14a5749fa015bd4357f7d4e05ab37fc8e862d909`，app树`8bb2132ea2c573b9ecd835699528432323ea5a29`。通过连接器expected-head更新，未合并main，未发正式更新。
+- **修复**：分享/首页收录批次部分成功时，原来会清空整批incoming选择；现在只移除已成功关联的来源。失败项、复制期间新收到的媒体保留在当前待收录列表，新草稿的成功媒体继续落盘。当前列表仍属会话状态，不承诺临时URI与失败选择跨进程持久；外部相册来源始终不删除。
+- **数据检查 passed**：冻结上述app树的`testDebugUnitTest --tests dev.h516.shicang.DirectMediaImportTest --tests dev.h516.shicang.LargeMediaStoreTest.declaredSixGBPlusOneRejectsWithoutTouchingSourceAndLongMetadataRoundTrips --tests dev.h516.shicang.LargeMediaStoreTest.interruptedImportDeletesOnlyItsPartialCopyAndKeepsExistingOriginal --tests dev.h516.shicang.BackupStoreTest`，使用`--no-daemon --max-workers=1 -I tools/verification.init.gradle`及既有JDK21/SDK36。23/23、3 suites、零失败/错误/跳过，3m32s；日志`/tmp/liuzheba-data-protection-check.log`。包含5个新增故障场景：部分成功重试不重复、新草稿部分成功、全部失败保留旧媒体/选择、复制期间新增输入不被清掉、既有PNG/视频/草稿在SQL关联失败并重开后内容摘要不变。已有用例另覆盖取消、读取中断、超限、旧备份保留与备份恢复。使用合成资料与宿主存储，不冒充原正式包覆盖升级/真机验收。
+- **签名核查**：当前`SHICANG_SIGNING_PROPERTIES`/`SHICANG_KEYSTORE`未配置，本地约定配置不存在；managed cloud spec23显示`secrets=[]`、`runtime_variables=[]`。仓库`environments` API读回0个环境；读取Actions Secrets元数据返回HTTP403 `Resource not accessible by integration`，不能因此声称仓库Secrets为空。当前四个工作流只生成verification调试包或unsigned release，没有云端正式签名步骤；历史交接记载正式签名在旧本机构建。未访问旧电脑或把历史私有密钥搬进公开库。
+- **覆盖安装边界**：公开最新正式版仍为v0.16/code17，原证书公钥摘要在`UpdateConfig.CERTIFICATE_SHA256`为`67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26`。先前提供的APK是`dev.h516.shicang.verification`、Android Debug证书（901650a0…），不能覆盖原正式版。正式更新尚缺可用原签名及递增版本号/原签名旧→新安装保数据验收；没有换签名、卸载、清数据或发布不兼容包。不得把源码推送称作已推送正式更新。
+- **下一步**：最终文档保存后将原协调任务转ready。继续时先核对PR与登记；保留原App和完整备份，在已授权且可访问的配置中恢复原签名通道后再做正式覆盖更新，当前不能靠证书公钥或APK反推出私钥。后续不反复询问用户密钥位置，准确报告403与已核实范围。
+
+---
+
+# 上一批记录（2026-10-22 · 发现页苹果风）
 
 - **用户反馈**：查看当前发现页后明确“苹果风”，沿既有重构接续，不创建新产品或发布正式包。
 - **分支 / PR**：继续 `codex/experience-refactor-prep-20261021` / [草稿 PR #31](https://github.com/h516df/liuzheba/pull/31)。远端实现 `83a2f66bf7c34e35490607c4dad690a4aa189f0f`，对应本地 `ca25847599e04e9680a5f08392f04be32aa79dbc`，完整根树均为 `acabb05c4ab2e3defc2892ac6e31bb925e7b4e31`，app树 `2ae294e0e7c23b76fbbf49923871988ebcaa43cf`。通过连接器expected-head更新并核对根树，不声称CLI push通过。
