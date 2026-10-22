@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 5,
+  "revision": 6,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -20,13 +20,13 @@
         "docs/research"
       ],
       "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
-      "head": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
-      "status": "active",
+      "head": "bba2171786c7a88d2a1cf6860cee3817616049db",
+      "status": "ready",
       "generation": 1,
-      "lease_until": 1792660105,
-      "updated_at": 1792654138,
+      "lease_until": 0,
+      "updated_at": 1792656071,
       "history": [],
-      "handoff": "用户明确先别做、先了解项目。停止实施，未推送产品修改；本地试改保存于 /workspace/liuzheba 的 stash paused-by-user-20261022-refactor-exploration。远端 PR31 保持原设计稿提交。后续先只读理解，实施前重新确认用户指令。"
+      "handoff": "首轮收录/页面重构已保存至PR31，最终文档head bba2171786c7a88d2a1cf6860cee3817616049db，受测实现9611ebc，app树0bd89633e09f7d661fcd368b25bdbb1fb8594d84。CI267/267、API35模拟器6/6、安全扫描和构建/lint通过；本地最终画面5/5。未合并、未正式发布，真机与正式升级未验。下一步按HANDOFF查看实际合成预览并接续已列待办；用户尚未认可新外观。"
     }
   },
   "batches": {
