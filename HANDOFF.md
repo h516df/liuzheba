@@ -1,4 +1,17 @@
-# 当前接续记录（2026-10-22 · 收录与页面重构实施）
+# 当前接续记录（2026-10-22 · 发现页苹果风）
+
+- **用户反馈**：查看当前发现页后明确“苹果风”，沿既有重构接续，不创建新产品或发布正式包。
+- **分支 / PR**：继续 `codex/experience-refactor-prep-20261021` / [草稿 PR #31](https://github.com/h516df/liuzheba/pull/31)。远端实现 `83a2f66bf7c34e35490607c4dad690a4aa189f0f`，对应本地 `ca25847599e04e9680a5f08392f04be32aa79dbc`，完整根树均为 `acabb05c4ab2e3defc2892ac6e31bb925e7b4e31`，app树 `2ae294e0e7c23b76fbbf49923871988ebcaa43cf`。通过连接器expected-head更新并核对根树，不声称CLI push通过。
+- **变化**：媒体延伸至浮动导航后方；减轻底栏、选中底色和边框；发现页使用深色导航，其他入口仍随主题；顶部张数独立居中，资料与更多为圆形按钮。底部档案名一点直达完整详情，右上角资料保留简要面板。视频进度工具为导航留出空间，空库沿用深色媒体画布与回档案入口。
+- **复用与边界**：采用已读Orchard 0.3 / Apple HIG导航与材质规则，产品代码独立实现，未上传私有源码或Apple素材。当前是带透明度的表面与边框，未实现实时背景模糊或完整Liquid Glass。上下/左右翻看、随机预览、手动播放及返回原媒体保持原逻辑；普通全屏浏览保留文字返回入口。
+- **验证 passed**：冻结实现后的定向复核12/12，8 suites、零失败/错误/跳过，日志`/tmp/liuzheba-discovery-verified-check.log`，完整命令为`bash ./gradlew --no-daemon --max-workers=1 -I tools/verification.init.gradle testDebugUnitTest --tests 'dev.h516.shicang.Discovery*UiTest' --tests dev.h516.shicang.UnifiedDiscoveryNoteUiTest --tests dev.h516.shicang.ArchiveUiSnapshotTest.libraryLight --tests dev.h516.shicang.ArchiveUiSnapshotTest.libraryDark --tests dev.h516.shicang.ArchiveUiSnapshotTest.mediaTapOpensViewerAndReturnsToSameFilteredCard`。JDK21/SDK36，5m18s成功，最终app树与83a2f66一致。中间回归暴露普通全屏返回文字入口缺失，已恢复原文字动作并重新编译复验，不把中间11/12写成最终通过。覆盖直接进详情/返回媒体、200%字号、空库出口、模拟播放器进度与导航不重叠、浅深档案页及原发现流程；模拟播放器仅验证几何，不证明编解码播放。
+- **远端CI passed**：实现83a2f66的[Android checks](https://github.com/h516df/liuzheba/actions/runs/39748820874)、[Cloud development](https://github.com/h516df/liuzheba/actions/runs/39748820611)、[API35 device checks](https://github.com/h516df/liuzheba/actions/runs/39748820629)、[Secret checks](https://github.com/h516df/liuzheba/actions/runs/39748820600)均读回completed/success。本次未下载远端XML重新计数，下节267/267与6/6属于上一受测实现，不挪作本次精确数量。
+- **预览**：实际Compose/Robolectric API35原生图形宿主，320dp窄屏、合成媒体；输出`app/build/outputs/unified-navigation/discovery-apple-*.png`，最终四张图与SHA256/来源清单另存`/workspace/scratch/liuzheba-review-20261022/discovery`。已目检代表浅色、深色200%、空库、播放器布局及档案页浅深色。静态图不能证明动画/真机体验；未签名、未安装正式包、未合并、未发布。
+- **协调**：沿原任务`experience-refactor-20261022`、同一owner/workspace/generation接续；最终文档保存后转ready，准确head以PR和登记读回为准。后续先核对PR head、当前检查与登记，再接续剩余发现范围、全部媒体、重复导入、播放器专项。
+
+---
+
+# 上一批记录（2026-10-22 · 收录与页面重构实施）
 
 - **目标**：用户要求开始重构，重点纠正使用逻辑、减少操作步骤、采用苹果式 UI/UX，并参考其 Orchard UI 组件库。首批围绕收录、详情追加、下载批次与内容入口落地。
 - **暂停暂存**：本轮已恢复并整合先前 `paused-by-user-20261022-refactor-exploration` 暂存；后续从当前提交接续，不再次套用旧stash。
