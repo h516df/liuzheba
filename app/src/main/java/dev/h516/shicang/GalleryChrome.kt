@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
@@ -122,16 +123,22 @@ import androidx.compose.ui.window.Dialog
 
 @Composable internal fun GalleryTabBar(route:String,select:(String)->Unit) {
     val c=MaterialTheme.colorScheme
-    Surface(Modifier.navigationBarsPadding().padding(horizontal=20.dp,vertical=8.dp),shape=RoundedCornerShape(32.dp),color=c.surface,shadowElevation=2.dp) {
-        Row(Modifier.fillMaxWidth().selectableGroup().padding(6.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
+    val immersive=route=="frame"
+    val foreground=if(immersive) Color.White else c.primary
+    val secondary=if(immersive) Color.White.copy(alpha=.65f) else c.onSurfaceVariant
+    val shape=RoundedCornerShape(32.dp)
+    Surface(Modifier.navigationBarsPadding().padding(horizontal=24.dp,vertical=8.dp)
+        .border(.5.dp,if(immersive) Color.White.copy(alpha=.18f) else c.outlineVariant.copy(alpha=.5f),shape),
+        shape=shape,color=if(immersive) Color(0xF2222224) else c.surface,shadowElevation=1.dp) {
+        Row(Modifier.fillMaxWidth().selectableGroup().padding(4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
             listOf("library" to "档案","frame" to "发现","settings" to "我的").forEach{(destination,label)->
-                Column(Modifier.weight(1f).heightIn(min=58.dp).clip(RoundedCornerShape(26.dp))
-                    .background(if(route==destination)c.surfaceVariant else Color.Transparent)
+                Column(Modifier.weight(1f).heightIn(min=54.dp).clip(RoundedCornerShape(28.dp))
+                    .background(if(route==destination) {if(immersive) Color.White.copy(alpha=.14f) else c.surfaceVariant.copy(alpha=.6f)} else Color.Transparent)
                     .testTag("nav-$destination").semantics{contentDescription="切换到$label"}
                     .selectable(route==destination,onClick={select(destination)},role=Role.Tab,interactionSource=remember{MutableInteractionSource()},indication=null)
-                    .padding(horizontal=8.dp,vertical=8.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)) {
-                    FrameGlyph(if(destination=="settings")"设置" else label,if(route==destination)c.primary else c.onSurfaceVariant)
-                    Text(label,style=MaterialTheme.typography.labelMedium,color=if(route==destination)c.primary else c.onSurfaceVariant)
+                    .padding(horizontal=8.dp,vertical=6.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                    FrameGlyph(if(destination=="settings")"设置" else label,if(route==destination)foreground else secondary)
+                    Text(label,style=MaterialTheme.typography.labelSmall,color=if(route==destination)foreground else secondary)
                 }
             }
         }

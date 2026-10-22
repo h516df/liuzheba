@@ -206,7 +206,9 @@ private val Muted: Color
              }},bottomBar={if(!editing && zoomPhoto.isEmpty() && route in listOf("frame","library","settings") && unlocked && s.ready) {
                 GalleryTabBar(route){destination->route=destination;settingsReturn="library";settingsPhoto=""}
             }}) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding)) {
+            Box(Modifier.fillMaxSize().padding(if(route=="frame" && !editing && zoomPhoto.isEmpty())
+                PaddingValues(start=padding.calculateStartPadding(androidx.compose.ui.platform.LocalLayoutDirection.current),
+                    end=padding.calculateEndPadding(androidx.compose.ui.platform.LocalLayoutDirection.current),top=padding.calculateTopPadding()) else padding)) {
                 when {
                     editing && unlocked->Unit // The full-page editor owns navigation and accessibility while open.
                     zoomPhoto.isNotEmpty() && unlocked->Unit // Save the underlying page before fullscreen changes its viewport; hidden pages must not remeasure or expose semantics.
@@ -216,7 +218,7 @@ private val Muted: Color
                     route=="frame" && !editing && zoomPhoto.isEmpty()->{
                         val active=remember(s.library.archives){s.library.active.filter{it.photos.isNotEmpty()}}
                         val ids=remember(active){active.map{it.id}}
-                        if(active.isEmpty()) Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("让照片成为主角",fontSize=23.sp);Text("添加照片或视频后，在这里全屏翻看。纯文字档案仍保留在档案页。",Modifier.padding(vertical=16.dp),color=Muted);GalleryButton(onClick={route="library"}){Text("去档案添加媒体")}}
+                        if(active.isEmpty()) Column(Modifier.fillMaxSize().background(Color.Black).padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("让照片成为主角",fontSize=28.sp,fontWeight=FontWeight.SemiBold,color=Color.White);Text("添加照片或视频后，在这里全屏翻看。纯文字档案仍保留在档案页。",Modifier.padding(vertical=16.dp),fontSize=15.sp,lineHeight=22.sp,color=Color.White.copy(alpha=.65f));GalleryButton(onClick={route="library"}){Text("去档案添加媒体")}}
                         else libraryState.SaveableStateProvider("discovery") {key(ids) {ArchiveFeed(active,frameArchive,model,s.appearance,positions,::rememberPhoto,
                             {frameArchive=it},{route="library"},::openDetails,::openPhotos,
                             {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy,enabled=mediaActive)}}

@@ -20,6 +20,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.media3.common.Player
 import kotlinx.coroutines.delay
 
@@ -28,7 +29,7 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
 
 /** Controls share the same player; gestures never replace the saved playback preference. */
 @Composable internal fun PlayerControls(player:Player, speed:Float, muted:Boolean,
-    speedChange:(Float)->Unit, mute:()->Unit, onClose:()->Unit, playIntentChange:(Boolean)->Unit={}) {
+    speedChange:(Float)->Unit, mute:()->Unit, onClose:()->Unit, playIntentChange:(Boolean)->Unit={},bottomInset:Dp=0.dp) {
     var visible by remember {mutableStateOf(true)}
     var position by remember {mutableLongStateOf(0)}
     var duration by remember {mutableLongStateOf(0)}
@@ -70,7 +71,7 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
                     }
                     SeekButton(true){seek(10000)}
                 }
-                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.85f)))).navigationBarsPadding().padding(horizontal=24.dp,vertical=20.dp)) {
+                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.85f)))).navigationBarsPadding().padding(bottom=bottomInset).padding(horizontal=24.dp,vertical=20.dp)) {
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(durationLabel(if(scrubbing)preview.toLong() else position),color=Color.White);Text(durationLabel(duration),color=Color.White.copy(alpha=.8f))}
                     Slider(value=if(scrubbing)preview.coerceIn(0f,duration.coerceAtLeast(1).toFloat()) else position.coerceIn(0,duration).toFloat(),
                         onValueChange={preview=it;scrubbing=true},onValueChangeFinished={player.seekTo(preview.toLong());scrubbing=false;touch++},
