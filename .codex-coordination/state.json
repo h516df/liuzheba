@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 10,
+  "revision": 11,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -27,11 +27,36 @@
       "updated_at": 1792660220,
       "history": [],
       "handoff": "导入失败保护已推送PR31，实现e021dca，最终文档head 9993abeba616b22764968935edc966114b5f206d，app树8bb2132ea2c573b9ecd835699528432323ea5a29；同树23/23宿主数据检查通过。部分失败/新输入选择保留，既有PNG/视频/草稿SQL失败+重开摘要一致。正式覆盖更新未发布：云端无签名绑定、仓库环境0、Secrets元数据403，原签名不可用；不能将verification测试APK当正式覆盖包。用户要求代理自行处理，不再问签名位置；后续按HANDOFF核对可访问配置与原签名通道。"
+    },
+    "release-v017-cloud-20261022": {
+      "owner": "codex-91839c4ac19c-release",
+      "workspace": "cloud-25a5cd9e84b3-release-v017",
+      "batch": "experience-refactor-20261022",
+      "role": "integrator",
+      "branch": "codex/release/v0.17-cloud-20261022",
+      "scopes": [
+        ".github/workflows/android.yml",
+        "app/build.gradle.kts",
+        "app/src/main/assets/release-notes.json",
+        "docs/RELEASING.md",
+        "docs/acceptance/v0.17",
+        "tools/release",
+        "@integration",
+        "@publish"
+      ],
+      "base": "9993abeba616b22764968935edc966114b5f206d",
+      "head": "9993abeba616b22764968935edc966114b5f206d",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792668297,
+      "updated_at": 1792661097,
+      "history": []
     }
   },
   "batches": {
     "experience-refactor-20261022": {
-      "status": "open"
+      "status": "sealed",
+      "integrator": "release-v017-cloud-20261022"
     }
   }
 }
