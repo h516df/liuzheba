@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 8,
+  "revision": 9,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -21,10 +21,10 @@
       ],
       "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
       "head": "38e286894c5e1899cdc7284b9cb9ae077d67f7e4",
-      "status": "ready",
+      "status": "active",
       "generation": 1,
-      "lease_until": 0,
-      "updated_at": 1792658725,
+      "lease_until": 1792666749,
+      "updated_at": 1792659549,
       "history": [],
       "handoff": "PR31接续完成发现页苹果风调整：全屏媒体、轻量浮动导航、圆形工具、标题直达详情及视频进度避让。实现83a2f66，同树本地12/12定向UI通过，Android/Cloud/device/Secret CI全部success。最终head 38e286894c5e1899cdc7284b9cb9ae077d67f7e4仅补HANDOFF，app树2ae294e0e7c23b76fbbf49923871988ebcaa43cf。合成预览已保存，真机与正式升级未验；未合并、未发布。"
     }
