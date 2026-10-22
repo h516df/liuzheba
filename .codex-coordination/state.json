@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 2,
+  "revision": 3,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -19,10 +19,10 @@
       ],
       "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
       "head": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
-      "status": "paused",
+      "status": "active",
       "generation": 1,
-      "lease_until": 0,
-      "updated_at": 1792650118,
+      "lease_until": 1792660105,
+      "updated_at": 1792652905,
       "history": [],
       "handoff": "用户明确先别做、先了解项目。停止实施，未推送产品修改；本地试改保存于 /workspace/liuzheba 的 stash paused-by-user-20261022-refactor-exploration。远端 PR31 保持原设计稿提交。后续先只读理解，实施前重新确认用户指令。"
     }
