@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 11,
+  "revision": 12,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -45,12 +45,13 @@
         "@publish"
       ],
       "base": "9993abeba616b22764968935edc966114b5f206d",
-      "head": "9993abeba616b22764968935edc966114b5f206d",
-      "status": "active",
+      "head": "12cc77e26f2fe6270944b198a6d128ef0e4772f4",
+      "status": "paused",
       "generation": 1,
-      "lease_until": 1792668297,
-      "updated_at": 1792661097,
-      "history": []
+      "lease_until": 0,
+      "updated_at": 1792662277,
+      "history": [],
+      "handoff": "PR33 v0.17/code18候选已构建并保存，代码df9bc2b、最终文档head12cc77e26f2fe6270944b198a6d128ef0e4772f4，app树850cc7a4ec5739ea6fd8f8a94347e54ea0fdcc0d；完整CI/release/Secret均success，说明XML2/2、API35 XML6/6，校验器三个错误包拒绝通过。unsigned105641307字节，SHA a08113ce69c789946f17f8ab4752ba187cd78455ea2bd276edee8009cd147da3。通过已有Make OAuth admin已证实repo Actions Secrets=0、环境0、运行时无密钥，原正式私钥当前未接入。正式覆盖安装和发布未完成，不能用新密钥代替。完整记录见HANDOFF、docs/acceptance/v0.17/candidate.json。保持批次sealed与成员PR31冻结，恢复原签名后沿PR33继续；不再问用户找位置，不重复构建已通过候选。"
     }
   },
   "batches": {
