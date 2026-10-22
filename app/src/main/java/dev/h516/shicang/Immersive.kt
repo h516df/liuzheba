@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
@@ -24,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -51,6 +54,17 @@ import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.ZoomableImageState
 import java.io.File
 
+@Composable private fun ImmersiveRoundButton(label:String,modifier:Modifier=Modifier,onClick:()->Unit) {
+    val interaction=remember{MutableInteractionSource()}
+    val pressed by interaction.collectIsPressedAsState()
+    Box(modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha=.24f))
+        .border(.5.dp,Color.White.copy(alpha=.2f),CircleShape)
+        .alpha(if(pressed) .55f else 1f)
+        .clickable(interactionSource=interaction,indication=null,role=Role.Button,onClick=onClick).semantics{contentDescription=label},contentAlignment=Alignment.Center) {
+        FrameGlyph(label,Color.White)
+    }
+}
+
 @Composable internal fun FullPhotoFrame(
     a:Archive,model:AppModel,appearance:Appearance,initialPhoto:String,
     position:(String)->Unit, next:(()->Unit)?, previous:(()->Unit)?,
@@ -72,6 +86,8 @@ import java.io.File
     val complete=appearance.skin!="全幅" || appearance.fit=="完整"
     val imageScale=if(complete) ContentScale.Fit else ContentScale.Crop
     val background=if(appearance.skin!="留白") Color.Black else MaterialTheme.colorScheme.background
+    // Discover draws behind the floating navigation; keep its tools above that layer.
+    val bottomInset=if(discovery!=null) 90.dp else 8.dp
     LaunchedEffect(pager.settledPage,a.photos,active) {
         a.photos.getOrNull(pager.settledPage)?.let {position(it.id)}
     }
@@ -110,7 +126,7 @@ import java.io.File
                     val width=minOf((maxWidth-40.dp).coerceAtLeast(1.dp),(maxHeight-140.dp).coerceAtLeast(1.dp)*ratio)
                     val canvas=if(framed) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
-                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && editingVideo==null && !busy,complete,{videoPlaying=it;touch()}){touch();controls=!controls}
+                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && editingVideo==null && !busy,complete,{videoPlaying=it;touch()},controlsInset=if(discovery!=null)bottomInset else 0.dp){touch();controls=!controls}
                 else {
                     // Keep the renderer and its decoded image stable across the pager midpoint.
                     val imageState=rememberZoomableImageState()
@@ -127,21 +143,23 @@ import java.io.File
                 }
             }
         }
-        if(active && hint && !videoPlaying) Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(24.dp)
+        if(active && hint && !videoPlaying) Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal=24.dp).padding(bottom=bottomInset+16.dp)
             .clickable {touch()},color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(16.dp)) {
             Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
         // Navigation and actions sit on the edges; metadata never covers the media until requested.
         AnimatedVisibility(visible=active && controls && !videoPlaying,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
-            Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.65f),Color.Transparent)))
-                .statusBarsPadding().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                if(close!=null) TextButton(onClick={touch();close()},colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) {
-                    Text("返回",maxLines=1)
-                }
-                Text(if(a.photos.isEmpty()) "档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.weight(1f),color=Color.White,
-                    style=MaterialTheme.typography.labelLarge,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+            Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.45f),Color.Transparent)))
+                .statusBarsPadding().padding(start=20.dp,end=12.dp,top=8.dp,bottom=24.dp)) {
+                if(close!=null) GalleryTextButton(onClick={touch();close()},modifier=Modifier.align(Alignment.CenterStart),
+                    colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text("返回",maxLines=1)}
+                else if(discovery!=null) Text("发现",Modifier.align(Alignment.CenterStart),color=Color.White,fontSize=17.sp,fontWeight=FontWeight.SemiBold)
+                Text(if(a.photos.isEmpty()) "档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.align(Alignment.Center),color=Color.White.copy(alpha=.85f),
+                    fontSize=13.sp,fontWeight=FontWeight.Medium)
+                Row(Modifier.align(Alignment.CenterEnd),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                    if(discovery!=null) ImmersiveRoundButton("资料"){touch();information=true}
                 Box {
-                    GalleryIcon("更多",Color.White){touch();menu=true}
+                    ImmersiveRoundButton("更多"){touch();menu=true}
                     DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
                         DropdownMenuItem(text={Text("写档案笔记")},onClick={menu=false;model.noteEditor.open("archive",a.id,a.name)})
                         current?.let{p->DropdownMenuItem(text={Text("写这项媒体的笔记")},onClick={menu=false;model.noteEditor.open("media",p.id,"${a.name} · ${if(p.isVideo) "视频" else "照片"}")})}
@@ -163,15 +181,21 @@ import java.io.File
                         if(next!=null) DropdownMenuItem(text={Text("下一份")},onClick={menu=false;touch();next()})
                     }
                 }
+                }
             }
         }
         AnimatedVisibility(visible=active && controls && !videoPlaying && !hint,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.62f))))
-                .navigationBarsPadding().padding(start=16.dp,end=12.dp,top=20.dp,bottom=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                TextButton(onClick={touch();information=true},modifier=Modifier.weight(1f).semantics{contentDescription="资料"},
-                    colors=ButtonDefaults.textButtonColors(contentColor=Color.White)) {
-                    Text(a.name,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
-                    Spacer(Modifier.width(8.dp));FrameGlyph("展开",Color.White)
+                .navigationBarsPadding().padding(start=24.dp,end=20.dp,top=40.dp,bottom=bottomInset),verticalAlignment=Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min=48.dp)
+                    .clickable(interactionSource=remember{MutableInteractionSource()},indication=null,role=Role.Button,onClick={touch();if(discovery!=null) details() else information=true})
+                    .semantics{contentDescription=if(discovery!=null) "打开档案：${a.name}" else "资料"}
+                    .padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                        Text(a.name,color=Color.White,fontSize=22.sp,fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
+                        Text(if(discovery!=null) "查看档案" else "查看资料",color=Color.White.copy(alpha=.72f),fontSize=13.sp)
+                    }
+                    Spacer(Modifier.width(12.dp));FrameGlyph("展开",Color.White.copy(alpha=.8f))
                 }
             }
         }

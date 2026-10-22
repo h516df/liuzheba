@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -90,7 +91,7 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
 
 /** A player exists only for the visible, explicitly started video. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,playback:(Boolean)->Unit={},tap:()->Unit) {
+@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,playback:(Boolean)->Unit={},controlsInset:Dp=0.dp,tap:()->Unit) {
     var started by rememberSaveable(p.id){mutableStateOf(false)}
     var playIntent by rememberSaveable(p.id){mutableStateOf(true)}
     var muted by rememberSaveable(p.id){mutableStateOf(true)}
@@ -149,7 +150,7 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
                     view.resizeMode=if(fit) AspectRatioFrameLayout.RESIZE_MODE_FIT else AspectRatioFrameLayout.RESIZE_MODE_ZOOM},
                 modifier=Modifier.fillMaxSize(),onRelease={it.player=null;it.keepScreenOn=false})
             PlayerControls(player,speed,muted,{speed=it;player.setPlaybackSpeed(it)},
-                {muted=!muted;player.volume=if(muted)0f else 1f},{position=player.currentPosition;started=false},playIntentChange={playIntent=it})
+                {muted=!muted;player.volume=if(muted)0f else 1f},{position=player.currentPosition;started=false},playIntentChange={playIntent=it},bottomInset=controlsInset)
             if(buffering && !failure) CircularProgressIndicator(Modifier.align(Alignment.Center),color=Color.White)
             if(failure) Surface(Modifier.align(Alignment.Center),color=Color.Black.copy(alpha=.85f)){
                 Column(Modifier.padding(16.dp),horizontalAlignment=Alignment.CenterHorizontally){

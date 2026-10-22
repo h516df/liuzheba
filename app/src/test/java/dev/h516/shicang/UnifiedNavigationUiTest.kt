@@ -26,8 +26,8 @@ abstract class UnifiedNavigationFixture {
     @Before fun bind(){Dispatchers.setMain(android.os.Handler(android.os.Looper.getMainLooper()).asCoroutineDispatcher().immediate)}
     @After fun reset(){Dispatchers.resetMain();RuntimeEnvironment.setFontScale(1f)}
     protected fun idle(check:()->Boolean){compose.waitUntil(15000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();check()}}
-    protected fun screenshot(name:String){val file=File("build/outputs/unified-navigation/$name.png");file.parentFile!!.mkdirs();compose.onRoot().captureRoboImage(file.absolutePath)}
-    protected fun fixture(video:Boolean=false,font:Float=1f,check:(AppModel,Archive)->Unit) {
+    protected fun screenshot(name:String){val file=File("build/outputs/unified-navigation/$name.png");file.parentFile!!.mkdirs();compose.onAllNodes(isRoot()).onLast().captureRoboImage(file.absolutePath)}
+    protected fun fixture(video:Boolean=false,font:Float=1f,choose:(String)->Unit={},take:(String)->Unit={},check:(AppModel,Archive)->Unit) {
         RuntimeEnvironment.setFontScale(font)
         val app=RuntimeEnvironment.getApplication()
         android.graphics.Bitmap.createBitmap(1,1,android.graphics.Bitmap.Config.ARGB_8888).apply{copyPixelsToBuffer(java.nio.ByteBuffer.allocate(4));recycle()}
@@ -48,7 +48,7 @@ abstract class UnifiedNavigationFixture {
         val loader=coil3.ImageLoader.Builder(app).components{add(coil3.decode.BitmapFactoryDecoder.Factory())}.build();coil3.SingletonImageLoader.setUnsafe(loader)
         val model=AppModel(app);val owners=androidx.lifecycle.ViewModelStore().apply{put("fixture",model)}
         try {
-            compose.setContent{ShicangApp(model,true,{},{},{},{},{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
+            compose.setContent{ShicangApp(model,true,{},{},choose,take,{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
             check(model,a)
         } finally {owners.clear();idle{model.resourcesClosed};loader.shutdown()}
     }
@@ -164,7 +164,8 @@ class UnifiedKeyboardUiTest:UnifiedNavigationFixture() {
 
 class UnifiedCreateUiTest:UnifiedNavigationFixture() {
     @Test fun newArchiveShowsDistinctCreationAndOpensOnlyAfterSave()=fixture {model,_->
-        compose.onNodeWithContentDescription("＋ 新建").performClick()
+        compose.onNodeWithContentDescription("收录").performClick()
+        compose.onNodeWithText("文字档案").performClick()
         compose.onNodeWithText("新建档案").assertExists()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("新建合成档案")
         compose.onNodeWithText("保存").performClick()

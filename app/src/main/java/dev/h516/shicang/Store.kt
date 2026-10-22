@@ -33,7 +33,7 @@ data class Appearance(val style:String="极简画廊", val mode:String="浅色",
     }
 }
 
-data class ImportResult(val photos: List<Photo>, val errors: List<String>)
+data class ImportResult(val photos: List<Photo>, val errors: List<String>,val sourceIndices:List<Int> = emptyList())
 class Store(private val context: Context) {
     private val prefs=context.getSharedPreferences("device",Context.MODE_PRIVATE)
     private val gate=Mutex()
@@ -55,6 +55,7 @@ class Store(private val context: Context) {
     /** Caller must cancel its jobs first; wait for any active transaction before releasing SQLite. */
     suspend fun close()=withContext(Dispatchers.IO) {gate.withLock {if(db.isOpen)db.close()}}
     private fun rows(kind: String) = db.rawQuery("SELECT json FROM objects WHERE kind=?",arrayOf(kind)).use { c -> buildList { while(c.moveToNext()) add(JSONObject(c.getString(0))) } }
+    private fun row(kind:String,id:String)=db.rawQuery("SELECT json FROM objects WHERE kind=? AND id=?",arrayOf(kind,id)).use {c->if(c.moveToFirst())JSONObject(c.getString(0))else null}
     private val protectionMutable=kotlinx.coroutines.flow.MutableStateFlow(readProtection())
     val protection: kotlinx.coroutines.flow.StateFlow<ProtectionState> = protectionMutable
     private val protectionChanges=kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
@@ -245,11 +246,12 @@ class Store(private val context: Context) {
             remove("label",id);db.setTransactionSuccessful()
         } finally {db.endTransaction()}
     } }
-    suspend fun importPhotos(uris: List<Uri>): ImportResult=withContext(Dispatchers.IO) { gate.withLock {
+    suspend fun importPhotos(uris: List<Uri>,progress:(String)->Unit={}): ImportResult=withContext(Dispatchers.IO) { gate.withLock {importPhotosUnsafe(uris,progress)} }
+    private suspend fun importPhotosUnsafe(uris:List<Uri>,progress:(String)->Unit):ImportResult {
         val priorWarning=prefs.getString("protectionImportWarning","").orEmpty()
         check(prefs.edit().putString("protectionImportWarning","有一批导入尚未完整结束").commit());markProtectionDirty()
-        val good=mutableListOf<Photo>();val errors=mutableListOf<String>()
-        val operation=coroutineContext
+        val good=mutableListOf<Photo>();val errors=mutableListOf<String>();val sourceIndices=mutableListOf<Int>()
+        val operation=kotlinx.coroutines.currentCoroutineContext()
         try {
         uris.forEachIndexed { index,uri ->
             operation.ensureActive()
@@ -260,24 +262,66 @@ class Store(private val context: Context) {
                 val maximum=if(declared.startsWith("image/")) Codec.MAX_PHOTO_BYTES else Codec.MAX_MEDIA_BYTES
                 val expected=LargeMediaIo.declaredSize(context.contentResolver,uri)
                 expected?.let {require(it<=maximum){"所选媒体超过安全上限：视频6GB，照片200MiB"};LargeMediaIo.requireSpace(photoDir.usableSpace,it)}
+                var copied=0L;var lastProgress=0L
+                progress("导入 ${index+1}/${uris.size} · 正在读取原件")
                 val bytes=context.contentResolver.openInputStream(uri).use { input ->
                     requireNotNull(input) { "无法读取所选媒体" }
                     tmp.outputStream().use { out -> LargeMediaIo.copy(input,out,maximum,available={photoDir.usableSpace},
-                        check={operation.ensureActive()},onBytes={buffer,count->digest.update(buffer,0,count)}) }
+                        check={operation.ensureActive()},onBytes={buffer,count->
+                            digest.update(buffer,0,count);copied+=count
+                            val now=System.nanoTime()
+                            if(now-lastProgress>=250_000_000L){lastProgress=now;progress("导入 ${index+1}/${uris.size} · 已复制 ${copied/1024/1024} MiB"+(expected?.let{" / ${it/1024/1024} MiB"} ?: ""))}
+                        }) }
                 }
+                progress("导入 ${index+1}/${uris.size} · 检查媒体信息")
+                operation.ensureActive()
                 val metadata=inspectMedia(tmp,declared)
+                operation.ensureActive()
                 require(bytes<=(if(metadata.first.startsWith("video/")) Codec.MAX_MEDIA_BYTES else Codec.MAX_PHOTO_BYTES)) {"单张照片最多200MB"}
                 require(tmp.renameTo(final)) { "照片保存失败" }
-                good.add(Photo(id,final.name,bytes,digest.digest().hex(),metadata.first,metadata.second))
+                good.add(Photo(id,final.name,bytes,digest.digest().hex(),metadata.first,metadata.second));sourceIndices.add(index)
             } catch(e:CancellationException) {tmp.delete();throw e}
             catch(e: Exception) {tmp.delete();errors.add("第${index+1}项：${e.message ?: "导入失败"}")}
         }
+        operation.ensureActive()
         } catch(e:CancellationException) {good.forEach{File(photoDir,it.file).delete()};throw e}
         val pending=org.json.JSONArray(prefs.getString("protectionPendingMedia","[]")).strings()+good.map{it.file}
         val warning=if(errors.isNotEmpty()) "有 ${errors.size} 项媒体导入失败，请核对原文件并重新导入" else priorWarning
         check(prefs.edit().putString("protectionPendingMedia",org.json.JSONArray(pending.distinct()).toString()).putString("protectionPriorWarning",warning).putString("protectionImportWarning",if(warning.isNotEmpty()) warning else "有已导入媒体尚未完整写入档案").commit())
-        ImportResult(good,errors)
-    } }
+        return ImportResult(good,errors,sourceIndices)
+    }
+    /** Import and durably link in one store operation. Formal append never submits unrelated draft edits. */
+    internal suspend fun importIntoArchive(id:String,uris:List<Uri>,editor:Archive?=null,progress:(String)->Unit={},onLinked:(Archive)->Unit={}):Pair<ImportResult,Archive> = withContext(Dispatchers.IO) {gate.withLock {
+        require(editor==null || editor.id==id){"编辑档案已变更"}
+        val formal=row("archive",id)?.let(Codec::archive)?.takeIf{it.deleted==0L}
+        val draft=row("draft",id)?.let(Codec::archive)
+        val base=editor?.takeIf{it.id==id} ?: formal ?: draft ?: error("原档案或编辑草稿不存在，请重新选择")
+        val result=importPhotosUnsafe(uris,progress)
+        if(result.photos.isEmpty())return@withLock result to base
+        val next=base.copy(photos=base.photos+result.photos,updated=System.currentTimeMillis())
+        // No suspension or cancellation boundary can strand a successfully copied batch before linking it.
+        // A failed SQL transaction removes only this batch's new copies; the picker sources stay untouched.
+        var linked=false
+        try {
+            withContext(kotlinx.coroutines.NonCancellable) {
+                db.beginTransaction()
+                try {
+                    if(editor!=null || formal==null)put("draft",id,Codec.archive(next))
+                    else {
+                        put("archive",id,Codec.archive(next.copy(cover=next.coverPhoto()?.id.orEmpty())))
+                        draft?.let{put("draft",id,Codec.archive(it.copy(photos=it.photos+result.photos,updated=next.updated)))}
+                    }
+                    db.setTransactionSuccessful()
+                }finally{db.endTransaction()}
+                linked=true
+                // Report the committed draft before cancellation can be delivered on the return
+                // dispatcher, so the caller can reconcile its editor in a non-suspending finalizer.
+                onLinked(next)
+                settleImportedMedia()
+            }
+        }finally{if(!linked)result.photos.forEach{File(photoDir,it.file).delete()}}
+        result to next
+    }}
     /** Append a separate derivative to the current archive, never replace its source or stale metadata. */
     internal suspend fun appendEditedVideo(archiveId:String,original:Photo,source:File,edited:File):Photo=withContext(Dispatchers.IO) { gate.withLock {
         val operation=coroutineContext

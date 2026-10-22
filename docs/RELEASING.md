@@ -10,6 +10,24 @@
 
 没有签名配置时，`assembleRelease` 生成 unsigned APK，不能发布为官方安装包。正式更新必须沿用相同签名并递增 versionCode。安装前核对大小、SHA256、包名、版本、签名及架构；异常时保留旧版本，不通过卸载解决签名冲突。
 
+## 云端候选包与覆盖安装校验
+
+`codex/release/`与既有`release/`分支会构建unsigned候选包并保留Actions附件。unsigned包不是可安装的正式更新；只有沿原正式证书签名后，才能进入发布步骤。正式密钥从仓库外已有安全配置注入，不上传源码或构建附件。v0.17使用code18，仍沿用正式包名与原证书公钥固定值。
+
+签名后的候选包先执行：
+
+```sh
+python3 tools/release/verify_apk.py \
+  --candidate /secure-output/app-release.apk \
+  --previous /verified-input/shicang-v0.16-universal.apk \
+  --sdk "$ANDROID_HOME" \
+  --receipt /temporary-output/upgrade-apk-check.json
+```
+
+脚本核对真实APK签名、原证书公钥摘要、正式包名、递增versionCode、当前更新说明版本、非debug及更新大小上限；失败写入blocked回执并退出非零，不安装、不卸载、不清数据、不发布。metadata_passed只证明安装包身份元数据，不能代替旧版→新版安装及资料保留验收。当前独立verification测试包即使可安装，也不能替代该校验。
+
+2026-10-22已通过现有Make GitHub OAuth管理员连接读取本仓库Actions Secrets元数据，返回total_count=0；当前云端无密钥绑定，仓库environments=0。此前GH_TOKEN读取Secrets的403仅属该连接权限限制，不是Secrets存在与否的证据。当前可准备候选包，但尚无可用原正式私钥，不能生成同签名覆盖更新；不生成替代私钥冒充原证书。
+
 ## 公开更新
 
 v0.5 起匿名读取 `h516df/liuzheba` 的公开稳定 Release，不需要 GitHub 登录，不发送旧版更新令牌。检查更新时清理旧更新授权存储，不读取或解密旧令牌，不影响档案数据。草稿和预发布版本不进入自动更新。
