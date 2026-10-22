@@ -6,5 +6,7 @@ data class ProtectionState(
     val lastSuccess:Long=0, val mediaCount:Int=0
 ) {
     val protected get()=status=="已保护"
+    val needsAttention get()=status in listOf("保护失败","待核对")
+    val showLibraryNotice get()=needsAttention
 }
 data class RecoveryChoice(val name:String,val time:Long,val archives:Int,val media:Int)

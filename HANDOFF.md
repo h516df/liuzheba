@@ -1,3 +1,49 @@
+# 当前接续记录（2026-10-22 · 收录与页面重构实施）
+
+- **目标**：用户要求开始重构，重点纠正使用逻辑、减少操作步骤、采用苹果式 UI/UX，并参考其 Orchard UI 组件库。首批围绕收录、详情追加、下载批次与内容入口落地。
+- **暂停暂存**：本轮已恢复并整合先前 `paused-by-user-20261022-refactor-exploration` 暂存；后续从当前提交接续，不再次套用旧stash。
+- **分支 / PR**：继续 `codex/experience-refactor-prep-20261021` / [PR #31](https://github.com/h516df/liuzheba/pull/31)，原三屏概念稿保留作历史参考。已将当前 main `0bfc3cea38d651bb1dfa9a2fa8977297e54f7c1d` 的文档更新纳入本地分支，不合并其他业务 PR。
+- **源码与证据基线**：本地产品实现提交 `22975ac941a6b0265b30276fd7d3b6078a6ece42`；`app/src/main/java/dev/h516/shicang` 树 `c1a1470dc31b703975087387fb2bda7fe4ba8836`。最终远端提交以 PR head 和读回回执为准；后续仅交接文档变化需核对 app 树一致，不能把中间受测树当成另一个产品版本。
+- **已实现**：可见档案/笔记/作者索引；统一收录面板；首页先选媒体再选位置、取消不建空草稿；编辑内相册/拍照直达；正式档案直接追加且不提交已有草稿的其他字段；同来源下载批次一次选目标、失败项保留；新建收录明确草稿状态并可从下载记录继续完成。已分离产品公共控件与内容索引组件，采用中性浅深色、蓝色动作、大标题、连续分段、输入/确认/导航一致规则。
+- **复用边界**：已审查复用 #28 直接追加事务和提交后取消的状态对齐，没有整体合并 #28、预占发行版本或采用其历史测试为本轮结果。已读 Orchard 0.3@`5da1e128bf5f4cb9ad48b2adb1aa060d91047eb2` 的规则/代码/合成预览，公开产品按规范独立实现，不提交私有源码、生成文件、AAR或预览，不让公开源码构建依赖私有库。当前导航是实色材质，不标作实时模糊或完整 Liquid Glass。
+- **检查状态**：最终 `bash cloud/check.sh` 正在本地云端工作区运行，完成后更新本行；不以启动命令视作通过。早期定向回归暴露收录弹层截图根节点选择和200%字号长确认的取消按钮不可见，均已修正，待最终同树复验。截图仅合成 Compose/Robolectric 宿主渲染；系统选择器、真实编解码、物理设备和原正式签名覆盖升级 not run。
+- **工具链**：SDK36由现有 `.devcontainer/setup.sh` 初始化；完整JDK21由官方Temurin包取得并核对SHA256，使用系统CA信任。变量只有 `JAVA_HOME` / `ANDROID_HOME` / `SHICANG_BUILD_PYTHON` / `GRADLE_OPTS`；工具与缓存不提交，不假设新会话继承。Git CLI认证本轮恢复中失效后使用已连接GitHub工具继续原子登记与远端交付，不索取令牌或降低仓库权限。
+- **方案、来源与待办**：[本轮实现说明](docs/research/experience-refactor-implementation-2026-10-22.md)。全部媒体/类型筛选、重复导入处理、发现范围、播放器/编辑专项和进一步批量整理尚未完成；现有功能入口保留。本轮不签名、不安装正式包、不合并主线、不发正式版。
+- **协调**：专用 `codex-coordination-v1` 中 `experience-refactor-20261022`，本会话独占声明范围；下一会话先读登记、核对PR head并按协议续接，不能直接重做main。
+- **下一步**：完成本批同树检查和真实合成画面复核、修复发现的问题，保存源码/交接到远端并更新PR说明；然后围绕使用反馈继续上述待办。续接提示：继续留着吧PR #31，先读AGENTS、HANDOFF、本轮实现说明并核对远端及协调登记。
+
+---
+
+## 之前的交接（历史保留）
+
+# 当前接续记录（2026-10-21 · 统一通用入口）
+
+- **目标**：适应用户经常新开云端 Codex 的方式；每个项目默认分支都指向同一通用工作流，并保留本地可执行简版，用户无需记启动语或分支名。
+- **通用入口**：[vibe-ui-quality-kit/workflow](https://github.com/h516df/vibe-ui-quality-kit/blob/main/workflow/README.md)。简版修订 2026-10-21-r1；项目 AGENTS/CLAUDE 的特有约束继续适用。
+- **本轮基线 / 分支**：`a9854163e4746a1285eadf799bdb3022b2370722` / `codex/shared-workflow-entry-20261021`。本轮只改规则与交接文档，不改业务源码、安装器、签名、数据、服务或发布权限。准确提交与 PR 以本次远端记录为准。
+- **已完成**：统一入口、清理有效入口里的失效 agent-rules 引用、独立简版与自动发现相关任务的约定；保留下方项目历史和原检查入口。
+- **验证**：本轮文档范围/简版一致性/项目约束保留/失效入口检查 passed；业务构建、设备、生产发布 not run。通用模板另在工具库验证。新 CI 结果以对应 PR 的实际运行记录为准。
+- **当前任务发现**：下面是本轮开始前的未合并 PR 快照，不是建议合并清单。代理根据用户任务自行核对实时 head、依赖和相关分支交接；不要求用户逐个记住，也不能把最新 PR 自动当主线。
+- **下一步**：新任务先读本仓库 AGENTS、云端说明与本记录，再按用户目标接续相关成果。完整私有规则暂不可读时先沿用本地简版；不能把存档视为账户级配置。
+
+## 未合并任务快照（2026-10-21）
+
+| PR | 任务分支 | 目标分支 | 读取时 head |
+| --- | --- | --- | --- |
+| [#31: design: 先预览档案、详情与收录 UI，再推进体验重构](https://github.com/h516df/liuzheba/pull/31) | `codex/experience-refactor-prep-20261021` | `main` | `c9af227e93c4aed638c01d02eef7ebf675ac040a` |
+| [#28: 标签优先与一步媒体操作，降低自动保护和整库读写卡顿](https://github.com/h516df/liuzheba/pull/28) | `feat/core-journey-20261020` | `main` | `031d816e752bf26e6ab13ac63dc4579f91b6877e` |
+| [#26: feat: 发现页按档案随机预览图片与视频](https://github.com/h516df/liuzheba/pull/26) | `feat/discovery-random-previews` | `main` | `222a3174287c910ba4057b2ce7b3a297cbfe9535` |
+| [#25: feat: 独立长笔记、持久草稿及安全恢复](https://github.com/h516df/liuzheba/pull/25) | `feat/long-notes` | `main` | `682d30eac9e9009a58b56170e7b9ffedbe4afa79` |
+| [#24: 新增直播录屏视频编辑：裁剪、固定遮挡与独立副本](https://github.com/h516df/liuzheba/pull/24) | `feat/video-editor-main` | `main` | `ff89075f94cecf8acf5747e52b378ba4bf32b9e2` |
+| [#21: fix: 保留播放意图与前台一键更新](https://github.com/h516df/liuzheba/pull/21) | `fix/playback-foreground-update` | `feat/immersive-media` | `61ed05b30046bf3599ae8d82bb523a21757d7711` |
+| [#20: feat: 媒体沉浸浏览与原位返回](https://github.com/h516df/liuzheba/pull/20) | `feat/immersive-media` | `feat/author-archive-workflow` | `776207aac3a7f6733dfd7f9ab180ed7d435aa737` |
+| [#19: feat: 作者主页导入与统一档案编辑闭环](https://github.com/h516df/liuzheba/pull/19) | `feat/author-archive-workflow` | `feat/local-search-assistant` | `d7959c7f12f7f11978ae6ee5ea6835fa232ea3d2` |
+| [#18: feat: 留着吧本机文字 AI、可解释搜索与定制规则](https://github.com/h516df/liuzheba/pull/18) | `feat/local-search-assistant` | `feat/automatic-local-protection` | `db8b2c1f0ab6c8ac48df8ee35e36ed74c751c9ad` |
+| [#17: feat: 留册自动创建本机保护目录、校验与恢复](https://github.com/h516df/liuzheba/pull/17) | `feat/automatic-local-protection` | `fix/backup-restore-limits` | `7681690a70dfcb256c3ab6b107258494d6f68282` |
+| [#16: fix: 导出前校验恢复容量上限并保留已有备份](https://github.com/h516df/liuzheba/pull/16) | `fix/backup-restore-limits` | `main` | `a02b0efb8a10eac097bc66943fd6e7c006ee3ead` |
+
+## 之前的交接（历史保留）
+
 # 当前接续记录（2026-10-21）
 
 本节是会话接续入口；长期规则见 [AGENTS.md](AGENTS.md)，工具链和检查命令见 [CLOUD_DEVELOPMENT.md](CLOUD_DEVELOPMENT.md)。后续任务更新本节，下面已有历史保留。

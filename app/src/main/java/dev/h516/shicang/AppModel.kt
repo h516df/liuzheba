@@ -149,14 +149,23 @@ class AppModel(app: Application): AndroidViewModel(app) {
         draftJob?.cancel()
         work("正在收录分享媒体") {
             mutable.value.editor?.let{store.draft(it)}
-            val l=store.load()
-            val a=if(targetId==null)Archive(name="分享收录") else l.drafts.firstOrNull{it.id==targetId} ?: l.active.firstOrNull{it.id==targetId} ?: error("档案已不存在")
-            val result=store.importPhotos(uris)
-            require(result.photos.isNotEmpty()) {result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
-            val draft=a.copy(photos=a.photos+result.photos)
-            store.draft(draft)
-            mutable.value=mutable.value.copy(editor=draft,incomingMedia=emptyList(),draftStatus="已收录 ${result.photos.size} 项 · 请保存")
-            if(result.errors.isNotEmpty())message("部分媒体未收录：${result.errors.joinToString("；")}")
+            if(targetId!=null) {
+                val editor=mutable.value.editor?.takeIf{it.id==targetId}
+                val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
+                try {
+                    val (result,_)=store.importIntoArchive(targetId,uris,editor,onLinked=linked::set)
+                    require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
+                    mutable.update{it.copy(incomingMedia=emptyList())}
+                    message("已添加 ${result.photos.size} 项"+if(result.errors.isEmpty()) "" else "；${result.errors.joinToString("；")}")
+                } finally {linked.get()?.let{next->if(editor!=null)mutable.update{it.copy(editor=next,draftStatus="草稿已保存")}}}
+            } else {
+                val base=Archive(name="新收录")
+                val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
+                val result=try{store.importIntoArchive(base.id,uris,base,onLinked=linked::set).first}
+                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,incomingMedia=emptyList(),draftStatus="已存为草稿 · 保存后完成收录")}}}
+                require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
+                if(result.errors.isNotEmpty())message("部分媒体未收录：${result.errors.joinToString("；")}")
+            }
         }
     }
     fun openDownloads(input:String="") {mutable.value=mutable.value.copy(downloadsOpen=true,downloadInput=input.ifBlank{mutable.value.downloadInput})}
@@ -183,22 +192,39 @@ class AppModel(app: Application): AndroidViewModel(app) {
     }
     fun removeDownload(id:String){mediaDownloads.remove(id)}
     fun retryDownload(job:MediaDownload) {downloadInput(job.source);resolveMedia()}
-    fun importDownload(job:MediaDownload,targetId:String?=null) {
-        if(job.state!="待收录")return
+    fun importDownload(job:MediaDownload,targetId:String?=null)=importDownloads(listOf(job),targetId)
+    fun importDownloads(jobs:List<MediaDownload>,targetId:String?=null) {
+        if(jobs.isEmpty() || jobs.any{it.state!="待收录"})return
         draftJob?.cancel()
-        work("正在收录下载媒体") {
-            require(mediaDownloads.list().any{it.id==job.id && it.state=="待收录"}) {"下载记录已变化，请重新选择"}
+        work("正在收录 ${jobs.size} 项下载媒体") {
+            val current=withContext(Dispatchers.IO){mediaDownloads.list()}
+            require(jobs.all{job->current.any{it.id==job.id && it.state=="待收录"}}){"下载记录已变化，请重新选择"}
             mutable.value.editor?.let{store.draft(it)}
-            val l=store.load()
-            val a=if(targetId==null) Archive(name=job.title,fields=listOf(Field(name="来源链接",type="链接",value=job.source)))
-                else l.drafts.firstOrNull{it.id==targetId} ?: l.active.firstOrNull{it.id==targetId} ?: error("档案已不存在")
-            val result=store.importPhotos(listOf(Uri.fromFile(mediaDownloads.file(job))))
-            require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"媒体读取失败"}}
-            val draft=a.copy(photos=a.photos+result.photos)
-            store.draft(draft)
-            // The media is now a durable draft; editing/saving uses the existing archive pipeline.
-            mediaDownloads.imported(job.id,draft.id)
-            mutable.value=mutable.value.copy(editor=draft,downloadsOpen=false,draftStatus="已收录 · 请保存")
+            val uris=jobs.map{Uri.fromFile(mediaDownloads.file(it))}
+            val editor=mutable.value.editor?.takeIf{it.id==targetId}
+            var result:ImportResult
+            var target:String
+            if(targetId==null) {
+                val base=Archive(name=jobs.first().title,fields=listOf(Field(name="来源链接",type="链接",value=jobs.first().source)))
+                val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
+                try{result=store.importIntoArchive(base.id,uris,base,onLinked=linked::set).first}
+                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,draftStatus="已存为草稿 · 保存后完成收录")}}}
+                require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"媒体读取失败"}}
+                target=base.id
+            } else {
+                val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
+                try {result=store.importIntoArchive(targetId,uris,editor,progress={text->mutable.update{it.copy(progress=text)}},onLinked=linked::set).first}
+                finally {linked.get()?.let{next->if(editor!=null)mutable.update{it.copy(editor=next,draftStatus="草稿已保存")}}}
+                require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"媒体读取失败"}}
+                target=targetId
+                message("已添加 ${result.photos.size} 项照片与视频")
+            }
+            // Only records whose copies were linked may release their temporary downloads.
+            // Failed sources remain available for retry. This never submits unrelated draft fields.
+            withContext(NonCancellable+Dispatchers.IO){result.sourceIndices.forEach{mediaDownloads.imported(jobs[it].id,target)}}
+            if(result.errors.isNotEmpty())message("已收录 ${result.photos.size} 项；${result.errors.joinToString("；")}")
+            // Keep the task list open when appending; a new draft opens in the editor.
+            val refreshed=withContext(Dispatchers.IO){mediaDownloads.list()};mutable.update{it.copy(downloadsOpen=targetId!=null,downloads=refreshed)}
         }
     }
     fun refreshSpace() {viewModelScope.launch {try {val value=store.space();mutable.value=mutable.value.copy(space=value)} catch(e:Exception){message("空间统计暂不可用")}}}
@@ -207,7 +233,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private fun work(text: String, block: suspend ()->Unit) {
         if(!mutable.value.ready || mutable.value.busy) return
         mutable.value=mutable.value.copy(busy=true,progress=text)
-        operation=viewModelScope.launch { try {block();reload()}
+        operation=viewModelScope.launch { try {block()}
             catch(e:CancellationException) {message("操作已停止，当前资料已重新读取")}
             catch(e: Exception) {message(e.message ?: "操作未完成，请重试")}
             finally {withContext(NonCancellable){runCatching{reload()};mutable.value=mutable.value.copy(busy=false,progress="")}}}
@@ -241,14 +267,28 @@ class AppModel(app: Application): AndroidViewModel(app) {
         if(!mutable.value.ready || mutable.value.busy) {viewModelScope.launch {state.first{it.ready && !it.busy};importPhotos(id,uris)};return}
         draftJob?.cancel()
         work("正在导入 ${uris.size} 项照片与视频") {
-            val a=mutable.value.editor?.takeIf{it.id==id} ?: store.load().drafts.firstOrNull{it.id==id} ?: error("原编辑草稿不存在，请重新选择照片")
-            val result=store.importPhotos(uris);val next=a.copy(photos=a.photos+result.photos)
-            store.draft(next);if(mutable.value.editor?.id==id) mutable.value=mutable.value.copy(editor=next,draftStatus="草稿已保存")
-            if(result.errors.isNotEmpty()) message("已导入${result.photos.size}项；${result.errors.joinToString("；")}")
+            val editor=mutable.value.editor?.takeIf{it.id==id}
+            val committed=java.util.concurrent.atomic.AtomicReference<Archive?>()
+            try {
+                val (result,_)=store.importIntoArchive(id,uris,editor,
+                    progress={text->mutable.update{it.copy(progress=text)}},onLinked=committed::set)
+                if(result.errors.isNotEmpty()) message("已导入${result.photos.size}项；${result.errors.joinToString("；")}")
+                else if(editor==null)message("已添加 ${result.photos.size} 项照片与视频")
+            } finally {
+                // This non-suspending finalizer runs on Main even when the IO return is cancelled.
+                // Publish committed media before a later edit can overwrite it, without cross-thread editor writes.
+                committed.get()?.let{next->if(editor!=null)mutable.update{current->if(current.editor?.id==id)current.copy(editor=next,draftStatus="草稿已保存")else current}}
+            }
         }
     }
     fun preparePhotos(id: String,launch:()->Unit) {
-        val a=mutable.value.editor?.takeIf{it.id==id} ?: return
+        if(!mutable.value.ready || mutable.value.busy)return
+        val a=mutable.value.editor?.takeIf{it.id==id}
+        if(a==null) {
+            if(mutable.value.library.active.any{it.id==id})launch()
+            else message("原档案已不存在，请重新打开")
+            return
+        }
         draftJob?.cancel();work("保存编辑草稿") {store.draft(a);launch()}
     }
     fun trash(a: Archive) = work("移入回收站") {store.trash(a.id);message("已移入回收站，可从设置恢复")}

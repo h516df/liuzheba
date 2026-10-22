@@ -33,10 +33,10 @@ class MainActivity: FragmentActivity() {
         verifiedAction=null
     }
     private val picker=registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(100)) { uris ->
-        targetDraft?.let {model.importPhotos(it,uris)}
+        targetDraft?.let {if(it.isEmpty())model.receiveMedia(uris) else model.importPhotos(it,uris)}
     }
     private val camera=registerForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        if(ok) targetDraft?.let {id -> cameraUri?.let{model.importPhotos(id,listOf(it))}} else model.message("已取消拍照")
+        if(ok) targetDraft?.let {id -> cameraUri?.let{if(id.isEmpty())model.receiveMedia(listOf(it)) else model.importPhotos(id,listOf(it))}} else model.message("已取消拍照")
     }
     private val backup=registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) {uri -> if(uri!=null) model.backup(uri)}
     private val restore=registerForActivityResult(ActivityResultContracts.OpenDocument()) {uri -> if(uri!=null) model.restoreBackup(uri)}
@@ -104,13 +104,17 @@ class MainActivity: FragmentActivity() {
             if(intent==null) model.message("请先在手机系统设置中启用锁屏密码") else credential.launch(intent)
         }
     }
-    private fun choosePhotos(id:String) {model.preparePhotos(id){targetDraft=id;picker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))}}
+    private fun choosePhotos(id:String) {
+        val launch={targetDraft=id;picker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))}
+        if(id.isEmpty())launch() else model.preparePhotos(id,launch)
+    }
     private fun takePhoto(id:String) {
-        model.preparePhotos(id) {
+        val launch={
         targetDraft=id
         val dir=File(cacheDir,"camera").apply{mkdirs()};val f=File(dir,"${uid()}.jpg")
         cameraUri=FileProvider.getUriForFile(this,"$packageName.files",f)
         try {camera.launch(cameraUri!!)} catch(e:Exception){model.message("无法打开系统相机：${e.message}")}
         }
+        if(id.isEmpty())launch() else model.preparePhotos(id,launch)
     }
 }

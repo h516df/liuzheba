@@ -95,6 +95,7 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun localAiOptInCanCancelWithoutDownloading()=render("local-ai-opt-in",verify={model->
         compose.onNodeWithText("按意思找 · AI").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("按意思找 · AI").performClick()
         compose.onNodeWithText("下载 / 校验本机 AI 模型").performClick()
@@ -107,24 +108,26 @@ class ArchiveUiSnapshotTest {
     @Test fun cancelledRuleDraftDoesNotRewriteLibrary()=render("search-rules-cancel",verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("旧回忆")
         compose.onNodeWithText("对应的原名称或关键词").performTextInput("一封旧信")
         compose.onNodeWithText("添加 / 更新别名").performClick()
         compose.onNodeWithText("取消").performClick()
-        compose.onNodeWithText("收起选项").assertExists()
+        compose.onNodeWithText("我的别名").assertExists()
         compose.onNodeWithText("定制规则").assertExists()
         org.junit.Assert.assertEquals(before,model.state.value.library)
     })
     @Test fun rulesBackDiscardsDraft()=render("search-rules-back",verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("不保存")
         compose.onNodeWithContentDescription("返回").performClick()
-        compose.onNodeWithText("收起选项").assertExists()
+        compose.onNodeWithText("我的别名").assertExists()
         org.junit.Assert.assertEquals(before,runBlocking{model.store.load()})
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").assert(hasText("不保存",substring=true).not())
@@ -133,13 +136,14 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithText("添加 / 更新别名").performClick()
         androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithText("定制规则").assertExists()
-        compose.onNodeWithText("收起选项").assertExists()
+        compose.onNodeWithText("我的别名").assertExists()
         org.junit.Assert.assertEquals(before,runBlocking{model.store.load()})
     })
     @Test @Config(qualifiers="zh-rCN-w320dp-h900dp-xhdpi")
     fun narrowRulesSaveOnlyOnExplicitAction()=render("rules-320-font200",fontScale=2f,verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performScrollTo().performTextInput("旧回忆")

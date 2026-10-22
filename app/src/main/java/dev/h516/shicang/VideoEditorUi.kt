@@ -63,7 +63,7 @@ import java.io.File
             Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Text("编辑视频",Modifier.weight(1f),style=MaterialTheme.typography.titleLarge)
-                    TextButton(onClick={close()},enabled=!saving){Text(if(running)"取消并返回" else "返回")}
+                    GalleryTextButton(onClick={close()},enabled=!saving){Text(if(running)"取消并返回" else "返回")}
                 }
                 Text("先裁掉边缘杂物，或框选固定遮挡。只另存副本，原片和声音保留。",style=MaterialTheme.typography.bodyMedium)
                 if(info==null && failure.isEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -80,7 +80,7 @@ import java.io.File
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             FilterChip(selected=mode=="裁画面",onClick={mode="裁画面"},enabled=!running,label={Text("裁画面")})
                             FilterChip(selected=mode=="遮挡",onClick={mode="遮挡"},enabled=!running,label={Text("遮挡")})
-                            TextButton(onClick={plan=if(mode=="裁画面")plan.copy(crop=VideoRect())else plan.copy(mask=null)},enabled=!running){Text("重置")}
+                            GalleryTextButton(onClick={plan=if(mode=="裁画面")plan.copy(crop=VideoRect())else plan.copy(mask=null)},enabled=!running){Text("重置")}
                         }
                         Text(if(mode=="裁画面")"在视频内拖出要保留的范围；框内会保留。" else "在视频内拖出黑色遮挡区；用于固定按钮，不会还原被挡住的画面。",style=MaterialTheme.typography.bodySmall)
                     }
@@ -93,10 +93,10 @@ import java.io.File
                     var startSeconds by remember(plan.startMs){mutableStateOf((plan.startMs/1000.0).toString())}
                     var endSeconds by remember(plan.endMs){mutableStateOf((plan.endMs/1000.0).toString())}
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(startSeconds,{startSeconds=it.take(16)},label={Text("起始秒")},enabled=!running,singleLine=true,modifier=Modifier.weight(1f),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Decimal))
-                        OutlinedTextField(endSeconds,{endSeconds=it.take(16)},label={Text("结束秒")},enabled=!running,singleLine=true,modifier=Modifier.weight(1f),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Decimal))
+                        GalleryTextField(startSeconds,{startSeconds=it.take(16)},label={Text("起始秒")},enabled=!running,singleLine=true,modifier=Modifier.weight(1f),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Decimal))
+                        GalleryTextField(endSeconds,{endSeconds=it.take(16)},label={Text("结束秒")},enabled=!running,singleLine=true,modifier=Modifier.weight(1f),keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Decimal))
                     }
-                    TextButton(onClick={
+                    GalleryTextButton(onClick={
                         val from=startSeconds.toDoubleOrNull();val to=endSeconds.toDoubleOrNull()
                         if(from==null || to==null || !from.isFinite() || !to.isFinite() || from<0 || to>metadata.durationMs/1000.0 || to-from<.25)failure="请输入视频时长内的秒数，至少保留 0.25 秒"
                         else {plan=plan.copy(startMs=(from*1000).toLong(),endMs=(to*1000).toLong());failure=""}
@@ -105,8 +105,8 @@ import java.io.File
                     if(running) {
                         if(progress==null) LinearProgressIndicator(Modifier.fillMaxWidth()) else LinearProgressIndicator(progress={progress!!/100f},modifier=Modifier.fillMaxWidth())
                         Text(if(saving)"正在保存独立副本" else "正在导出${progress?.let{" $it%"}.orEmpty()}")
-                        TextButton(onClick={job?.cancel()},enabled=!saving){Text("取消导出")}
-                    } else Button(onClick={
+                        GalleryTextButton(onClick={job?.cancel()},enabled=!saving){Text("取消导出")}
+                    } else GalleryButton(onClick={
                         failure="";running=true;progress=null;preview=true
 
                     },modifier=Modifier.fillMaxWidth().testTag("video-save-copy")){Text("另存到此档案")}
