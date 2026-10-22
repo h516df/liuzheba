@@ -1,0 +1,9 @@
+{
+  "certificateSha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26",
+  "alias": "shicang",
+  "schemaVersion": 1,
+  "repository": "h516df/liuzheba",
+  "packageName": "dev.h516.shicang",
+  "publishedTag": "v0.16",
+  "publishedApkSha256": "8fe854b89f4971133fb21209dd599f77a143cbc4a8737264c69f96f9b09c2014"
+}
