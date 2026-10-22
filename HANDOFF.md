@@ -1,3 +1,49 @@
+# 当前接续记录（2026-10-22 · 导入失败与覆盖安装数据保护）
+
+- **用户指令**：“推送吧先”；强调覆盖安装保留资料、导入图片/视频失败不丢数据。用户明确“你自己搞，别问我”，签名配置由代理自行核查，不再要求用户寻找位置或发送密钥正文。
+- **源码已推送**：继续[草稿PR #31](https://github.com/h516df/liuzheba/pull/31) / `codex/experience-refactor-prep-20261021`。实现远端`e021dca8640369134594ba6718ac76a924cdf276`对应本地`2636a456fc2ca78ef501be30df8cc0540bdfa8ef`，根树均`14a5749fa015bd4357f7d4e05ab37fc8e862d909`，app树`8bb2132ea2c573b9ecd835699528432323ea5a29`。通过连接器expected-head更新，未合并main，未发正式更新。
+- **修复**：分享/首页收录批次部分成功时，原来会清空整批incoming选择；现在只移除已成功关联的来源。失败项、复制期间新收到的媒体保留在当前待收录列表，新草稿的成功媒体继续落盘。当前列表仍属会话状态，不承诺临时URI与失败选择跨进程持久；外部相册来源始终不删除。
+- **数据检查 passed**：冻结上述app树的`testDebugUnitTest --tests dev.h516.shicang.DirectMediaImportTest --tests dev.h516.shicang.LargeMediaStoreTest.declaredSixGBPlusOneRejectsWithoutTouchingSourceAndLongMetadataRoundTrips --tests dev.h516.shicang.LargeMediaStoreTest.interruptedImportDeletesOnlyItsPartialCopyAndKeepsExistingOriginal --tests dev.h516.shicang.BackupStoreTest`，使用`--no-daemon --max-workers=1 -I tools/verification.init.gradle`及既有JDK21/SDK36。23/23、3 suites、零失败/错误/跳过，3m32s；日志`/tmp/liuzheba-data-protection-check.log`。包含5个新增故障场景：部分成功重试不重复、新草稿部分成功、全部失败保留旧媒体/选择、复制期间新增输入不被清掉、既有PNG/视频/草稿在SQL关联失败并重开后内容摘要不变。已有用例另覆盖取消、读取中断、超限、旧备份保留与备份恢复。使用合成资料与宿主存储，不冒充原正式包覆盖升级/真机验收。
+- **签名核查**：当前`SHICANG_SIGNING_PROPERTIES`/`SHICANG_KEYSTORE`未配置，本地约定配置不存在；managed cloud spec23显示`secrets=[]`、`runtime_variables=[]`。仓库`environments` API读回0个环境；读取Actions Secrets元数据返回HTTP403 `Resource not accessible by integration`，不能因此声称仓库Secrets为空。当前四个工作流只生成verification调试包或unsigned release，没有云端正式签名步骤；历史交接记载正式签名在旧本机构建。未访问旧电脑或把历史私有密钥搬进公开库。
+- **覆盖安装边界**：公开最新正式版仍为v0.16/code17，原证书公钥摘要在`UpdateConfig.CERTIFICATE_SHA256`为`67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26`。先前提供的APK是`dev.h516.shicang.verification`、Android Debug证书（901650a0…），不能覆盖原正式版。正式更新尚缺可用原签名及递增版本号/原签名旧→新安装保数据验收；没有换签名、卸载、清数据或发布不兼容包。不得把源码推送称作已推送正式更新。
+- **下一步**：最终文档保存后将原协调任务转ready。继续时先核对PR与登记；保留原App和完整备份，在已授权且可访问的配置中恢复原签名通道后再做正式覆盖更新，当前不能靠证书公钥或APK反推出私钥。后续不反复询问用户密钥位置，准确报告403与已核实范围。
+
+---
+
+# 上一批记录（2026-10-22 · 发现页苹果风）
+
+- **用户反馈**：查看当前发现页后明确“苹果风”，沿既有重构接续，不创建新产品或发布正式包。
+- **分支 / PR**：继续 `codex/experience-refactor-prep-20261021` / [草稿 PR #31](https://github.com/h516df/liuzheba/pull/31)。远端实现 `83a2f66bf7c34e35490607c4dad690a4aa189f0f`，对应本地 `ca25847599e04e9680a5f08392f04be32aa79dbc`，完整根树均为 `acabb05c4ab2e3defc2892ac6e31bb925e7b4e31`，app树 `2ae294e0e7c23b76fbbf49923871988ebcaa43cf`。通过连接器expected-head更新并核对根树，不声称CLI push通过。
+- **变化**：媒体延伸至浮动导航后方；减轻底栏、选中底色和边框；发现页使用深色导航，其他入口仍随主题；顶部张数独立居中，资料与更多为圆形按钮。底部档案名一点直达完整详情，右上角资料保留简要面板。视频进度工具为导航留出空间，空库沿用深色媒体画布与回档案入口。
+- **复用与边界**：采用已读Orchard 0.3 / Apple HIG导航与材质规则，产品代码独立实现，未上传私有源码或Apple素材。当前是带透明度的表面与边框，未实现实时背景模糊或完整Liquid Glass。上下/左右翻看、随机预览、手动播放及返回原媒体保持原逻辑；普通全屏浏览保留文字返回入口。
+- **验证 passed**：冻结实现后的定向复核12/12，8 suites、零失败/错误/跳过，日志`/tmp/liuzheba-discovery-verified-check.log`，完整命令为`bash ./gradlew --no-daemon --max-workers=1 -I tools/verification.init.gradle testDebugUnitTest --tests 'dev.h516.shicang.Discovery*UiTest' --tests dev.h516.shicang.UnifiedDiscoveryNoteUiTest --tests dev.h516.shicang.ArchiveUiSnapshotTest.libraryLight --tests dev.h516.shicang.ArchiveUiSnapshotTest.libraryDark --tests dev.h516.shicang.ArchiveUiSnapshotTest.mediaTapOpensViewerAndReturnsToSameFilteredCard`。JDK21/SDK36，5m18s成功，最终app树与83a2f66一致。中间回归暴露普通全屏返回文字入口缺失，已恢复原文字动作并重新编译复验，不把中间11/12写成最终通过。覆盖直接进详情/返回媒体、200%字号、空库出口、模拟播放器进度与导航不重叠、浅深档案页及原发现流程；模拟播放器仅验证几何，不证明编解码播放。
+- **远端CI passed**：实现83a2f66的[Android checks](https://github.com/h516df/liuzheba/actions/runs/39748820874)、[Cloud development](https://github.com/h516df/liuzheba/actions/runs/39748820611)、[API35 device checks](https://github.com/h516df/liuzheba/actions/runs/39748820629)、[Secret checks](https://github.com/h516df/liuzheba/actions/runs/39748820600)均读回completed/success。本次未下载远端XML重新计数，下节267/267与6/6属于上一受测实现，不挪作本次精确数量。
+- **预览**：实际Compose/Robolectric API35原生图形宿主，320dp窄屏、合成媒体；输出`app/build/outputs/unified-navigation/discovery-apple-*.png`，最终四张图与SHA256/来源清单另存`/workspace/scratch/liuzheba-review-20261022/discovery`。已目检代表浅色、深色200%、空库、播放器布局及档案页浅深色。静态图不能证明动画/真机体验；未签名、未安装正式包、未合并、未发布。
+- **协调**：沿原任务`experience-refactor-20261022`、同一owner/workspace/generation接续；最终文档保存后转ready，准确head以PR和登记读回为准。后续先核对PR head、当前检查与登记，再接续剩余发现范围、全部媒体、重复导入、播放器专项。
+
+---
+
+# 上一批记录（2026-10-22 · 收录与页面重构实施）
+
+- **目标**：用户要求开始重构，重点纠正使用逻辑、减少操作步骤、采用苹果式 UI/UX，并参考其 Orchard UI 组件库。首批围绕收录、详情追加、下载批次与内容入口落地。
+- **暂停暂存**：本轮已恢复并整合先前 `paused-by-user-20261022-refactor-exploration` 暂存；后续从当前提交接续，不再次套用旧stash。
+- **分支 / PR**：继续 `codex/experience-refactor-prep-20261021` / [PR #31](https://github.com/h516df/liuzheba/pull/31)，原三屏概念稿保留作历史参考。已将当前 main `0bfc3cea38d651bb1dfa9a2fa8977297e54f7c1d` 的文档更新纳入本地分支，不合并其他业务 PR。
+- **源码与证据基线**：已通过连接器保存远端实现提交 `9611ebc81a2f99a9051501b9674b330ba8fda784`，根树 `cc8ab3b41d177dc43413c10836a6e54afef0aa3a`，app树 `0bd89633e09f7d661fcd368b25bdbb1fb8594d84`。已逐字节上传并核对本地 `1f717e3` 同一根树；连接器服务端提交元数据产生不同SHA，不宣称CLI push/receipt通过。GitHub PR测试合成提交 `439a240609277755d1328cad6517481102cd6922` 的根树也完全一致。最终回执文档提交只改文档，准确head以PR读回为准。
+- **已实现**：可见档案/笔记/作者索引；统一收录面板；首页先选媒体再选位置、取消不建空草稿；编辑内相册/拍照直达；正式档案直接追加且不提交已有草稿的其他字段；同来源下载批次一次选目标、失败项保留；新建收录明确草稿状态并可从下载记录继续完成。已分离产品公共控件与内容索引组件，采用中性浅深色、蓝色动作、大标题、连续分段、输入/确认/导航一致规则。
+- **复用边界**：已审查复用 #28 直接追加事务和提交后取消的状态对齐，没有整体合并 #28、预占发行版本或采用其历史测试为本轮结果。已读 Orchard 0.3@`5da1e128bf5f4cb9ad48b2adb1aa060d91047eb2` 的规则/代码/合成预览，公开产品按规范独立实现，不提交私有源码、生成文件、AAR或预览，不让公开源码构建依赖私有库。当前导航是实色材质，不标作实时模糊或完整 Liquid Glass。
+- **远端验证 passed**：实现提交 `9611ebc` 的[Cloud development](https://github.com/h516df/liuzheba/actions/runs/39741852448)、[PR Android checks](https://github.com/h516df/liuzheba/actions/runs/39741852572)、[Push Android checks](https://github.com/h516df/liuzheba/actions/runs/39741846866)与[Secret checks](https://github.com/h516df/liuzheba/actions/runs/39741852334)全部成功。已下载并核对267/267、52 suites，零失败/错误/跳过；debug/application/androidTest构建与lint通过，lint为0 errors / 82 warnings / 1 hint。XML/lint报告ZIP SHA256 `57edc84ebe06e6f3339c4705f0b93f0f0f2c7f1bd54db62561e3eb65c5b2290b`。
+- **原生模拟器 passed**：[API35 device run](https://github.com/h516df/liuzheba/actions/runs/39741852348)，读回XML核实6/6，零失败/错误/跳过。覆盖content-URI导入、播放定位与后台恢复、真实Media3 trim/crop/mask、取消导出、IME保存/取消与系统SAF备份往返；仅独立verification模拟器与合成媒体。报告ZIP SHA256 `dddde25aed2c554e9c54dc677119b16881d8345fa927e54db290629928a9f5ed`，合成merge树与受测源码一致。
+- **本地验证**：早期定向回归44项暴露两个问题：收录弹层存在多个根节点导致截图失败，以及200%字号长确认的取消按钮不可见。已分别按顶层弹层取图、固定操作区/说明区滚动修复；最终CI同树267/267复验通过。本地 `bash cloud/check.sh` 的JVM部分也267/267通过；在远端最终实现已完整构建/lint通过后主动停止重复的本地dex构建（该本地全命令不是passed），保留XML副本。最终源树的宿主画面复核 `testDebugUnitTest --tests dev.h516.shicang.CollectionJourneyUiTest --tests dev.h516.shicang.UnifiedBackupLargeTextUiTest` 为5/5 passed；本地 `1f717e3` 根树与远端受测树完全一致。已目检浅深、空库、窄屏、大字和代表流程。临时合成预览与哈希清单保存在 `/workspace/scratch/liuzheba-review-20261022`，截图不上传公开GitHub，不把静态图说成动画/真机验收。实体手机与原正式签名覆盖升级 not run，未宣称用户认可外观。
+
+- **工具链**：SDK36由现有 `.devcontainer/setup.sh` 初始化；完整JDK21由官方Temurin包取得并核对SHA256，使用系统CA信任。变量只有 `JAVA_HOME` / `ANDROID_HOME` / `SHICANG_BUILD_PYTHON` / `GRADLE_OPTS`；工具与缓存不提交，不假设新会话继承。Git CLI认证本轮恢复中失效后使用已连接GitHub工具继续原子登记与远端交付，不索取令牌或降低仓库权限。
+- **方案、来源与待办**：[本轮实现说明](docs/research/experience-refactor-implementation-2026-10-22.md)。全部媒体/类型筛选、重复导入处理、发现范围、播放器/编辑专项和进一步批量整理尚未完成；现有功能入口保留。本轮不签名、不安装正式包、不合并主线、不发正式版。
+- **协调**：专用 `codex-coordination-v1` 中 `experience-refactor-20261022`，本会话独占声明范围；下一会话先读登记、核对PR head并按协议续接，不能直接重做main。
+- **下一步**：核对最终文档head与已通过实现的app树一致，查看本批实际合成画面；后续围绕使用反馈继续上述待办。续接提示：继续留着吧PR #31，先读AGENTS、HANDOFF、本轮实现说明并核对远端及协调登记。
+
+---
+
+## 之前的交接（历史保留）
+
 # 当前接续记录（2026-10-21 · 统一通用入口）
 
 - **目标**：适应用户经常新开云端 Codex 的方式；每个项目默认分支都指向同一通用工作流，并保留本地可执行简版，用户无需记启动语或分支名。
@@ -30,13 +76,16 @@
 
 本节是会话接续入口；长期规则见 [AGENTS.md](AGENTS.md)，工具链和检查命令见 [CLOUD_DEVELOPMENT.md](CLOUD_DEVELOPMENT.md)。后续任务更新本节，下面已有历史保留。
 
-- **本轮目标**：将项目约定、进度和续接方式保存到 GitHub，使新 Codex 会话可以继续工作。
-- **核对的主线基线**：`5dce51f98664e3b1c4674f8b62a5a17290e24943`（main 的日期快照，继续前重新读取；不是永远最新提交）。
-- **本轮分支**：`codex/session-continuity-20261021`。此分支仅修改协作与交接文档，PR 和实际合并状态以 GitHub 为准。
-- **已准备**：新会话阅读顺序、结束保存流程、远端提交核对及续接提示；保留原项目规则、既有历史和云端开发配置。
-- **验证范围**：本轮检查文档差异、仓库内链接、原文保留及远端读回；业务测试/构建/设备/发布为 **not run**，历史证据不能重标成本轮结果。实际检查结果与远端提交见本轮 PR。
-- **配置与边界**：只使用独立 verification 调试包验收；原正式签名、手机升级与个人资料保护沿用现有规则。 其他配置键名、初始化入口及限制仍以云端说明和任务相关文档为准。
-- **下一步**：核对下面 PR 快照及当前 main；按用户的具体目标选择主线或指定分支，读对应 PR 的最新交接后继续。尚未完成的业务工作不因本轮文档完善而视作已完成。
+- **本轮目标**：用户要求重构准备和网上灵感，并询问 GitHub 发布能力；随后明确“整体布局混乱、功能难找”，喜欢苹果，要求先做 UI 看效果。当前优先交付视觉稿，不擅自进入全面代码重写。
+- **核对的主线基线**：研究和视觉稿基于 `a9854163e4746a1285eadf799bdb3022b2370722`，源码为 0.16 / code17。收尾时远端 main 已到 `0bfc3cea38d651bb1dfa9a2fa8977297e54f7c1d`，本轮 fetch 后确认仅 AGENTS / CLOUD_DEVELOPMENT / HANDOFF 三份通用工作流文档变化；没有把别的任务合并进本分支。已读新增的通用入口与其 workflow/README.md，继续时重新核对。
+- **本轮分支 / PR**：`codex/experience-refactor-prep-20261021` / [草稿 PR #31](https://github.com/h516df/liuzheba/pull/31)。设计交付提交 `c9af227e93c4aed638c01d02eef7ebf675ac040a` 已推送并 ls-remote 核对；收尾反馈以本次后续提交为准。不改其他任务分支，不合并、不发版。
+- **已完成**：云端 SDK 初始化、Gradle 9.1.0/JDK21 启动核对；读取 AGENTS / CLAUDE / CLOUD_DEVELOPMENT / HANDOFF 与相关规则；核实源码关键流程，检索并阅读 Eagle、mymind、Anytype、Ente 官方说明；形成 [体验重构准备](docs/research/experience-refactor-2026-10-21.md)，包含问题证据、参考取舍、目标路径、P0–P4、验收和发布边界。
+- **视觉稿与反馈**：[档案/详情/收录](docs/design/ui-preview-2026-10-21.png)，由图像工具生成，使用虚构物品示例。用户看后反馈“还行”，并要求“先收尾”；记录为首版方向初步可接受，不是最终定稿或全面实施授权。视觉稿不是 Android 实际截图或交互原型。实施时仍遵循 Android 行为；发现/我的尚未出视觉稿。
+- **当前停点 / 待完成**：按用户要求收尾，停在研究与三屏视觉稿阶段。后续继续时围绕“整体布局混乱、功能难找”，按 P0 清点入口、P1 原生小样，再审查复用 #28 并打通流程。业务工作未因研究文档完成而完成。
+- **已有候选核对**：#28 为 open/draft，head `031d816e752bf26e6ab13ac63dc4579f91b6877e`。GitHub 返回 mergeable false，但 `git merge-tree --write-tree origin/main origin/feat/core-journey-20261020` 成功，树 `e0ae6a1f4af0072dd8a6d8b32a7183991f1b539f`；仅对象模拟，不是实际合并或验收。#24/#25/#26 原 head 不是 main 祖先，而主线已有对应功能，需按文件/行为核对，不能因旧 PR 还开着就重新实施。
+- **验证范围**：设计提交 `c9af227` 的 `git diff --cached --check`、10 个本地文档/图片链接、代码围栏、HANDOFF 历史保留和 PNG 格式/1536×1024 尺寸检查 **passed**，远端 SHA 核对 **passed**；收尾提交复核文档与远端。业务测试/完整 APK 构建/原生/实体手机/正式发布均 **not run**；原历史测试不可重标成本轮结果。
+- **配置与阻塞**：开发入口 `source .cloud/env.sh`、`bash cloud/check.sh`；工具通过 `.devcontainer/setup.sh` 恢复。GitHub 连接返回 admin/push，云端 gh 认证和 Release 列表读取成功；源码写入以实际推送和 SHA 读回为准。当前未注入原正式签名 `SHICANG_SIGNING_PROPERTIES` / `SHICANG_KEYSTORE`，申请/配置位置见 `docs/RELEASING.md` 与云端环境 Secrets；不读取或迁移旧电脑密钥，不把 unsigned/debug APK 发布为官方包。
+- **下一步与续接提示**：用户下次要求继续留着吧时，代理自行找到 #31，读取本节、视觉稿及研究方案；沿用首版初步可接受的方向，再依据具体请求细化或实现。重新核对 main/#28，复核“追加媒体、名称建档、浏览返回、找回内容”；不要要求用户记住分支名，不自动合并旧 PR，不把概念稿称作体验已改善。
 
 ## 打开的 PR 快照
 

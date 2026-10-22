@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,17 +44,19 @@ import coil3.compose.AsyncImage
 }
 
 @Composable private fun ArchiveTargetDialog(title:String,archives:List<Archive>,busy:Boolean,dismiss:()->Unit,select:(String?)->Unit) {
-    AlertDialog(onDismissRequest={if(!busy)dismiss()},title={Text(title)},text={
-        LazyColumn(Modifier.heightIn(max=340.dp)) {
-            item {TextButton(onClick={select(null)},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("新建档案")}}
-            items(archives,key={it.id}) {a->TextButton(onClick={select(a.id)},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text(a.name,maxLines=2,overflow=TextOverflow.Ellipsis)}}
+    GalleryAlertDialog(onDismissRequest={if(!busy)dismiss()},title={Text(title)},text={
+        var query by rememberSaveable{mutableStateOf("")}
+        LazyColumn(Modifier.heightIn(max=380.dp)) {
+            item {GallerySearchField(query,{query=it},"搜索收录位置")}
+            item {GalleryTextButton(onClick={select(null)},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("新建档案")}}
+            items(archives.filter{query.isBlank() || it.name.contains(query,true)}.sortedByDescending{it.updated},key={it.id}) {a->GalleryTextButton(onClick={select(a.id)},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text(a.name,maxLines=2,overflow=TextOverflow.Ellipsis)}}
         }
-    },confirmButton={},dismissButton={TextButton(onClick=dismiss,enabled=!busy){Text("取消")}})
+    },confirmButton={},dismissButton={GalleryTextButton(onClick=dismiss,enabled=!busy){Text("取消")}})
 }
 
 @Composable private fun DownloadSheet(model:AppModel,s:AppState) {
     val context=LocalContext.current
-    var target by remember {mutableStateOf<MediaDownload?>(null)}
+    var target by remember {mutableStateOf<List<MediaDownload>?>(null)}
     val plan=s.mediaPlan
     var selection by remember(plan) {mutableStateOf(plan?.items?.indices?.toSet() ?: emptySet())}
     Dialog(onDismissRequest=model::closeDownloads,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
@@ -62,11 +65,11 @@ import coil3.compose.AsyncImage
                 PageBar("链接下载",model::closeDownloads)
                 LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                     item {
-                        OutlinedTextField(s.downloadInput,model::downloadInput,Modifier.fillMaxWidth(),enabled=!s.resolving,
+                        GalleryTextField(s.downloadInput,model::downloadInput,Modifier.fillMaxWidth(),enabled=!s.resolving,
                             label={Text("粘贴分享链接或媒体地址")},minLines=2,maxLines=4)
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Button(onClick=model::resolveMedia,enabled=!s.resolving && s.downloadInput.isNotBlank()) {Text(if(s.resolving) "正在解析…" else "解析链接")}
-                            if(s.downloadInput.isNotBlank()) TextButton(onClick={
+                            GalleryButton(onClick=model::resolveMedia,enabled=!s.resolving && s.downloadInput.isNotBlank()) {Text(if(s.resolving) "正在解析…" else "解析链接")}
+                            if(s.downloadInput.isNotBlank()) GalleryTextButton(onClick={
                                 val url=runCatching{MediaLinks.validUrl(s.downloadInput)}.getOrNull()
                                 if(url!=null)context.startActivity(Intent(context,MediaBrowserActivity::class.java).putExtra("url",url))
                             }){Text("打开网页")}
@@ -78,9 +81,9 @@ import coil3.compose.AsyncImage
                         item {
                             Text(plan.title,style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=TextOverflow.Ellipsis)
                             Row(verticalAlignment=Alignment.CenterVertically) {
-                                TextButton(onClick={selection=if(selection.size==plan.items.size) emptySet() else plan.items.indices.toSet()}){Text(if(selection.size==plan.items.size)"取消全选" else "全选")}
+                                GalleryTextButton(onClick={selection=if(selection.size==plan.items.size) emptySet() else plan.items.indices.toSet()}){Text(if(selection.size==plan.items.size)"取消全选" else "全选")}
                                 Spacer(Modifier.weight(1f))
-                                Button(onClick={model.enqueueMedia(selection)},enabled=selection.isNotEmpty()){Text("下载所选 ${selection.size} 项")}
+                                GalleryButton(onClick={model.enqueueMedia(selection)},enabled=selection.isNotEmpty()){Text("下载所选 ${selection.size} 项")}
                             }
                         }
                         itemsIndexed(plan.items) {index,item ->
@@ -93,16 +96,24 @@ import coil3.compose.AsyncImage
                         }
                     }
                     item {Text("下载记录",style=MaterialTheme.typography.titleMedium)}
+                    items(s.downloads.filter{it.state=="待收录"}.groupBy{it.source}.values.filter{it.size>1}.toList(),key={"batch-"+it.first().id}) {batch->
+                        GalleryTonalButton(onClick={target=batch},enabled=!s.busy,modifier=Modifier.fillMaxWidth()) {
+                            Text("收录同一来源的 ${batch.size} 项",style=MaterialTheme.typography.labelLarge)
+                        }
+                    }
                     if(s.downloads.isEmpty()) item {Text("下载完成后，选择一份档案收录。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)}
                     items(s.downloads.asReversed(),key={it.id}) {job ->
                         Column(Modifier.fillMaxWidth().padding(vertical=6.dp)) {
                             Text(job.title,maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyLarge)
-                            Text("${if(job.kind=="video")"视频" else "图片"} · ${job.state}${if(job.state=="下载中") " ${job.percent}%" else ""}",Modifier.padding(top=4.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
+                            val draft=s.library.drafts.firstOrNull{it.id==job.archiveId && s.library.active.none{a->a.id==job.archiveId}}
+                            val status=if(job.state=="已收录" && draft!=null) "已存为草稿" else job.state
+                            Text("${if(job.kind=="video")"视频" else "图片"} · $status${if(job.state=="下载中") " ${job.percent}%" else ""}",Modifier.padding(top=4.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
                             if(job.state in listOf("下载中","等待网络","等待下载")) LinearProgressIndicator(progress={job.percent/100f},modifier=Modifier.fillMaxWidth().padding(top=8.dp))
                             Row {
-                                if(job.state=="待收录") TextButton(onClick={target=job},enabled=!s.busy){Text("收录到档案")}
-                                if(job.state in listOf("下载失败","文件已移除","下载已移除")) TextButton(onClick={model.retryDownload(job)}){Text("重新解析")}
-                                TextButton(onClick={model.removeDownload(job.id)},enabled=!s.busy){Text(if(job.state in listOf("下载中","等待网络","等待下载"))"取消下载" else "移除记录")}
+                                if(draft!=null)GalleryTextButton(onClick={model.closeDownloads();model.edit(draft)},enabled=!s.busy){Text("继续完成收录")}
+                                if(job.state=="待收录") GalleryTextButton(onClick={target=listOf(job)},enabled=!s.busy){Text("收录到档案")}
+                                if(job.state in listOf("下载失败","文件已移除","下载已移除")) GalleryTextButton(onClick={model.retryDownload(job)}){Text("重新解析")}
+                                GalleryTextButton(onClick={model.removeDownload(job.id)},enabled=!s.busy){Text(if(job.state in listOf("下载中","等待网络","等待下载"))"取消下载" else "移除记录")}
                             }
                         }
                     }
@@ -112,5 +123,5 @@ import coil3.compose.AsyncImage
             }
         }
     }
-    target?.let{job->ArchiveTargetDialog("收录到档案",s.library.active,s.busy,{target=null}){id->target=null;model.importDownload(job,id)}}
+    target?.let{jobs->ArchiveTargetDialog("收录 ${jobs.size} 项到档案",s.library.active,s.busy,{target=null}){id->target=null;model.importDownloads(jobs,id)}}
 }
