@@ -24,7 +24,10 @@ android {
     }
     buildFeatures { compose = true; buildConfig = true }
 
-    buildTypes { release { isMinifyEnabled = true; isShrinkResources=true;proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"));signingConfig=null } }
+    buildTypes {
+        debug { applicationIdSuffix = ".dev" }
+        release { isMinifyEnabled = true; isShrinkResources=true;proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"));signingConfig=null }
+    }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 chaquopy {

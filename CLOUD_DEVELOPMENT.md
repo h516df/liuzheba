@@ -13,7 +13,7 @@ GitHub Actions 的 **Cloud development** 在 PR、main 推送及手动运行时�
 
 ## 当前边界
 
-正式签名原密钥尚未接入本环境；当前工作流生成独立 verification 调试包。正式签名、安装升级与资料保留需另行验证。
+原证书已接入受保护的 `android-signing` 环境，普通检查不读取正式密钥。普通 debug 为 `.dev`，原生合成验证包为 `.verification`；正式包名不变。真实产品签名与可移植恢复入口及验收边界见 [SIGNING_PREPARATION](docs/SIGNING_PREPARATION.md)。安装升级与资料保留仍需单独验证。
 
 原 README、AGENTS 与交接文件中的 Windows 路径作为历史恢复线索保留；云端开发不依赖这些路径。生产运行与发布步骤按本节边界处理，不自动运行旧的本机派发、安装、隧道或签名脚本。凭据通过平台 Secrets 注入，不能进入源码、日志或构建附件；私有项目继续保持私有。
 
