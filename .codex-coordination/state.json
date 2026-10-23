@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 48,
+  "revision": 49,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -388,9 +388,13 @@
       "role": "work",
       "branch": "codex/product-experience-20261023",
       "scopes": [
+        ".github/workflows/production-release.yml",
         "AGENTS.md",
         "README.md",
         "app",
+        "cloud/run_official_upgrade.py",
+        "cloud/test_verify_upgrade.py",
+        "cloud/verify_upgrade.py",
         "docs/PRODUCT_REWORK.md",
         "docs/acceptance/v0.18",
         "docs/releases/v0.18.md"
@@ -400,7 +404,7 @@
       "status": "active",
       "generation": 1,
       "lease_until": 1792756802,
-      "updated_at": 1792749602,
+      "updated_at": 1792749729,
       "history": []
     }
   },
