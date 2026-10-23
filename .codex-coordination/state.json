@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 22,
+  "revision": 23,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -70,7 +70,7 @@
       "status": "active",
       "generation": 2,
       "lease_until": 1792741541,
-      "updated_at": 1792734341,
+      "updated_at": 1792735067,
       "history": [
         {
           "owner": "codex-91839c4ac19c-release",
@@ -79,7 +79,39 @@
           "reason": "原整合任务已明确paused并固定PR33 head，原分支原样保留。用户本会话明确授权接续档案与混合媒体沉浸重构及正式GitHub发布，使用新云工作区和新分支隔离旧写手。"
         }
       ],
-      "handoff": "PR33 v0.17/code18候选已构建并保存，代码df9bc2b、最终文档head12cc77e26f2fe6270944b198a6d128ef0e4772f4，app树850cc7a4ec5739ea6fd8f8a94347e54ea0fdcc0d；完整CI/release/Secret均success，说明XML2/2、API35 XML6/6，校验器三个错误包拒绝通过。unsigned105641307字节，SHA a08113ce69c789946f17f8ab4752ba187cd78455ea2bd276edee8009cd147da3。通过已有Make OAuth admin已证实repo Actions Secrets=0、环境0、运行时无密钥，原正式私钥当前未接入。正式覆盖安装和发布未完成，不能用新密钥代替。完整记录见HANDOFF、docs/acceptance/v0.17/candidate.json。保持批次sealed与成员PR31冻结，恢复原签名后沿PR33继续；不再问用户找位置，不重复构建已通过候选。"
+      "handoff": "PR33 v0.17/code18候选已构建并保存，代码df9bc2b、最终文档head12cc77e26f2fe6270944b198a6d128ef0e4772f4，app树850cc7a4ec5739ea6fd8f8a94347e54ea0fdcc0d；完整CI/release/Secret均success，说明XML2/2、API35 XML6/6，校验器三个错误包拒绝通过。unsigned105641307字节，SHA a08113ce69c789946f17f8ab4752ba187cd78455ea2bd276edee8009cd147da3。通过已有Make OAuth admin已证实repo Actions Secrets=0、环境0、运行时无密钥，原正式私钥当前未接入。正式覆盖安装和发布未完成，不能用新密钥代替。完整记录见HANDOFF、docs/acceptance/v0.17/candidate.json。保持批次sealed与成员PR31冻结，恢复原签名后沿PR33继续；不再问用户找位置，不重复构建已通过候选。",
+      "receipt": {
+        "source_sha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
+        "members": {
+          "experience-refactor-20261022": "9993abeba616b22764968935edc966114b5f206d"
+        },
+        "checks": [
+          {
+            "name": "Cloud development (289 tests; build; lint)",
+            "status": "passed",
+            "source_sha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39907289864"
+          },
+          {
+            "name": "Android device checks (7 real emulator tests)",
+            "status": "passed",
+            "source_sha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39907289905"
+          },
+          {
+            "name": "Android checks",
+            "status": "passed",
+            "source_sha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39907289885"
+          },
+          {
+            "name": "Secret checks",
+            "status": "passed",
+            "source_sha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39907289881"
+          }
+        ]
+      }
     }
   },
   "batches": {
