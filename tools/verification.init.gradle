@@ -1,6 +1,10 @@
 // Isolate instrumentation from the installed release without changing release configuration.
 gradle.beforeProject { project ->
     project.plugins.withId('com.android.application') {
-        project.android.buildTypes.getByName('debug').applicationIdSuffix = '.verification'
+        // Run after the app's ordinary .dev DSL, before variants are created.
+        // Setting it when the plugin is first applied is overwritten by build.gradle.kts.
+        project.extensions.getByName('androidComponents').finalizeDsl { androidDsl ->
+            androidDsl.buildTypes.getByName('debug').applicationIdSuffix = '.verification'
+        }
     }
 }
