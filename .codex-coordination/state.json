@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 54,
+  "revision": 55,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -409,6 +409,24 @@
       "updated_at": 1792752276,
       "history": [],
       "handoff": "PR39 frozen at 07d72dd144dc756f96fb213cb0af396ee7de939c; exact-source host XML300/300 and API35 native XML8/8, zero failed/error/skipped, original publication/data protections retained. Actual UI images and product audit committed. Final local directory/viewer return7/7 plus build/lint passed. No source writer remains; integrate PR39 normally, then run exact-main official publication in a new batch because squash changes ancestry."
+    },
+    "product-v018-integration-20261023": {
+      "owner": "codex-product-integration-9248636",
+      "workspace": "cloud-product-integration-9248636",
+      "batch": "product-experience-v018-20261023",
+      "role": "integrator",
+      "branch": "codex/product-v018-integration-20261023",
+      "scopes": [
+        "@integration",
+        "@publish"
+      ],
+      "base": "07d72dd144dc756f96fb213cb0af396ee7de939c",
+      "head": "07d72dd144dc756f96fb213cb0af396ee7de939c",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792759479,
+      "updated_at": 1792752279,
+      "history": []
     }
   },
   "batches": {
@@ -425,7 +443,8 @@
       "integrator": "publisher-draft-id-fix-20261023"
     },
     "product-experience-v018-20261023": {
-      "status": "open"
+      "status": "sealed",
+      "integrator": "product-v018-integration-20261023"
     }
   }
 }
