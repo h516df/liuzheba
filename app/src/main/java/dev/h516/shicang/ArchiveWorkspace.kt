@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-/** Complete archive reading: text stays with its ordered mixture of images and videos. */
+/** One reading destination for both roots. Editing and supplemental records are progressive. */
 @Composable internal fun ArchiveDetailScreen(
     model:AppModel,s:AppState,a:Archive,back:()->Unit,view:(String)->Unit,edit:()->Unit,
     addMedia:()->Unit,delete:()->Unit,authors:@Composable ()->Unit
@@ -32,66 +32,81 @@ import androidx.compose.ui.unit.dp
     val c=MaterialTheme.colorScheme
     var filter by rememberSaveable(a.id){mutableStateOf(MediaFilter.ALL)}
     var expanded by rememberSaveable(a.id){mutableStateOf(false)}
-    var extra by rememberSaveable(a.id){mutableStateOf(a.fields.any{it.value.isNotBlank()})}
+    var extra by rememberSaveable(a.id){mutableStateOf(false)}
+    var menu by remember{mutableStateOf(false)}
     val note=s.library.archiveNote(a.id)
     val media=a.media(filter)
+    val hasDraft=s.library.drafts.any{it.id==a.id} || s.library.noteDrafts.any{it.type=="archive" && it.target==a.id}
     Column(Modifier.fillMaxSize()) {
-        PageBar("档案详情",back){TextButton(onClick=edit,enabled=!s.busy){Text("编辑")}}
-        LazyColumn(Modifier.testTag("archive-content"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
+        PageBar("档案详情",back){
+            GalleryTextButton(onClick=edit,enabled=!s.busy){Text("编辑")}
+            Box {
+                IconButton(onClick={menu=true},modifier=Modifier.semantics{contentDescription="档案选项"}){FrameGlyph("更多",c.onSurface)}
+                DropdownMenu(menu,{menu=false}) {
+                    DropdownMenuItem(text={Text("添加照片或视频")},onClick={menu=false;addMedia()},enabled=!s.busy)
+                    DropdownMenuItem(text={Text("移入回收站",color=c.error)},onClick={menu=false;delete()},enabled=!s.busy)
+                }
+            }
+        }
+        LazyColumn(Modifier.testTag("archive-content"),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
             item {
-                Text(a.name,style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.SemiBold)
-                Text(a.mediaCountLabel(),Modifier.padding(top=8.dp),color=c.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
+                Text(a.name,style=MaterialTheme.typography.headlineLarge)
                 val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter(String::isNotBlank)
-                if(labels.isNotEmpty())FlowRow(Modifier.padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                    labels.forEach{SuggestionChip(onClick=edit,label={Text(it)})}
-                }
+                Text((listOf(a.mediaCountLabel())+labels).joinToString(" · "),Modifier.padding(top=8.dp),color=c.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
+                if(hasDraft)Text("有未保存的修改，继续编辑可找回。",Modifier.padding(top=8.dp),style=MaterialTheme.typography.bodySmall,color=c.primary)
             }
-            item {
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.surface).padding(18.dp)) {
-                    if(!note?.title.isNullOrBlank())Text(note!!.title,style=MaterialTheme.typography.titleMedium,modifier=Modifier.padding(bottom=8.dp))
+            a.coverPhoto()?.let{cover->item(key="cover") {
+                Box(Modifier.fillMaxWidth().aspectRatio(1.28f).clip(RoundedCornerShape(16.dp))
+                    .clickable(onClickLabel="沉浸浏览"){view(cover.id)}) {
+                    MediaThumb(cover,model,Modifier.fillMaxSize(),"${a.name}的封面",androidx.compose.ui.layout.ContentScale.Fit)
+                    Surface(onClick={view(cover.id)},modifier=Modifier.align(Alignment.BottomEnd).padding(10.dp),
+                        color=Color.Black.copy(alpha=.62f),contentColor=Color.White,shape=RoundedCornerShape(24.dp)) {
+                        Row(Modifier.heightIn(min=48.dp).padding(horizontal=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            FrameGlyph("全部照片",Color.White);Text("沉浸浏览",style=MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }}
+            if(note!=null && (note.body.isNotBlank() || note.title.isNotBlank())) item {
+                Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    if(note.title.isNotBlank())Text(note.title,style=MaterialTheme.typography.titleMedium)
                     androidx.compose.foundation.text.selection.SelectionContainer {
-                        Text(note?.body?.ifBlank{"写下这份收藏的故事、来源或想法。"} ?: "写下这份收藏的故事、来源或想法。",
-                            Modifier.testTag("archive-text"),style=MaterialTheme.typography.bodyLarge,
-                            color=if(note?.body.isNullOrBlank())c.onSurfaceVariant else c.onSurface,
-                            maxLines=if(expanded)Int.MAX_VALUE else 6,overflow=TextOverflow.Ellipsis)
+                        Text(note.body,Modifier.testTag("archive-text"),style=MaterialTheme.typography.bodyLarge,
+                            maxLines=if(expanded)Int.MAX_VALUE else 10,overflow=TextOverflow.Ellipsis)
                     }
-                    FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-                        if(note!=null)TextButton(onClick={expanded=!expanded}){Text(if(expanded)"收起文字" else "展开全文")}
-                        TextButton(onClick=edit,enabled=!s.busy){Text(if(note==null)"写文字" else "编辑文字")}
+                    if(note.body.length>280 || note.body.lines().size>10)GalleryTextButton(onClick={expanded=!expanded},contentPadding=PaddingValues(0.dp)){Text(if(expanded)"收起文字" else "展开全文")}
+                }
+            }
+            if(a.photos.isNotEmpty()) {
+                item {
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Text("照片与视频",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+                        Text(a.photos.size.toString(),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     }
-                    if(s.library.noteDrafts.any{it.type=="archive" && it.target==a.id})Text("有未完成草稿",style=MaterialTheme.typography.labelSmall,color=c.primary)
-                }
-            }
-            item {
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                    Text("照片与视频",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
-                    if(a.photos.isNotEmpty())TextButton(onClick=edit,enabled=!s.busy){Text("整理")}
-                    FilledTonalButton(onClick=addMedia,enabled=!s.busy){Text("添加")}
-                }
-                if(a.photos.isNotEmpty())FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    MediaFilter.entries.forEach{value->FilterChip(selected=filter==value,onClick={filter=value},label={Text(value.label)},modifier=Modifier.testTag("archive-filter-${value.name}"))}
-                }
-            }
-            if(media.isEmpty())item {
-                Text(if(a.photos.isEmpty())"添加图片或视频，补充这份档案。" else "这里没有${filter.label}",Modifier.padding(vertical=12.dp),color=c.onSurfaceVariant)
-            }
-            items(media.chunked(3),key={row->row.first().id}) {row->
-                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                    row.forEach{p->
-                        MediaThumb(p,model,Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(12.dp))
-                            .clickable(onClickLabel="查看${if(p.isVideo)"视频" else "图片"}"){view(p.id)}
-                            .testTag("archive-media-${p.id}"),"查看第${a.photos.indexOf(p)+1}项${if(p.isVideo)"视频" else "图片"}")
+                    // Filtering is useful for mixed archives; a single media type needs no extra controls.
+                    if(a.photos.any{it.isVideo} && a.photos.any{!it.isVideo})FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        MediaFilter.entries.forEach{value->FilterChip(selected=filter==value,onClick={filter=value},label={Text(value.label)},modifier=Modifier.testTag("archive-filter-${value.name}"))}
                     }
-                    repeat(3-row.size){Spacer(Modifier.weight(1f))}
+                }
+                items(media.chunked(3),key={row->row.first().id}) {row->
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        row.forEach{p->MediaThumb(p,model,Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(10.dp))
+                            .clickable(onClickLabel="查看${if(p.isVideo)"视频" else "图片"}"){view(p.id)}.testTag("archive-media-${p.id}"),
+                            "查看第${a.photos.indexOf(p)+1}项${if(p.isVideo)"视频" else "图片"}")}
+                        repeat(3-row.size){Spacer(Modifier.weight(1f))}
+                    }
                 }
             }
-            item {
-                TextButton(onClick={extra=!extra},modifier=Modifier.fillMaxWidth()) {Text(if(extra)"收起补充资料" else "来源、作者与补充资料")}
+            if(a.fields.isNotEmpty() || a.authorIds.isNotEmpty())item {
+                HorizontalDivider(color=c.outlineVariant.copy(alpha=.4f))
+                Row(Modifier.fillMaxWidth().clickable{extra=!extra}.padding(vertical=16.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Text("来源与补充资料",Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
+                    Text(if(extra)"收起" else "展开",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)
+                }
             }
             if(extra) {
                 item{authors()}
                 items(a.fields,key={it.id}){ArchiveFieldValue(it,model)}
-                item{TextButton(onClick=delete,enabled=!s.busy){Text("移入回收站",color=c.error)}}
             }
         }
     }
@@ -109,6 +124,7 @@ internal fun moveMediaBefore(a:Archive,id:String,target:String):Archive {
     val grid=rememberLazyGridState()
     var choosing by rememberSaveable(a.id){mutableStateOf(false)}
     var selected by rememberSaveable(a.id){mutableStateOf(listOf<String>())}
+    var removed by remember(a.id){mutableStateOf<Archive?>(null)}
     var dragging by remember{mutableStateOf<String?>(null)}
     var pointer by remember{mutableStateOf(Offset.Zero)}
     val current by rememberUpdatedState(a)
@@ -120,7 +136,7 @@ internal fun moveMediaBefore(a:Archive,id:String,target:String):Archive {
             TextButton(onClick={choosing=!choosing;selected=emptyList()},enabled=!busy){Text(if(choosing)"完成选择" else "多选")}
             if(choosing)TextButton(onClick={selected=if(picked.size==a.photos.size)emptyList() else a.photos.map{it.id}},enabled=!busy){Text("全选")}
         }
-        LazyVerticalGrid(GridCells.Fixed(3),state=grid,modifier=Modifier.fillMaxWidth().heightIn(min=120.dp,max=420.dp).testTag("editor-media-grid"),
+        if(a.photos.isNotEmpty()) LazyVerticalGrid(GridCells.Fixed(3),state=grid,modifier=Modifier.fillMaxWidth().heightIn(min=120.dp,max=420.dp).testTag("editor-media-grid"),
             horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
             items(a.photos,key={it.id}){p->
                 Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(12.dp))
@@ -148,8 +164,16 @@ internal fun moveMediaBefore(a:Archive,id:String,target:String):Archive {
                 TextButton(onClick={model.change(moveMediaBefore(a,p.id,a.photos[index-1].id))},enabled=!busy && index>0){Text("前移")}
                 TextButton(onClick={model.change(moveMediaBefore(a,p.id,a.photos[index+1].id))},enabled=!busy && index<a.photos.lastIndex){Text("后移")}
             }
-            TextButton(onClick={model.change(a.copy(photos=a.photos.filterNot{it.id in selected}));selected=emptyList()},enabled=!busy){Text("移除 ${picked.size} 项")}
+            TextButton(onClick={removed=a;model.change(a.copy(photos=a.photos.filterNot{it.id in selected}));selected=emptyList()},enabled=!busy){Text("移除 ${picked.size} 项")}
         }
-        Text("长按拖动排序，点选可设封面。",Modifier.padding(vertical=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+        removed?.let{before->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            Text("已从草稿移除",Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+            TextButton(onClick={
+                // Restore only removed items/order/cover; preserve text and edits made since removal.
+                val now=current;val oldIds=before.photos.map{it.id}.toSet()
+                model.change(now.copy(photos=before.photos+now.photos.filterNot{it.id in oldIds},cover=before.cover));removed=null
+            },enabled=!busy){Text("撤销移除")}
+        }}
+        if(a.photos.isNotEmpty()) Text("长按拖动排序，点选可设封面。",Modifier.padding(vertical=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
     }
 }

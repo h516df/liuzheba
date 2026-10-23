@@ -36,3 +36,9 @@ internal enum class MediaFilter(val label: String) { ALL("全部"), IMAGES("图�
 internal fun Archive.media(filter: MediaFilter): List<Photo> = photos.filter {
     filter == MediaFilter.ALL || (filter == MediaFilter.VIDEOS) == it.isVideo
 }
+
+/** Archive notes always reopen the unified editor, including entry from the notes index. */
+internal fun AppModel.editRelatedNote(note:LongNote,library:Library) {
+    val archive=if(note.type=="archive")library.active.firstOrNull{it.id==note.target} else null
+    if(archive!=null)edit(archive) else noteEditor.open(note.type,note.target,library.noteLabel(note))
+}

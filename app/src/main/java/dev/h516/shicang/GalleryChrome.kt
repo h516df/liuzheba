@@ -53,7 +53,7 @@ import androidx.compose.ui.window.Dialog
 
 @Composable internal fun GalleryButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,
     shape:Shape=CircleShape,contentPadding:PaddingValues=PaddingValues(horizontal=18.dp,vertical=10.dp),
-    colors:ButtonColors=ButtonDefaults.buttonColors(containerColor=Color(0xFF0066D6),contentColor=Color.White),content:@Composable RowScope.()->Unit) =
+    colors:ButtonColors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.primary,contentColor=Color.White),content:@Composable RowScope.()->Unit) =
     GalleryAction(onClick,modifier,enabled,shape,colors,contentPadding,content)
 
 @Composable internal fun GalleryTonalButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,
@@ -123,15 +123,15 @@ import androidx.compose.ui.window.Dialog
 
 @Composable internal fun GalleryTabBar(route:String,select:(String)->Unit) {
     val c=MaterialTheme.colorScheme
-    val immersive=route=="frame"
+    val immersive=false
     val foreground=if(immersive) Color.White else c.primary
     val secondary=if(immersive) Color.White.copy(alpha=.65f) else c.onSurfaceVariant
     val shape=RoundedCornerShape(32.dp)
-    Surface(Modifier.navigationBarsPadding().padding(horizontal=24.dp,vertical=8.dp)
+    Surface(Modifier.navigationBarsPadding().padding(horizontal=20.dp,vertical=8.dp)
         .border(.5.dp,if(immersive) Color.White.copy(alpha=.18f) else c.outlineVariant.copy(alpha=.5f),shape),
         shape=shape,color=if(immersive) Color(0xF2222224) else c.surface,shadowElevation=1.dp) {
         Row(Modifier.fillMaxWidth().selectableGroup().padding(4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
-            listOf("library" to "档案","frame" to "发现").forEach{(destination,label)->
+            listOf("frame" to "发现","library" to "档案").forEach{(destination,label)->
                 Column(Modifier.weight(1f).heightIn(min=54.dp).clip(RoundedCornerShape(28.dp))
                     .background(if(route==destination) {if(immersive) Color.White.copy(alpha=.14f) else c.surfaceVariant.copy(alpha=.6f)} else Color.Transparent)
                     .testTag("nav-$destination").semantics{contentDescription="切换到$label"}

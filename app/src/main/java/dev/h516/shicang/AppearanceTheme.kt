@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.sp
         primaryContainer=Color(0xFF123456),onPrimaryContainer=Color(0xFFD6EAFF),secondaryContainer=Color(0xFF2C2C2E),
         onSecondaryContainer=Color(0xFF90C3FF),surfaceContainer=Color(0xFF2C2C2E))
     else lightColorScheme(primary=if(sea) Color(0xFF396877) else Color(0xFF0066D6),onPrimary=Color.White,
-        background=if(sea) Color(0xFFF2F6F7) else Color(0xFFF2F2F7),surface=Color.White,
-        surfaceVariant=if(sea) Color(0xFFE5EEF0) else Color(0xFFE5E5EA),
+        background=if(sea) Color(0xFFF2F6F7) else Color(0xFFF7F8FA),surface=Color.White,
+        surfaceVariant=if(sea) Color(0xFFE5EEF0) else Color(0xFFEEF0F3),
         onSurface=Color(0xFF1C1C1E),onBackground=Color(0xFF1C1C1E),onSurfaceVariant=Color(0xFF636366),
         outline=Color(0xFF8E8E93),outlineVariant=Color(0xFFD1D1D6),secondary=Color(0xFF636366),
         primaryContainer=if(sea) Color(0xFFDCECF0) else Color(0xFFE4EFFF),onPrimaryContainer=Color(0xFF0055B3),

@@ -117,14 +117,13 @@ private val Muted: Color
         LaunchedEffect(s.message,unlocked,s.editor) {if(unlocked && s.editor==null && s.message.isNotEmpty()){snackbar.showSnackbar(s.message);model.dismissMessage()}}
         LaunchedEffect(route,s.ready) {if(route=="settings" && s.ready) model.refreshSpace()}
         val editing=s.editor!=null
-        var frameArchive by rememberSaveable {mutableStateOf("")}
         val viewingPreferences=remember{context.getSharedPreferences("device",0)}
         var positions by rememberSaveable {mutableStateOf(runCatching {
             val saved=org.json.JSONObject(viewingPreferences.getString("viewingPositions","{}").orEmpty())
             HashMap<String,String>().apply{saved.keys().asSequence().take(200).forEach{key->val value=saved.optString(key);if(Codec.validId(key) && Codec.validId(value))put(key,value)}}
         }.getOrDefault(hashMapOf()))}
         val mediaActive=!collectMenu && !appearanceOpen && !s.authorsOpen && noteEditing==null && !s.downloadsOpen && s.exportRequest==null && s.shares.isEmpty() && s.protectionSelection==null && confirm==null
-        val immersive=unlocked && s.ready && !editing && (route=="frame" || zoomPhoto.isNotEmpty())
+        val immersive=unlocked && s.ready && !editing && zoomPhoto.isNotEmpty()
         DisposableEffect(immersive,dark) {
             val window=(context as? android.app.Activity)?.window
             val bars=window?.let {androidx.core.view.WindowCompat.getInsetsController(it,it.decorView)}
@@ -178,15 +177,15 @@ private val Muted: Color
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
-                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"档案";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"我的";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route in listOf("library","settings")) 34.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
-                        if(route=="frame" && !editing) Text("留着吧 · 私人档案",fontSize=11.sp,color=Muted)
+                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"档案";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"我的";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route in listOf("frame","library","settings")) 28.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
+                        if(route=="frame" && !editing && androidx.compose.ui.platform.LocalDensity.current.fontScale<=1.4f) Text("留着吧 · 私人档案",style=MaterialTheme.typography.bodySmall,color=Muted)
                         if(route=="library" && unlocked && s.ready && s.protection.location.isEmpty())Text("资料仅保存在应用内",fontSize=11.sp,color=Muted)}
-                    if(unlocked && s.ready && route=="library") {
+                    if(unlocked && s.ready && route in listOf("frame","library")) {
                         GalleryTextButton(onClick={openSettings()},modifier=Modifier.testTag("nav-settings").semantics{contentDescription="我的"}){FrameGlyph("设置",scheme.onSurfaceVariant)}
                     }
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
-                        GalleryButton(onClick={collectMenu=true},enabled=!s.busy,shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="收录"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
-                            FrameGlyph("新建",scheme.onPrimary);Spacer(Modifier.width(5.dp));Text("收录",style=MaterialTheme.typography.labelLarge)
+                        GalleryTonalButton(onClick={collectMenu=true},enabled=!s.busy,colors=ButtonDefaults.filledTonalButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurface),shape=RoundedCornerShape(24.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="收录"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
+                            FrameGlyph("新建",scheme.onSurface);Spacer(Modifier.width(5.dp));Text("收录",style=MaterialTheme.typography.labelLarge)
                         }
                     }
                 }
@@ -209,9 +208,7 @@ private val Muted: Color
              }},bottomBar={if(!editing && zoomPhoto.isEmpty() && route in listOf("frame","library") && unlocked && s.ready) {
                 GalleryTabBar(route){destination->route=destination;settingsReturn="library";settingsPhoto=""}
             }}) { padding ->
-            Box(Modifier.fillMaxSize().padding(if(route=="frame" && !editing && zoomPhoto.isEmpty())
-                PaddingValues(start=padding.calculateStartPadding(androidx.compose.ui.platform.LocalLayoutDirection.current),
-                    end=padding.calculateEndPadding(androidx.compose.ui.platform.LocalLayoutDirection.current),top=padding.calculateTopPadding()) else padding)) {
+            Box(Modifier.fillMaxSize().padding(padding)) {
                 when {
                     editing && unlocked->Unit // The full-page editor owns navigation and accessibility while open.
                     zoomPhoto.isNotEmpty() && unlocked->Unit // Save the underlying page before fullscreen changes its viewport; hidden pages must not remeasure or expose semantics.
@@ -219,12 +216,9 @@ private val Muted: Color
                     !unlocked->Column(Modifier.align(Alignment.Center).padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally){Text("你的留着吧，妥善留存",fontSize=23.sp);Text("解锁后查看私人档案",Modifier.padding(20.dp),color=Muted);GalleryButton(onClick=unlock){Text("解锁留着吧")}}
 
                     route=="frame" && !editing && zoomPhoto.isEmpty()->{
-                        val active=remember(s.library.archives){s.library.active.filter{it.photos.isNotEmpty()}}
-                        val ids=remember(active){active.map{it.id}}
-                        if(active.isEmpty()) Column(Modifier.fillMaxSize().background(Color.Black).padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("让照片成为主角",fontSize=28.sp,fontWeight=FontWeight.SemiBold,color=Color.White);Text("添加照片或视频后，在这里全屏翻看。纯文字档案仍保留在档案页。",Modifier.padding(vertical=16.dp),fontSize=15.sp,lineHeight=22.sp,color=Color.White.copy(alpha=.65f));GalleryButton(onClick={route="library"}){Text("去档案添加媒体")}}
-                        else libraryState.SaveableStateProvider("discovery") {key(ids) {ArchiveFeed(active,frameArchive,model,s.appearance,positions,::rememberPhoto,
-                            {frameArchive=it},{route="library"},::openDetails,::openPhotos,
-                            {openSettings()},{model.edit(it)},{model.edit()},s.busy,enabled=mediaActive)}}
+                        libraryState.SaveableStateProvider("discovery") {
+                            DiscoveryScreen(model,s,::openDetails){a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()}
+                        }
                     }
                     route=="photos"->libraryState.SaveableStateProvider("photos:$selected") {val a=s.library.active.firstOrNull{it.id==selected}
                         if(a!=null) AllPhotos(a,model){rememberPhoto(a.id,it);zoomPhoto=it}
@@ -248,10 +242,12 @@ private val Muted: Color
 
                     val a=s.library.active.firstOrNull {it.id==selected && it.photos.any {p->p.id==zoomPhoto}}
                         ?: s.library.active.firstOrNull {it.photos.any {p->p.id==zoomPhoto}}
-                    if(a!=null) key(a.id,"viewer") {FullPhotoFrame(a,model,s.appearance,zoomPhoto,
-                        {rememberPhoto(a.id,it)},null,null,{zoomPhoto="";route="library"},
-                        {openDetails(a.id)},{openPhotos(a.id)},
-                        {appearanceOpen=true},{model.edit(a)},{model.edit()},s.busy,{zoomPhoto=""},active=mediaActive)}
+                    if(a!=null) libraryState.SaveableStateProvider("viewer:${a.id}:$zoomPhoto") {
+                        ArchiveFeed(s.library.active.filter{it.photos.isNotEmpty()},a.id,model,s.appearance,
+                            positions+ (a.id to zoomPhoto),::rememberPhoto,{},
+                            {zoomPhoto="";route="library"},::openDetails,::openPhotos,
+                            {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy,enabled=mediaActive,close={zoomPhoto=""})
+                    }
                     else LaunchedEffect(Unit){zoomPhoto=""}
 
                 }

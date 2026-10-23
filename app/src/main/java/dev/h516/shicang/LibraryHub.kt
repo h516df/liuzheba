@@ -87,5 +87,5 @@ import kotlinx.coroutines.withContext
             }
         }
     }
-    reading?.let {note->NoteReaderDialog(note,library.noteLabel(note),library.noteDrafts.any{it.key==note.key},{reading=null},{reading=null;model.noteEditor.open(note.type,note.target,library.noteLabel(note))})}
+    reading?.let {note->NoteReaderDialog(note,library.noteLabel(note),library.noteDrafts.any{it.key==note.key},{reading=null},{reading=null;model.editRelatedNote(note,library)})}
 }

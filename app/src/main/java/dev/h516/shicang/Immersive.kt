@@ -93,7 +93,7 @@ import java.io.File
     val imageScale=if(complete) ContentScale.Fit else ContentScale.Crop
     val background=if(appearance.skin!="留白") Color.Black else MaterialTheme.colorScheme.background
     // Discover draws behind the floating navigation; keep its tools above that layer.
-    val bottomInset=if(discovery!=null) 90.dp else 8.dp
+    val bottomInset=8.dp
     LaunchedEffect(pager.settledPage,a.photos,active) {
         a.photos.getOrNull(pager.settledPage)?.let {position(it.id)}
     }
@@ -154,7 +154,7 @@ import java.io.File
             Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
         // Navigation and actions sit on the edges; metadata never covers the media until requested.
-        AnimatedVisibility(visible=active && controls && !videoPlaying,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
+        AnimatedVisibility(visible=active && controls && !videoPlaying && editingVideo==null && !reading && !information,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.45f),Color.Transparent)))
                 .statusBarsPadding().padding(start=20.dp,end=12.dp,top=8.dp,bottom=24.dp)) {
                 if(close!=null) GalleryTextButton(onClick={touch();close()},modifier=Modifier.align(Alignment.CenterStart),
@@ -163,12 +163,11 @@ import java.io.File
                 Text(if(a.photos.isEmpty()) "档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.align(Alignment.Center),color=Color.White.copy(alpha=.85f),
                     fontSize=13.sp,fontWeight=FontWeight.Medium)
                 Row(Modifier.align(Alignment.CenterEnd),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                    if(discovery!=null) ImmersiveRoundButton("设置",Modifier.testTag("nav-settings")){touch();settings()}
+
                     if(discovery!=null) ImmersiveRoundButton("资料"){touch();information=true}
                 Box {
                     ImmersiveRoundButton("更多"){touch();menu=true}
                     DropdownMenu(menu,{menu=false},shape=RoundedCornerShape(16.dp)) {
-                        DropdownMenuItem(text={Text("写档案笔记")},onClick={menu=false;model.noteEditor.open("archive",a.id,a.name)})
                         current?.let{p->DropdownMenuItem(text={Text("写这项媒体的笔记")},onClick={menu=false;model.noteEditor.open("media",p.id,"${a.name} · ${if(p.isVideo) "视频" else "照片"}")})}
                         DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
                         discovery?.let { action ->
@@ -191,7 +190,7 @@ import java.io.File
                 }
             }
         }
-        AnimatedVisibility(visible=active && controls && !videoPlaying && !hint,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
+        AnimatedVisibility(visible=active && controls && !videoPlaying && editingVideo==null && !reading && !information && !hint,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.62f))))
                 .navigationBarsPadding().padding(start=24.dp,end=20.dp,top=40.dp,bottom=bottomInset),verticalAlignment=Alignment.CenterVertically) {
                 Row(Modifier.fillMaxWidth().heightIn(min=48.dp)

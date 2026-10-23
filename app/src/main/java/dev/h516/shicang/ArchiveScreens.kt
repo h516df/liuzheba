@@ -195,6 +195,7 @@ private fun openLink(context:Context,url:String,model:AppModel) {
     var saveTemplate by remember{mutableStateOf(false)}
     var templateName by remember{mutableStateOf("")}
     var removed by remember(a.id){mutableStateOf<Pair<Int,Field>?>(null)}
+    var editorMenu by remember{mutableStateOf(false)}
     fun change(value:Archive){model.change(value)}
     BackHandler(templates){templates=false}
     BackHandler(managingLabels!=null){managingLabels=null}
@@ -210,24 +211,31 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 items(s.library.templates,key={it.id}){t->Column(Modifier.fillMaxWidth().clickable{model.applyTemplate(t);templates=false}.padding(vertical=20.dp)){Text(t.name,fontSize=17.sp);Text(t.fields.joinToString(" · "){it.name},Modifier.padding(top=6.dp),fontSize=12.sp,color=c.onSurfaceVariant);HorizontalDivider(Modifier.padding(top=20.dp),color=c.outlineVariant.copy(alpha=.5f))}}
             }
         } else Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            PageBar(if(s.library.active.any{it.id==a.id}) "编辑档案" else "新建档案",back){GalleryTextButton(onClick={confirm("放弃这次编辑？已保存的档案保持原样。",model::discardEditor)},enabled=!s.busy){Text("放弃修改")};GalleryButton(onClick=model::saveEditor,enabled=!s.busy,shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp)){Text(if(s.busy) "处理中" else "保存")}}
+            PageBar(if(s.library.active.any{it.id==a.id}) "编辑档案" else "新建档案",back){
+                Box {
+                    IconButton(onClick={editorMenu=true},enabled=!s.busy,modifier=Modifier.semantics{contentDescription="编辑选项"}){FrameGlyph("更多",c.onSurfaceVariant)}
+                    DropdownMenu(editorMenu,{editorMenu=false}){DropdownMenuItem(text={Text("放弃修改",color=c.error)},onClick={editorMenu=false;confirm("放弃这次编辑？已保存的档案保持原样。",model::discardEditor)})}
+                }
+                GalleryButton(onClick=model::saveEditor,enabled=!s.busy,shape=RoundedCornerShape(20.dp),contentPadding=PaddingValues(horizontal=18.dp,vertical=8.dp)){Text(if(s.busy) "处理中" else "保存")}
+            }
             Text("${s.draftStatus.ifBlank{"正在保留草稿"}} · 返回保留草稿",Modifier.padding(horizontal=20.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
             if(s.message.isNotEmpty()) Row(Modifier.fillMaxWidth().background(c.surfaceVariant).padding(start=24.dp),verticalAlignment=Alignment.CenterVertically){Text(s.message,Modifier.weight(1f),fontSize=12.sp);GalleryTextButton(onClick=model::dismissMessage){Text("知道了",fontSize=12.sp)}}
             if(s.busy) {LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(start=24.dp),fontSize=12.sp);GalleryTextButton(onClick=model::cancelOperation){Text("取消")}}}
             LazyColumn(Modifier.testTag("archive-editor-fields"),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=16.dp,bottom=24.dp)) {
                 item {
                     Text("档案名称",Modifier.padding(bottom=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
-                    TextField(a.name,{change(a.copy(name=it))},Modifier.fillMaxWidth(),enabled=!s.busy,singleLine=true,shape=RoundedCornerShape(16.dp),placeholder={Text("名称或称呼",style=MaterialTheme.typography.headlineMedium)},textStyle=MaterialTheme.typography.headlineMedium,colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,disabledContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
+                    TextField(a.name,{change(a.copy(name=it))},Modifier.fillMaxWidth(),enabled=!s.busy,singleLine=true,shape=RoundedCornerShape(16.dp),placeholder={Text("名称或称呼",style=MaterialTheme.typography.headlineMedium)},textStyle=MaterialTheme.typography.headlineMedium,colors=TextFieldDefaults.colors(unfocusedContainerColor=Color.Transparent,focusedContainerColor=Color.Transparent,disabledContainerColor=Color.Transparent,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
                     Spacer(Modifier.height(18.dp))
                     Text("文字",style=MaterialTheme.typography.titleMedium,modifier=Modifier.padding(bottom=8.dp))
                     val text=model.editorTextFor(a)
                     TextField(text.note.body,model::changeArchiveText,modifier=Modifier.fillMaxWidth().testTag("archive-body"),
-                        enabled=!s.busy,minLines=5,maxLines=14,placeholder={Text("介绍、故事、来源或你想留下的话……")},
+                        enabled=!s.busy,minLines=3,maxLines=14,placeholder={Text("介绍、故事、来源或你想留下的话……")},
                         shape=RoundedCornerShape(16.dp),textStyle=MaterialTheme.typography.bodyLarge,
-                        colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
+                        colors=TextFieldDefaults.colors(unfocusedContainerColor=Color.Transparent,focusedContainerColor=Color.Transparent,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
+                    HorizontalDivider(color=c.outlineVariant.copy(alpha=.4f))
                     SectionTitle("照片与视频"){GalleryTextButton(onClick={choose(a.id)},enabled=!s.busy){Text("相册")};GalleryTextButton(onClick={take(a.id)},enabled=!s.busy){Text("拍照")}}
                     if(a.photos.isEmpty()) Text("可稍后添加，只有资料也能保存。",fontSize=12.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=10.dp))
-                    if(a.photos.isNotEmpty()) EditorMediaGrid(a,model,s.busy)
+                    EditorMediaGrid(a,model,s.busy)
                     Spacer(Modifier.height(16.dp))
                     Row(Modifier.fillMaxWidth().clickable(enabled=!s.busy){labels=true}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

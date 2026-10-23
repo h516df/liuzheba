@@ -125,6 +125,7 @@ class DeviceAcceptanceTest {
         store.save(archive)
         start()
         click("发现")
+        click("浏览合成设备视频的照片与视频")
         click("播放视频")
         await("video decoder ready", 20000) {
             onMain { player()?.let { it.playbackState == Player.STATE_READY && it.playerError == null } == true }
@@ -161,7 +162,7 @@ class DeviceAcceptanceTest {
         val note=LongNote("archive",archive.id,body="这份档案同时包含横屏、竖屏视频和文字。")
         store.saveNote(note,null,store.generationToken)
         prefs.edit().putBoolean("discoveryRandomMedia",false).commit()
-        start();click("发现");click("播放视频")
+        start();click("发现");click("浏览合成横竖视频档案的照片与视频");click("播放视频")
         await("portrait decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.height>it.videoSize.width}==true}}
         click("横屏观看")
         await("manual landscape layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE}
@@ -353,6 +354,7 @@ class DeviceAcceptanceTest {
         waitText("编辑档案")
         editName("不应保存的修改")
         await("native keyboard visible") { ui.windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }
+        click("编辑选项")
         click("放弃修改")
         click("确认")
         await("cancel closes editor") { findText("编辑档案") == null }
