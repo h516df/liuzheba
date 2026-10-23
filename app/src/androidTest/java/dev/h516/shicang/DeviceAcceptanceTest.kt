@@ -505,7 +505,17 @@ class DeviceAcceptanceTest {
         it.text?.toString() == text || it.contentDescription?.toString() == text
     }
 
-    private fun click(text: String) = click(waitText(text))
+    private fun click(text: String) {
+        // Closing the editor precedes the final data reload. Wait for the real enabled control,
+        // and reacquire stale accessibility nodes; never treat a rejected click as an action.
+        await("enabled control $text") {
+            var node: AccessibilityNodeInfo? = findText(text)
+            while (node != null && !node.isClickable) node = node.parent
+            node?.let { it.isEnabled && it.isVisibleToUser &&
+                it.performAction(AccessibilityNodeInfo.ACTION_CLICK) } == true
+        }
+        Thread.sleep(250)
+    }
 
     private fun click(target: AccessibilityNodeInfo) {
         var node: AccessibilityNodeInfo? = target
