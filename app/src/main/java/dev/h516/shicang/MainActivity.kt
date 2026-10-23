@@ -76,13 +76,7 @@ class MainActivity: FragmentActivity() {
     private fun receiveShare(intent:Intent) {
         if(intent.action !in listOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE))return
         if(intent.type?.startsWith("text/")==true) {model.receiveShare(intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty());return}
-        if(intent.type?.startsWith("image/")!=true && intent.type?.startsWith("video/")!=true)return
-        val uris=buildList<Uri> {
-            if(intent.action==Intent.ACTION_SEND) intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let{add(it)}
-            else addAll(intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty())
-            intent.clipData?.let{clip->repeat(clip.itemCount){clip.getItemAt(it).uri?.let{uri->add(uri)}}}
-        }.distinct().filter{it.scheme=="content"}.take(100)
-        model.receiveMedia(uris)
+        model.receiveMedia(sharedMediaUris(intent))
     }
     override fun onSaveInstanceState(out: Bundle) {out.putString("targetDraft",targetDraft);out.putString("cameraUri",cameraUri?.toString());super.onSaveInstanceState(out)}
     override fun onStop() {super.onStop();if(getSharedPreferences("device",MODE_PRIVATE).getBoolean("appLock",false)) unlocked.value=false}
@@ -117,4 +111,18 @@ class MainActivity: FragmentActivity() {
         }
         if(id.isEmpty())launch() else model.preparePhotos(id,launch)
     }
+}
+
+/** Accept ordered content URIs from single-type and mixed media shares. */
+@Suppress("DEPRECATION")
+internal fun sharedMediaUris(intent:Intent):List<Uri> {
+    if(intent.action !in listOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE))return emptyList()
+    val mime=intent.type.orEmpty()
+    if(!mime.startsWith("image/") && !mime.startsWith("video/") && mime!="*/*")return emptyList()
+    // The declared aggregate type is only routing metadata. Store inspects each original's bytes.
+    return buildList<Uri> {
+        if(intent.action==Intent.ACTION_SEND)intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let(::add)
+        else addAll(intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty())
+        intent.clipData?.let{clip->repeat(clip.itemCount){clip.getItemAt(it).uri?.let(::add)}}
+    }.distinct().filter{it.scheme=="content"}.take(100)
 }

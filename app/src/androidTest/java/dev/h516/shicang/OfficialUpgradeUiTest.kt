@@ -42,7 +42,17 @@ class OfficialUpgradeUiTest {
         }
     }
     @Suppress("DEPRECATION") private fun installedCode()=context.packageManager.getPackageInfo(production,0).longVersionCode
-    private fun launchOfficial(){context.startActivity(checkNotNull(context.packageManager.getLaunchIntentForPackage(production)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitText("搜索档案")}
+    private fun launchOfficial() {
+        context.startActivity(checkNotNull(context.packageManager.getLaunchIntentForPackage(production)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        await("official navigation ready") {
+            val current=nodes()
+            current.none{it.text?.toString()?.startsWith("正在打开资料")==true} && current.any {
+                it.packageName?.toString()==production &&
+                    (it.text?.toString() in listOf("档案详情","备份与恢复","我的") || it.contentDescription?.toString()=="搜索档案")
+            }
+        }
+        returnToLibrary()
+    }
 
     private fun seed() {
         check(installedCode()==17L){"Seed requires the published 0.16 installation"}
@@ -57,7 +67,8 @@ class OfficialUpgradeUiTest {
         }
         val media=listOf(FileProvider.getUriForFile(context,"${context.packageName}.files",image))+sources
         val clips=ClipData.newUri(context.contentResolver,"synthetic mixed media",media.first()).apply{media.drop(1).forEach{addItem(ClipData.Item(it))}}
-        context.startActivity(Intent(Intent.ACTION_SEND_MULTIPLE).setClassName(production,"$production.MainActivity").setType("*/*")
+        // 0.16 only routes image/* or video/*; each URI still has its real provider MIME type.
+        context.startActivity(Intent(Intent.ACTION_SEND_MULTIPLE).setClassName(production,"$production.MainActivity").setType("image/*")
             .putParcelableArrayListExtra(Intent.EXTRA_STREAM,ArrayList(media)).apply{clipData=clips}
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
         click("新建档案");waitText("新建档案")
@@ -75,7 +86,11 @@ class OfficialUpgradeUiTest {
         val apk=File(context.cacheDir,"camera/upgrade.apk");check(apk.isFile && apk.length()>1000000)
         if(Build.VERSION.SDK_INT>=26 && !context.packageManager.canRequestPackageInstalls()) {
             context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            clickAny("Allow from this source","允许来自此来源的应用","允许此来源的应用")
+            waitNode("unknown-source settings label"){it.text?.toString() in listOf("Allow from this source","允许来自此来源的应用","允许此来源的应用")}
+            val toggle=waitNode("system unknown-source switch"){
+                it.packageName?.toString()=="com.android.settings" && it.isCheckable && it.isEnabled
+            }
+            if(!toggle.isChecked)click(toggle)
             await("allow this installation source"){context.packageManager.canRequestPackageInstalls()}
             ui.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);SystemClock.sleep(300)
         }
@@ -101,12 +116,13 @@ class OfficialUpgradeUiTest {
         click("我的");clickScrolling("备份与恢复");clickScrolling("导出备份文件（换机或留存）");click("确认")
         val name=waitNode("system backup filename"){it.isEditable && it.packageName?.toString()?.contains("documentsui")==true}
         setText(name,filename)
-        click(waitNode("system save action"){it.isEnabled && (it.viewIdResourceName?.endsWith(":id/action_menu_save")==true || it.text?.toString() in listOf("Save","保存"))})
+        click(waitNode("system save action"){it.isEnabled && (it.viewIdResourceName?.endsWith(":id/action_menu_save")==true || it.text?.toString().equals("Save",ignoreCase=true) || it.text?.toString()=="保存")})
         waitText("完整备份已保存并校验，可在所选文件位置找到")
     }
     private fun nodes():List<AccessibilityNodeInfo> {
+        ui.clearCache()
         val result=mutableListOf<AccessibilityNodeInfo>()
-        fun visit(node:AccessibilityNodeInfo?){if(node==null)return;result+=node;repeat(node.childCount){visit(node.getChild(it))}}
+        fun visit(node:AccessibilityNodeInfo?){if(node==null)return;if(node.isVisibleToUser)result+=node;repeat(node.childCount){visit(node.getChild(it))}}
         visit(ui.rootInActiveWindow);return result
     }
     private fun waitNode(label:String,predicate:(AccessibilityNodeInfo)->Boolean):AccessibilityNodeInfo {
@@ -115,11 +131,24 @@ class OfficialUpgradeUiTest {
     }
     private fun waitText(text:String)=waitNode(text){it.text?.toString()==text || it.contentDescription?.toString()==text}
     private fun click(text:String)=click(waitText(text))
-    private fun clickAny(vararg text:String)=click(waitNode(text.joinToString("/")){it.text?.toString() in text || it.contentDescription?.toString() in text})
+    private fun clickAny(vararg text:String)=click(waitNode(text.joinToString("/")){node->text.any{it.equals(node.text?.toString(),ignoreCase=true) || it.equals(node.contentDescription?.toString(),ignoreCase=true)}})
     private fun click(node:AccessibilityNodeInfo) {
         var target:AccessibilityNodeInfo?=node
         while(target!=null && !target.isClickable)target=target.parent
-        check(target?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true){"Expected a clickable control"};SystemClock.sleep(250)
+        if(target?.performAction(AccessibilityNodeInfo.ACTION_CLICK)!=true) {
+            // Some system controls expose a visible switch but reject accessibility ACTION_CLICK.
+            // Touch its actual reported bounds, exactly as a person would; never grant permissions via shell.
+            val visible=target ?: node
+            val bounds=android.graphics.Rect();visible.getBoundsInScreen(bounds)
+            check(visible.isVisibleToUser && visible.isEnabled && !bounds.isEmpty){"Control is not touchable: ${visible.text}"}
+            val down=SystemClock.uptimeMillis()
+            for(action in listOf(android.view.MotionEvent.ACTION_DOWN,android.view.MotionEvent.ACTION_UP)) {
+                val event=android.view.MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,bounds.exactCenterX(),bounds.exactCenterY(),0)
+                event.source=android.view.InputDevice.SOURCE_TOUCHSCREEN
+                try{check(ui.injectInputEvent(event,true))}finally{event.recycle()}
+            }
+        }
+        SystemClock.sleep(250)
     }
     private fun clickScrolling(text:String) {
         repeat(14){

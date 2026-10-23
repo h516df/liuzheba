@@ -87,6 +87,34 @@ class DeviceAcceptanceTest {
         }
     }
 
+    @Test fun wildcardShareImportsOrderedPhotoAndVideoThroughActualActivity() = runBlocking {
+        val (_, video) = importVideo()
+        val image = File(context.cacheDir, "camera/shared-${uid()}.png").also { fixtures += it }
+        android.graphics.Bitmap.createBitmap(160, 160, android.graphics.Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.BLUE)
+            image.outputStream().use { compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        val uris = listOf(image, video).map { FileProvider.getUriForFile(context, "${context.packageName}.files", it) }
+        start()
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).setPackage(context.packageName).setType("*/*")
+            .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            .apply { clipData = android.content.ClipData.newUri(context.contentResolver, "mixed media", uris.first()).apply { addItem(android.content.ClipData.Item(uris.last())) } }
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        assertEquals(MainActivity::class.java.name, intent.resolveActivity(context.packageManager)?.className)
+        context.startActivity(intent)
+        click("新建档案")
+        await("ordered mixed media imported") {
+            onMain { (activity as MainActivity).model.state.value.let { !it.busy && it.editor?.photos?.size == 2 } }
+        }
+        editName("合成混合分享档案"); click("保存")
+        await("archive saved") { onMain { (activity as MainActivity).model.state.value.library.active.any { it.name == "合成混合分享档案" } } }
+        val saved = store.load().active.single { it.name == "合成混合分享档案" }
+        assertEquals(listOf(false, true), saved.photos.map { it.isVideo })
+        assertEquals(listOf(image, video).map(::sha), saved.photos.map { it.sha256 })
+        saved.photos.forEach { assertEquals(it.sha256, sha(File(store.photoDir, it.file))) }
+    }
+
     @Test fun contentUriImportPlaysSeeksAndRetainsPositionAfterBackground() = runBlocking {
         val (photo, source) = importVideo()
         assertEquals(source.length(), photo.bytes)
@@ -358,13 +386,15 @@ class DeviceAcceptanceTest {
         click("确认")
         waitDocumentsUi()
         // DocumentsUI may first consume Back to dismiss its filename keyboard.
-        repeat(3) {
+        repeat(2) {
             if (documentNodes().isNotEmpty()) {
                 assertTrue(ui.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK))
-                Thread.sleep(400)
+                ui.waitForIdle(700, 6000)
             }
         }
-        await("cancel returns from SAF") { documentNodes().isEmpty() }
+        await("cancel returns to the real backup page") {
+            documentNodes().isEmpty() && findText("导出备份文件（换机或留存）") != null
+        }
         assertEquals(0L, store.lastBackup())
         assertFalse(prefs.contains("backupLocation"))
         assertEquals(before, store.load())
@@ -477,7 +507,17 @@ class DeviceAcceptanceTest {
         it.text?.toString() == text || it.contentDescription?.toString() == text
     }
 
-    private fun click(text: String) = click(waitText(text))
+    private fun click(text: String) {
+        // Closing the editor precedes the final data reload. Wait for the real enabled control,
+        // and reacquire stale accessibility nodes; never treat a rejected click as an action.
+        await("enabled control $text") {
+            var node: AccessibilityNodeInfo? = findText(text)
+            while (node != null && !node.isClickable) node = node.parent
+            node?.let { it.isEnabled && it.isVisibleToUser &&
+                it.performAction(AccessibilityNodeInfo.ACTION_CLICK) } == true
+        }
+        Thread.sleep(250)
+    }
 
     private fun click(target: AccessibilityNodeInfo) {
         var node: AccessibilityNodeInfo? = target
@@ -487,13 +527,17 @@ class DeviceAcceptanceTest {
     }
 
     private fun clickScrolling(text: String) {
-        repeat(8) {
-            findText(text)?.let { click(it); return }
-            val scrolled = nodes().filter { it.isScrollable }.any { it.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) }
-            check(scrolled) { "Cannot scroll to $text" }
-            Thread.sleep(300)
+        await("scroll to $text", 20000) {
+            if (findText(text) != null) true else {
+                // During activity return there may briefly be no app window or scroll container.
+                // Wait for the real page; an absent container is not a completed navigation.
+                nodes().filter { it.isScrollable }.any {
+                    it.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                }
+                false
+            }
         }
-        error("Cannot find $text after scrolling")
+        click(text)
     }
 
     private fun setText(node: AccessibilityNodeInfo, value: String) {
