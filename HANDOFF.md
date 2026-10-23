@@ -1,3 +1,15 @@
+# 当前实现与发布交接（2026-10-23）
+
+- 用户授权：实施混合档案与沉浸浏览重构，并正式发布GitHub。代码已通过[PR35](https://github.com/h516df/liuzheba/pull/35)合入主线；初始主线提交f78d239748665216a6cdbeec01ba6b87a79510b1与受测开发提交d9633d2d5902c0a890dd045a4ddae3acb1cf327f完整根树相同：02de1f7360b80a665e01ca214c069002c2a01c2e。原开发与签名准备分支保留，不把旧成员SHA声称为squash主线祖先。
+- 实现：正文与混合媒体统一编辑/事务保存/草稿；筛选、拖动排序、封面、多选移除；档案/发现双入口；沉浸全文阅读、完整视频比例、手动横屏、进度和位置恢复；持久导入回执。schema1、备份format6与原件兼容保持。
+- 已核实PR最终报告：289/289宿主测试、57 suites，7/7 API35原生测试，零失败/错误/跳过；debug/androidTest构建与lint零错误；12项Python和全部工作流actionlint1.7.7通过。Cloud run39907289864、native run39907289905、Android run39907289885与39907285184、Secret run39907289881均success。测试归档摘要与来源见implementation.json。首轮原生发现收起视频后工具栏未显示，修复后重新跑7项通过，失败不挪作成功。
+- 原整合批以保留的d9633d2及真实树相等证据完成源码整合，未在该批声明发行。正式发行另冻结真实主线SHA：v017-main-input-20261023与v017-official-publish-20261023；冻结分支codex/v017-frozen-main-20261023，发布分支codex/v017-official-release-20261023。登记在codex-coordination-v1。
+- 本次交接提交只更新验收文档，并让主线触发被历史合并说明跳过的push检查；不改受测app树533fd8573da65edbc5fb3483c132aefa5605451f。合并/API默认说明不再继承跳过CI的标记。
+- 发布门禁：main精确SHA的Cloud、原生设备、Secret检查成功后，显式运行production-release.yml。原签名在受保护android-signing环境，先unsigned构建、独立签名，再通过正式0.16界面创建资料、系统确认覆盖更新、导出备份比对条目/顺序/正文/原件摘要，最后上传三资产并回读摘要、标签与latest。签名Secret不进Gradle或开发工作区。
+- 正式发行最终状态由[最新Release](https://github.com/h516df/liuzheba/releases/latest)、[正式发布运行记录](https://github.com/h516df/liuzheba/actions/workflows/production-release.yml)与协调登记的publication回执共同确定；静态交接不预报发布成功。实体手机未验，模拟器不能代替手机兼容性。
+
+## 本轮开发阶段记录（历史）
+
 # 当前接续记录（2026-10-23 · 混合档案重构与正式发行进行中）
 
 - 用户明确要求实施并发布GitHub；本轮授权覆盖历史仅准备不发行限制。
