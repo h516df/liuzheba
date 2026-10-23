@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 29,
+  "revision": 30,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -140,11 +140,11 @@
       "handoff": "冻结PR35经GitHub squash合并后的精确主线，根树02de1f7360b80a665e01ca214c069002c2a01c2e与受测开发提交d9633d2完全一致。原开发分支保留旧成员祖先，本发布批以真实主线SHA冻结，不冒称旧成员是squash主线祖先。仅冻结源码，289/7 PR证据已核实；正式发布仍待精确主线检查、签名、覆盖安装与资产回读。"
     },
     "v017-official-publish-20261023": {
-      "owner": "codex-rebuild-fed4015f19c9",
-      "workspace": "cloud-rebuild-fed4015f19c9-publish",
+      "owner": "codex-rebuild-fed4015f19c9-publish2",
+      "workspace": "cloud-rebuild-fed4015f19c9-publish-main",
       "batch": "v017-main-publication-20261023",
       "role": "integrator",
-      "branch": "codex/v017-official-release-20261023",
+      "branch": "codex/v017-publish-main-20261023",
       "scopes": [
         ".github/workflows",
         "AGENTS.md",
@@ -164,11 +164,18 @@
       ],
       "base": "f78d239748665216a6cdbeec01ba6b87a79510b1",
       "head": "7702a303c7db282c3b3b70124159a8e97a5980df",
-      "status": "active",
-      "generation": 1,
-      "lease_until": 1792742790,
-      "updated_at": 1792735590,
-      "history": []
+      "status": "paused",
+      "generation": 2,
+      "lease_until": 0,
+      "updated_at": 1792736138,
+      "history": [
+        {
+          "owner": "codex-rebuild-fed4015f19c9",
+          "branch": "codex/v017-official-release-20261023",
+          "head": "7702a303c7db282c3b3b70124159a8e97a5980df"
+        }
+      ],
+      "handoff": "PR36 documentation merged with explicit clean message. Main c792c008db166d5ab73208c87aa4a6b31d795505 has exactly the same complete tree as 7702a303c7db282c3b3b70124159a8e97a5980df; tested application tree 533fd8573da65edbc5fb3483c132aefa5605451f unchanged. Old publication branch is frozen and retained. Stop its writer and move to an isolated worktree at the actual main SHA; no ancestor equivalence is invented. Original frozen main f78d239748665216a6cdbeec01ba6b87a79510b1 remains an actual ancestor. Wait exact-main checks before signing or publication."
     }
   },
   "batches": {
