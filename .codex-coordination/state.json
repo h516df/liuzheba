@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 32,
+  "revision": 33,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -163,11 +163,11 @@
         "@publish"
       ],
       "base": "f78d239748665216a6cdbeec01ba6b87a79510b1",
-      "head": "c792c008db166d5ab73208c87aa4a6b31d795505",
+      "head": "24ee465af57064be8e7a5bf216fd55239e0f4a2f",
       "status": "active",
       "generation": 2,
-      "lease_until": 1792743344,
-      "updated_at": 1792736816,
+      "lease_until": 1792745826,
+      "updated_at": 1792738626,
       "history": [
         {
           "owner": "codex-rebuild-fed4015f19c9",
@@ -175,43 +175,7 @@
           "head": "7702a303c7db282c3b3b70124159a8e97a5980df"
         }
       ],
-      "handoff": "PR36 documentation merged with explicit clean message. Main c792c008db166d5ab73208c87aa4a6b31d795505 has exactly the same complete tree as 7702a303c7db282c3b3b70124159a8e97a5980df; tested application tree 533fd8573da65edbc5fb3483c132aefa5605451f unchanged. Old publication branch is frozen and retained. Stop its writer and move to an isolated worktree at the actual main SHA; no ancestor equivalence is invented. Original frozen main f78d239748665216a6cdbeec01ba6b87a79510b1 remains an actual ancestor. Wait exact-main checks before signing or publication.",
-      "receipt": {
-        "source_sha": "c792c008db166d5ab73208c87aa4a6b31d795505",
-        "members": {
-          "v017-main-input-20261023": "f78d239748665216a6cdbeec01ba6b87a79510b1"
-        },
-        "checks": [
-          {
-            "name": "Secret checks",
-            "status": "passed",
-            "source_sha": "c792c008db166d5ab73208c87aa4a6b31d795505",
-            "run_id": 39910411878,
-            "url": "https://github.com/h516df/liuzheba/actions/runs/39910411878"
-          },
-          {
-            "name": "Android device checks",
-            "status": "passed",
-            "source_sha": "c792c008db166d5ab73208c87aa4a6b31d795505",
-            "run_id": 39910412053,
-            "url": "https://github.com/h516df/liuzheba/actions/runs/39910412053"
-          },
-          {
-            "name": "Cloud development",
-            "status": "passed",
-            "source_sha": "c792c008db166d5ab73208c87aa4a6b31d795505",
-            "run_id": 39910411897,
-            "url": "https://github.com/h516df/liuzheba/actions/runs/39910411897"
-          },
-          {
-            "name": "Android checks",
-            "status": "passed",
-            "source_sha": "c792c008db166d5ab73208c87aa4a6b31d795505",
-            "run_id": 39910411921,
-            "url": "https://github.com/h516df/liuzheba/actions/runs/39910411921"
-          }
-        ]
-      }
+      "handoff": "PR36 documentation merged with explicit clean message. Main c792c008db166d5ab73208c87aa4a6b31d795505 has exactly the same complete tree as 7702a303c7db282c3b3b70124159a8e97a5980df; tested application tree 533fd8573da65edbc5fb3483c132aefa5605451f unchanged. Old publication branch is frozen and retained. Stop its writer and move to an isolated worktree at the actual main SHA; no ancestor equivalence is invented. Original frozen main f78d239748665216a6cdbeec01ba6b87a79510b1 remains an actual ancestor. Wait exact-main checks before signing or publication."
     }
   },
   "batches": {
