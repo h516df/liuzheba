@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 37,
+  "revision": 38,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -167,7 +167,7 @@
       "status": "active",
       "generation": 3,
       "lease_until": 1792749006,
-      "updated_at": 1792741806,
+      "updated_at": 1792742350,
       "history": [
         {
           "owner": "codex-rebuild-fed4015f19c9",
@@ -180,7 +180,43 @@
           "head": "da83436a687977fdebf9b680b9305f220f225876"
         }
       ],
-      "handoff": "PR37 merged after exact-source host/device checks. Reference upgrade harness source 0273f7349dc770504a31ff1870527c28f793ba43 passed with candidate c792c008db166d5ab73208c87aa4a6b31d795505; a verified diff since that source changes only the independent native control helper and HANDOFF, leaving reference harness and application identical. Main 6826b378061acb117eb08a2515d9070e792f1e3b has exactly the same full tree as da83436a687977fdebf9b680b9305f220f225876. Old publication branch stopped and retained without rewriting. Move this same task to an isolated worktree at actual main, preserving frozen member f78d239748665216a6cdbeec01ba6b87a79510b1 as actual ancestor; wait exact-main checks and repeat official signed upgrade before publication."
+      "handoff": "PR37 merged after exact-source host/device checks. Reference upgrade harness source 0273f7349dc770504a31ff1870527c28f793ba43 passed with candidate c792c008db166d5ab73208c87aa4a6b31d795505; a verified diff since that source changes only the independent native control helper and HANDOFF, leaving reference harness and application identical. Main 6826b378061acb117eb08a2515d9070e792f1e3b has exactly the same full tree as da83436a687977fdebf9b680b9305f220f225876. Old publication branch stopped and retained without rewriting. Move this same task to an isolated worktree at actual main, preserving frozen member f78d239748665216a6cdbeec01ba6b87a79510b1 as actual ancestor; wait exact-main checks and repeat official signed upgrade before publication.",
+      "receipt": {
+        "source_sha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+        "members": {
+          "v017-main-input-20261023": "f78d239748665216a6cdbeec01ba6b87a79510b1"
+        },
+        "checks": [
+          {
+            "name": "Secret checks",
+            "status": "passed",
+            "source_sha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+            "run_id": 39920417494,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39920417494"
+          },
+          {
+            "name": "Android device checks",
+            "status": "passed",
+            "source_sha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+            "run_id": 39920417485,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39920417485"
+          },
+          {
+            "name": "Cloud development",
+            "status": "passed",
+            "source_sha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+            "run_id": 39920417507,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39920417507"
+          },
+          {
+            "name": "Android checks",
+            "status": "passed",
+            "source_sha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+            "run_id": 39920417493,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39920417493"
+          }
+        ]
+      }
     }
   },
   "batches": {
