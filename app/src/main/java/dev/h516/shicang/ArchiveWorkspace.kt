@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
     var extra by rememberSaveable(a.id){mutableStateOf(false)}
     var menu by remember{mutableStateOf(false)}
     val note=s.library.archiveNote(a.id)
+    var textOverflow by remember(a.id,note?.body){mutableStateOf(false)}
     val media=a.media(filter)
     val hasDraft=s.library.drafts.any{it.id==a.id} || s.library.noteDrafts.any{it.type=="archive" && it.target==a.id}
     Column(Modifier.fillMaxSize()) {
@@ -72,9 +73,10 @@ import androidx.compose.ui.unit.dp
                     if(note.title.isNotBlank())Text(note.title,style=MaterialTheme.typography.titleMedium)
                     androidx.compose.foundation.text.selection.SelectionContainer {
                         Text(note.body,Modifier.testTag("archive-text"),style=MaterialTheme.typography.bodyLarge,
-                            maxLines=if(expanded)Int.MAX_VALUE else 10,overflow=TextOverflow.Ellipsis)
+                            maxLines=if(expanded)Int.MAX_VALUE else 10,overflow=TextOverflow.Ellipsis,
+                            onTextLayout={if(!expanded)textOverflow=it.hasVisualOverflow})
                     }
-                    if(note.body.length>280 || note.body.lines().size>10)GalleryTextButton(onClick={expanded=!expanded},contentPadding=PaddingValues(0.dp)){Text(if(expanded)"收起文字" else "展开全文")}
+                    if(expanded || textOverflow)GalleryTextButton(onClick={expanded=!expanded},contentPadding=PaddingValues(0.dp)){Text(if(expanded)"收起文字" else "展开全文")}
                 }
             }
             if(a.photos.isNotEmpty()) {

@@ -177,7 +177,7 @@ private val Muted: Color
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
-                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"档案";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"我的";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route in listOf("frame","library","settings")) 28.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
+                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"档案";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"我的";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},style=if(route in listOf("frame","library","settings")) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge)
                         if(route=="frame" && !editing && androidx.compose.ui.platform.LocalDensity.current.fontScale<=1.4f) Text("留着吧 · 私人档案",style=MaterialTheme.typography.bodySmall,color=Muted)
                         if(route=="library" && unlocked && s.ready && s.protection.location.isEmpty())Text("资料仅保存在应用内",fontSize=11.sp,color=Muted)}
                     if(unlocked && s.ready && route in listOf("frame","library")) {

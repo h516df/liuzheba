@@ -110,7 +110,7 @@ import java.io.File
     var hint by remember {mutableStateOf(!preferences.getBoolean("frameHintV2",false))}
     fun touch() {activity++;hint=false;preferences.edit().putBoolean("frameHintV2",true).apply()}
     BackHandler(menu) {menu=false}
-    Box(Modifier.fillMaxSize().background(background)) {
+    Box(Modifier.fillMaxSize().background(background).then(if(active)Modifier else Modifier.clearAndSetSemantics{})) {
         val framed=appearance.skin=="留白"
         HorizontalPager(pager,Modifier.fillMaxSize(),
             key={a.photos.getOrNull(it)?.id ?: a.id},userScrollEnabled=!zoomed && !reading && editingVideo==null,

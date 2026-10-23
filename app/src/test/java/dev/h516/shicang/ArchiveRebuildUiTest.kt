@@ -60,4 +60,18 @@ class ArchiveRebuildUiTest:UnifiedNavigationFixture() {
         val library=runBlocking{model.store.load()};assertEquals(3,library.photoTrash.size)
         assertTrue(a.photos.all{model.photoFile(it).isFile})
     }
+    @Test fun expansionUsesActualTextOverflowAtLargeFont()=fixture(font=2f) {model,a->
+        val body="大字号下，即使不足两百字，也可能超过十行，需要完整展开。".repeat(5)
+        model.edit(a);model.change(a.copy(photos=emptyList()));model.changeArchiveText(body);model.saveEditor()
+        idle{model.state.value.editor==null && !model.state.value.busy}
+        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithText("展开全文").performScrollTo().assertIsDisplayed().performClick()
+        compose.onNodeWithText("收起文字").performScrollTo().assertIsDisplayed()
+        val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithTag("archive-text").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){it(layouts)}
+        assertTrue(layouts.single().lineCount>10)
+        assertFalse(layouts.single().hasVisualOverflow)
+        assertTrue(model.state.value.library.noteDrafts.isEmpty())
+    }
+
 }

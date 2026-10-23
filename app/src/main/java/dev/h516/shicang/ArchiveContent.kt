@@ -18,7 +18,7 @@ internal fun Library.archiveTextDraft(a: Archive, generation: String): ArchiveTe
 }
 
 internal fun Library.archiveSummary(a: Archive): String = archiveNote(a.id)?.body
-    ?.lineSequence()?.map(String::trim)?.filter(String::isNotEmpty)?.joinToString(" ")
+    ?.take(320)?.lineSequence()?.map(String::trim)?.filter(String::isNotEmpty)?.joinToString(" ")
     ?.takeIf(String::isNotBlank) ?: archiveCaption(a, this)
 
 internal fun Archive.mediaCountLabel(): String {

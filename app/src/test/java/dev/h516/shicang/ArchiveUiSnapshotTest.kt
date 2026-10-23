@@ -241,6 +241,10 @@ class ArchiveUiSnapshotTest {
     private fun render(name:String,dark:Boolean=false,detail:Boolean=false,settings:Boolean=false,empty:Boolean=false,fontScale:Float=1f,longLibrary:Boolean=false,verify:(AppModel)->Unit={}) {
         RuntimeEnvironment.setFontScale(fontScale)
         val app=RuntimeEnvironment.getApplication()
+        // Warm native Bitmap JNI on the sandbox's test thread before Coil decoder workers.
+        android.graphics.Bitmap.createBitmap(1,1,android.graphics.Bitmap.Config.ARGB_8888).apply {
+            copyPixelsToBuffer(java.nio.ByteBuffer.allocate(4));recycle()
+        }
         app.getSharedPreferences("device",0).edit().putString("generation",uid()).putBoolean("libraryCovers",true).putBoolean("frameHintV2",true).apply()
         val store=Store(app)
         runBlocking {

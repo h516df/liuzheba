@@ -1,0 +1,48 @@
+{
+  "environment": "Compose + Robolectric native graphics, API35 host",
+  "data": "synthetic geometry and text, no private photos",
+  "physicalPhone": "not_run",
+  "meaning": "rendered implementation, not a concept image or approval of visual quality",
+  "files": [
+    {
+      "file": "product-discovery.png",
+      "sha256": "65e1ecb61faa94875030ab0d1e806e477c6ecf1536f7d11aeada9db1c6dd928b",
+      "bytes": 86674
+    },
+    {
+      "file": "product-library.png",
+      "sha256": "d5fb200596f0eec2146602d30bab9c70f5a993bd706485285d8f35ec76250320",
+      "bytes": 77364
+    },
+    {
+      "file": "product-reading.png",
+      "sha256": "7cca7a0b61e756bd4e2ea98dd268c0e302b206cd0eaab2e8a774f1034e326c6e",
+      "bytes": 76583
+    },
+    {
+      "file": "product-editing.png",
+      "sha256": "21c12781d5d6a4165bc14272936e2336ca6e32109ba991012b131f9aeab64dcc",
+      "bytes": 90309
+    },
+    {
+      "file": "product-discovery-dark-font200.png",
+      "sha256": "3f9ab474a9f110cbb8c6ebe9e6f50f81fc967aa45839c644c1773fa348e5608b",
+      "bytes": 84875
+    },
+    {
+      "file": "product-detail-dark-font200.png",
+      "sha256": "4914f9d3bff92208e6ba47a65ab42fc9e6ac1e7b0d657151e60d5ebf14b2305f",
+      "bytes": 75957
+    },
+    {
+      "file": "product-discovery-empty.png",
+      "sha256": "99d39866d3a0eee08ccf3506dbc577c527991be8cd2dc7c94e7a1a9963db329e",
+      "bytes": 72096
+    },
+    {
+      "file": "product-missing-original.png",
+      "sha256": "4668ba32b505362e956f1c6e0c4690acd4465ea14b1b87d5931c31c97089617c",
+      "bytes": 54691
+    }
+  ]
+}
