@@ -60,7 +60,7 @@ class LabelEditorWorkflowUiTest:UnifiedNavigationFixture() {
         compose.onNodeWithText("完成").performClick()
         assertTrue(model.state.value.editor!!.tags.isEmpty())
         assertTrue(model.state.value.library.labels.any{it.id==tag.id})
-        compose.onNodeWithContentDescription("返回").performClick();compose.onNodeWithText("保留草稿并返回").performClick();idle{model.state.value.editor==null && !model.state.value.busy}
+        compose.onNodeWithContentDescription("返回").performClick();idle{model.state.value.editor==null && !model.state.value.busy}
         assertTrue(runBlocking{model.store.load()}.drafts.single().tags.isEmpty())
         assertEquals(a.photos,runBlocking{model.store.load()}.active.single().photos)
     }

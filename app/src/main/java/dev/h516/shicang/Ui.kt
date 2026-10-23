@@ -86,13 +86,8 @@ private val Muted: Color
         var zoomPhoto by rememberSaveable{mutableStateOf("")}
         val snackbar=remember{SnackbarHostState()}
         var confirm by remember{mutableStateOf<Pair<String,()->Unit>?>(null)}
-        var leaveEditorPrompt by remember{mutableStateOf(false)}
         var collectMenu by remember{mutableStateOf(false)}
-        fun requestLeaveEditor() {
-            if(s.busy)return
-            val editor=s.editor ?: return
-            if(s.library.active.firstOrNull{it.id==editor.id}==editor)model.discardEditor() else leaveEditorPrompt=true
-        }
+        fun requestLeaveEditor() {if(!s.busy && s.editor!=null)model.leaveEditor()}
         if(s.protectionSelection!=null) GalleryAlertDialog(
             onDismissRequest=model::dismissProtectionSelection,
             title={Text("找到已有恢复版本")},
@@ -123,7 +118,11 @@ private val Muted: Color
         LaunchedEffect(route,s.ready) {if(route=="settings" && s.ready) model.refreshSpace()}
         val editing=s.editor!=null
         var frameArchive by rememberSaveable {mutableStateOf("")}
-        var positions by rememberSaveable {mutableStateOf(hashMapOf<String,String>())}
+        val viewingPreferences=remember{context.getSharedPreferences("device",0)}
+        var positions by rememberSaveable {mutableStateOf(runCatching {
+            val saved=org.json.JSONObject(viewingPreferences.getString("viewingPositions","{}").orEmpty())
+            HashMap<String,String>().apply{saved.keys().asSequence().take(200).forEach{key->val value=saved.optString(key);if(Codec.validId(key) && Codec.validId(value))put(key,value)}}
+        }.getOrDefault(hashMapOf()))}
         val mediaActive=!collectMenu && !appearanceOpen && !s.authorsOpen && noteEditing==null && !s.downloadsOpen && s.exportRequest==null && s.shares.isEmpty() && s.protectionSelection==null && confirm==null
         val immersive=unlocked && s.ready && !editing && (route=="frame" || zoomPhoto.isNotEmpty())
         DisposableEffect(immersive,dark) {
@@ -139,6 +138,7 @@ private val Muted: Color
         }
         fun rememberPhoto(archiveId:String,photoId:String) {
             positions=rememberPhotoPosition(positions,archiveId,photoId)
+            viewingPreferences.edit().putString("viewingPositions",org.json.JSONObject(positions as Map<*,*>).toString()).apply()
         }
 
         fun openDetails(id:String) {
@@ -177,10 +177,13 @@ private val Muted: Color
         Scaffold(containerColor=scheme.background,contentWindowInsets=if(immersive) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets,snackbarHost={if(unlocked) Box(Modifier.padding(bottom=if(immersive) 96.dp else 0.dp)){SnackbarHost(snackbar)}},
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                    if(editing || route !in listOf("frame","library","settings")) GalleryIcon("返回",scheme.onSurface){backPage()}
+                    if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
                     Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"档案";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"我的";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},fontSize=if(route in listOf("library","settings")) 34.sp else 20.sp,fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.SemiBold)
                         if(route=="frame" && !editing) Text("留着吧 · 私人档案",fontSize=11.sp,color=Muted)
                         if(route=="library" && unlocked && s.ready && s.protection.location.isEmpty())Text("资料仅保存在应用内",fontSize=11.sp,color=Muted)}
+                    if(unlocked && s.ready && route=="library") {
+                        GalleryTextButton(onClick={openSettings()},modifier=Modifier.testTag("nav-settings").semantics{contentDescription="我的"}){FrameGlyph("设置",scheme.onSurfaceVariant)}
+                    }
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
                         GalleryButton(onClick={collectMenu=true},enabled=!s.busy,shape=RoundedCornerShape(16.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="收录"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
                             FrameGlyph("新建",scheme.onPrimary);Spacer(Modifier.width(5.dp));Text("收录",style=MaterialTheme.typography.labelLarge)
@@ -203,7 +206,7 @@ private val Muted: Color
                     }
                 }
                 if(s.busy){LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(horizontal=24.dp,vertical=4.dp),fontSize=12.sp);if(s.progress.contains("备份")||s.progress.contains("恢复")||s.progress.contains("导入")||s.progress.contains("打包")||s.progress.contains("写入")) GalleryTextButton(onClick=model::cancelOperation){Text("取消")}}}
-             }},bottomBar={if(!editing && zoomPhoto.isEmpty() && route in listOf("frame","library","settings") && unlocked && s.ready) {
+             }},bottomBar={if(!editing && zoomPhoto.isEmpty() && route in listOf("frame","library") && unlocked && s.ready) {
                 GalleryTabBar(route){destination->route=destination;settingsReturn="library";settingsPhoto=""}
             }}) { padding ->
             Box(Modifier.fillMaxSize().padding(if(route=="frame" && !editing && zoomPhoto.isEmpty())
@@ -221,7 +224,7 @@ private val Muted: Color
                         if(active.isEmpty()) Column(Modifier.fillMaxSize().background(Color.Black).padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){Text("让照片成为主角",fontSize=28.sp,fontWeight=FontWeight.SemiBold,color=Color.White);Text("添加照片或视频后，在这里全屏翻看。纯文字档案仍保留在档案页。",Modifier.padding(vertical=16.dp),fontSize=15.sp,lineHeight=22.sp,color=Color.White.copy(alpha=.65f));GalleryButton(onClick={route="library"}){Text("去档案添加媒体")}}
                         else libraryState.SaveableStateProvider("discovery") {key(ids) {ArchiveFeed(active,frameArchive,model,s.appearance,positions,::rememberPhoto,
                             {frameArchive=it},{route="library"},::openDetails,::openPhotos,
-                            {appearanceOpen=true},{model.edit(it)},{model.edit()},s.busy,enabled=mediaActive)}}
+                            {openSettings()},{model.edit(it)},{model.edit()},s.busy,enabled=mediaActive)}}
                     }
                     route=="photos"->libraryState.SaveableStateProvider("photos:$selected") {val a=s.library.active.firstOrNull{it.id==selected}
                         if(a!=null) AllPhotos(a,model){rememberPhoto(a.id,it);zoomPhoto=it}
@@ -231,10 +234,10 @@ private val Muted: Color
                         when(librarySection) {
                             "notes"->NotesLibrary(model,s.library)
                             "authors"->AuthorsLibrary(model,s)
-                            else->LibraryV19(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})
+                            else->ArchiveLibraryScreen(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})
                         }
                     }
-                    route=="detail"->libraryState.SaveableStateProvider("detail:$selected") {val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else DetailV19(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{openPhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}},::openDetails,{choosePhotos(a.id)},{AuthorArchiveSection(model,s,a,false);ArchiveNoteSection(model,s.library,a)})}
+                    route=="detail"->libraryState.SaveableStateProvider("detail:$selected") {val a=s.library.active.firstOrNull{it.id==selected};if(a==null) Empty("档案已移入回收站或不存在","返回档案"){route="library"} else ArchiveDetailScreen(model,s,a,{backPage()},{rememberPhoto(a.id,it);zoomPhoto=it},{model.edit(a)},{choosePhotos(a.id)},{confirm="将「${a.name}」移入回收站？可以恢复。" to {model.trash(a);route="library"}},{AuthorArchiveSection(model,s,a,false)})}
                     route=="settings"->libraryState.SaveableStateProvider("settings") {Settings(model,s,setLock,{route=it},{title,action->confirm=title to action})}
                     route=="backup"->BackupScreen(model,s,chooseProtection,backup,{confirm="恢复将切换当前档案。成功后保留恢复前副本，失败时原资料继续可用。" to restore},{title,action->confirm=title to action})
                     route=="bin"->Bin(model,s){title,action->confirm=title to action}
@@ -261,14 +264,13 @@ private val Muted: Color
             archive={collectMenu=false;model.edit()},
             link={collectMenu=false;model.edit(Archive(fields=listOf(Field(name="来源",type="链接"))))},
             download={collectMenu=false;model.openDownloads()})
-        if(unlocked && editing) EditorV19(model,s,choosePhotos,takePhoto,{requestLeaveEditor()},{title,action->confirm=title to action},{s.editor?.let{AuthorArchiveSection(model,s,it,true)}})
+        if(unlocked && editing) ArchiveEditorScreen(model,s,choosePhotos,takePhoto,{requestLeaveEditor()},{title,action->confirm=title to action},{s.editor?.let{AuthorArchiveSection(model,s,it,true)}})
         if(unlocked && s.ready && s.authorsOpen) AuthorWorkflowUi(model,s)
         if(unlocked && s.ready) LongNotesUi(model,s.library,false,{})
-        if(unlocked && leaveEditorPrompt) GalleryAlertDialog(onDismissRequest={leaveEditorPrompt=false},title={Text("保留这次编辑？")},text={Text("保存草稿后返回，下次可以继续；已保存的档案暂不改变。")},confirmButton={GalleryTextButton(onClick={leaveEditorPrompt=false;model.leaveEditor()}){Text("保留草稿并返回")}},dismissButton={Row{GalleryTextButton(onClick={leaveEditorPrompt=false}){Text("继续编辑")};GalleryTextButton(onClick={leaveEditorPrompt=false;model.discardEditor()}){Text("放弃修改")}}})
         if(unlocked && appearanceOpen) ModalBottomSheet(onDismissRequest={appearanceOpen=false},
             sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=scheme.surface,tonalElevation=0.dp,
             shape=RoundedCornerShape(topStart=26.dp,topEnd=26.dp)) {
-            AppearanceV5(model,s,{appearanceOpen=false},{appearanceOpen=false;openSettings(settingsPhotoPosition(s.library,positions,zoomPhoto))})
+            AppearanceSettings(model,s,{appearanceOpen=false},{appearanceOpen=false;openSettings(settingsPhotoPosition(s.library,positions,zoomPhoto))})
         }
         if(unlocked && s.ready) MediaCollectionUi(model,s)
         if(unlocked && s.ready && s.shares.isNotEmpty()) GalleryAlertDialog(onDismissRequest={if(!s.busy)model.dismissShare()},
@@ -298,69 +300,6 @@ private val Muted: Color
         }
     }
 }
-@Composable private fun Cover(a:Archive,model:AppModel,modifier:Modifier=Modifier) {
-    val p=a.coverPhoto()
-    if(p==null) NameCard(a,modifier) else {
-        var failed by remember(p.id){mutableStateOf(false)}
-        var attempt by remember(p.id){mutableIntStateOf(0)}
-        val context=LocalContext.current
-        val file=model.photoFile(p)
-        val request=remember(file,attempt){coil3.request.ImageRequest.Builder(context).data(file).memoryCacheKey("${file.path}:$attempt").build()}
-        Box(modifier.background(MaterialTheme.colorScheme.surface)) {
-            if(failed) NameCard(a,Modifier.fillMaxSize())
-            AsyncImage(model=request,contentDescription="${a.name}的封面",contentScale=ContentScale.Crop,modifier=Modifier.fillMaxSize(),onError={failed=true},onSuccess={failed=false})
-            if(failed) GalleryTextButton(onClick={attempt++;failed=false},modifier=Modifier.align(Alignment.BottomCenter).background(MaterialTheme.colorScheme.surface)){Text("照片读取失败 · 重试",fontSize=11.sp)}
-        }
-    }
-}
-@Composable private fun Tag(text:String) {Surface(shape=RoundedCornerShape(50),color=MaterialTheme.colorScheme.primary.copy(alpha=.09f)){Text(text,Modifier.padding(horizontal=12.dp,vertical=5.dp),fontSize=11.sp,color=MaterialTheme.colorScheme.primary)}}
-@Composable private fun LibraryScreen(model:AppModel,s:AppState,open:(String)->Unit) {
-    var query by rememberSaveable{mutableStateOf("")}
-    var search by rememberSaveable{mutableStateOf(false)}
-    var category by rememberSaveable{mutableStateOf("")};var tag by rememberSaveable{mutableStateOf("")};var sortName by rememberSaveable{mutableStateOf(false)}
-    var results by remember{mutableStateOf(s.library.active)}
-    LaunchedEffect(query,category,tag,s.library,sortName){results=withContext(Dispatchers.Default){val found=s.library.find(query,category,tag);if(sortName) found.sortedBy{it.name} else found.sortedByDescending{it.updated}}}
-    val heroId=results.firstOrNull{it.photos.isNotEmpty()}?.id
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal=22.dp),contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item {
-            Row(verticalAlignment=Alignment.CenterVertically){Text("${results.size} 份收藏",Modifier.weight(1f),fontSize=12.sp,color=Muted);GalleryTextButton(onClick={search=!search;if(!search) query=""}){Text(if(search) "收起搜索" else "搜索",fontSize=12.sp)};GalleryTextButton(onClick={sortName=!sortName}){Text(if(sortName) "按名称" else "最近添加",fontSize=12.sp)}}
-            if(search) QuietInput(query,{query=it},"搜索称呼、标签或资料",Modifier.fillMaxWidth())
-            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(20.dp)) {
-                val categories=listOf(Label("","category","全部"))+s.library.labels.filter{it.kind=="category"}
-                categories.forEach{l->Column(Modifier.clickable{category=l.id}.padding(vertical=10.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(l.name,fontSize=14.sp,color=if(category==l.id) MaterialTheme.colorScheme.onSurface else Muted);Spacer(Modifier.height(8.dp));Box(Modifier.height(2.dp).width(18.dp).background(if(category==l.id) MaterialTheme.colorScheme.onSurface else Color.Transparent))}}
-            }
-            if(s.library.labels.any{it.kind=="tag"}) Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){GalleryTextButton(onClick={tag=""}){Text("全部标签",fontSize=11.sp)};s.library.labels.filter{it.kind=="tag"}.forEach{l->FilterChip(tag==l.id,{tag=if(tag==l.id) "" else l.id},label={Text(l.name,fontSize=11.sp)})}}
-        }
-        if(s.library.drafts.isNotEmpty()) item{Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){s.library.drafts.forEach{draft->GalleryTextButton(onClick={model.edit(draft)},enabled=!s.busy){Text("继续草稿 · ${draft.name.ifBlank{"未命名"}}",fontSize=12.sp)}}}}
-        if(results.isEmpty()) item{Column(Modifier.fillMaxWidth().padding(vertical=40.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(if(query.isBlank() && category.isBlank() && tag.isBlank()) "这里还没有收藏" else "没有匹配的档案",color=Muted);GalleryTextButton(onClick={if(query.isNotBlank() || category.isNotBlank() || tag.isNotBlank()){query="";category="";tag=""}else model.edit()}){Text(if(query.isNotBlank() || category.isNotBlank() || tag.isNotBlank()) "清除筛选" else "新建档案")}}}
-        items(results,key={it.id}) {a->
-            val metadata=(listOf(s.library.labelName(a.category))+a.fields.filter{it.value.isNotBlank()}.take(2).map{it.value}).filter{it.isNotBlank()}.joinToString(" · ")
-            if(a.id==heroId) Column(Modifier.fillMaxWidth().clickable{open(a.id)}) {
-                Cover(a,model,Modifier.fillMaxWidth().aspectRatio(1.22f).clip(RoundedCornerShape(16.dp)))
-                Row(Modifier.fillMaxWidth().padding(top=12.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(a.name,fontSize=19.sp,maxLines=2,overflow=TextOverflow.Ellipsis);if(metadata.isNotBlank()) Text(metadata,Modifier.padding(top=4.dp),fontSize=11.sp,color=Muted,maxLines=1,overflow=TextOverflow.Ellipsis)};Text("${a.photos.size} 张",fontSize=11.sp,color=Muted)}
-            } else Column {
-                Row(Modifier.fillMaxWidth().clickable{open(a.id)}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                    if(a.photos.isNotEmpty()){Cover(a,model,Modifier.width(70.dp).height(82.dp).clip(RoundedCornerShape(10.dp)));Spacer(Modifier.width(14.dp))}
-                    Column(Modifier.weight(1f)){Text(a.name,fontSize=17.sp,maxLines=2,overflow=TextOverflow.Ellipsis);Text(metadata.ifBlank{"私人档案"},Modifier.padding(top=6.dp),fontSize=12.sp,color=Muted,maxLines=2,overflow=TextOverflow.Ellipsis)}
-                    Text(if(a.photos.isEmpty()) "资料 ›" else "${a.photos.size} 张 ›",Modifier.padding(start=8.dp),fontSize=11.sp,color=Muted)
-                }
-                HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant.copy(alpha=.45f))
-            }
-        }
-    }
-}
-@Composable private fun Detail(model:AppModel,s:AppState,a:Archive,zoom:(String)->Unit,allPhotos:()->Unit,delete:()->Unit) {
-    val context=LocalContext.current
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(bottom=32.dp)) {
-        item {Text(a.name,fontSize=24.sp,fontWeight=FontWeight.Medium);Row(Modifier.horizontalScroll(rememberScrollState()).padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)){(listOf(a.category)+a.tags).filter{it.isNotEmpty()}.forEach{Tag(s.library.labelName(it))}}}
-        item {Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){GalleryButton(onClick={model.edit(a)},enabled=!s.busy){Text("编辑资料")};OutlinedButton(onClick=delete,enabled=!s.busy){Text("移入回收站")}}}
-        if(a.photos.isEmpty()) item {Text("还没有照片，资料已完整保存。可以随时编辑并添加照片。",color=Muted,fontSize=13.sp)}
-        else {item {GalleryTextButton(onClick=allPhotos){Text("照片集 · ${a.photos.size} · 全部照片")};Box(Modifier.height(260.dp)){AllPhotos(a,model,zoom)}}}
-        item {Text("自定义信息",fontSize=16.sp,fontWeight=FontWeight.Medium)}
-        if(a.fields.isEmpty()) item {Text("还没有补充信息",color=Muted)}
-        items(a.fields,key={it.id}){f->Surface(shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.surface){Column(Modifier.fillMaxWidth().padding(16.dp)){Text(f.name,fontSize=12.sp,color=Muted);Text(f.value.ifBlank{"未填写"},Modifier.padding(top=5.dp),fontSize=16.sp);if(f.value.startsWith("https://")||f.value.startsWith("http://")) GalleryTextButton(onClick={runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(f.value)).addCategory(Intent.CATEGORY_BROWSABLE))}.onFailure{model.message("没有可打开此链接的应用")}}){Text("打开链接")}}}}
-    }
-}
 @Composable private fun Settings(model:AppModel,s:AppState,setLock:(Boolean)->Unit,navigate:(String)->Unit,confirm:(String,()->Unit)->Unit) {
     val c=MaterialTheme.colorScheme
     var appearance by rememberSaveable{mutableStateOf(false)}
@@ -371,7 +310,7 @@ private val Muted: Color
             Text("整理与外观",Modifier.padding(start=4.dp,bottom=10.dp),style=MaterialTheme.typography.titleSmall,color=c.onSurfaceVariant)
             Column(Modifier.clip(RoundedCornerShape(20.dp)).background(c.surface).animateContentSize(tween(220)).padding(horizontal=16.dp)) {
                 SettingButton("外观","${s.appearance.theme} · ${s.appearance.skin}"){appearance=!appearance}
-                AnimatedVisibility(appearance){AppearanceV5(model,s,{}, {},showActions=false)}
+                AnimatedVisibility(appearance){AppearanceSettings(model,s,{}, {},showActions=false)}
                 SettingButton("分类与标签"," "){navigate("labels")}
                 SettingButton("回收站","${s.library.archives.count{it.deleted!=0L}+s.library.photoTrash.size} 项"){navigate("bin")}
             }

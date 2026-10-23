@@ -29,7 +29,8 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
 
 /** Controls share the same player; gestures never replace the saved playback preference. */
 @Composable internal fun PlayerControls(player:Player, speed:Float, muted:Boolean,
-    speedChange:(Float)->Unit, mute:()->Unit, onClose:()->Unit, playIntentChange:(Boolean)->Unit={},bottomInset:Dp=0.dp) {
+    speedChange:(Float)->Unit, mute:()->Unit, onClose:()->Unit, playIntentChange:(Boolean)->Unit={},bottomInset:Dp=0.dp,
+    landscape:Boolean=false,rotate:(()->Unit)?=null,readText:(()->Unit)?=null) {
     var visible by remember {mutableStateOf(true)}
     var position by remember {mutableLongStateOf(0)}
     var duration by remember {mutableLongStateOf(0)}
@@ -77,7 +78,10 @@ internal fun seekPosition(position:Long, delta:Long, duration:Long):Long =
                         onValueChange={preview=it;scrubbing=true},onValueChangeFinished={player.seekTo(preview.toLong());scrubbing=false;touch++},
                         valueRange=0f..duration.coerceAtLeast(1).toFloat(),enabled=duration>0,modifier=Modifier.semantics{contentDescription="播放进度"},
                         colors=SliderDefaults.colors(thumbColor=Color.White,activeTrackColor=Color.White,inactiveTrackColor=Color.White.copy(alpha=.3f)))
-                    Text("双击快进快退 · 长按 2 倍速 · 拖动下方进度条定位",color=Color.White.copy(alpha=.75f),style=MaterialTheme.typography.labelSmall)
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        if(rotate!=null)TextButton(onClick={rotate();touch++}){Text(if(landscape)"恢复方向" else "横屏观看",color=Color.White)}
+                        if(readText!=null)TextButton(onClick={player.pause();readText();touch++}){Text("阅读文字",color=Color.White)}
+                    }
                 }
             }
         }

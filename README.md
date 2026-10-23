@@ -30,7 +30,7 @@ Windows 使用 `gradlew.bat`。调试安装包位于 `app/build/outputs/apk/debu
 
 ## 测试
 
-23 项 JVM 逻辑测试覆盖档案编解码、搜索、随机浏览、模板、链接与旧备份兼容。原生测试覆盖持久化、备份、编辑/保存/重开、照片、视频及应用锁。
+JVM 与 Compose 宿主测试覆盖档案编解码、搜索、随机浏览、模板、链接与旧备份兼容。原生测试覆盖持久化、备份、编辑/保存/重开、照片、视频及应用锁。
 
 ```sh
 ./gradlew --init-script tools/verification.init.gradle assembleDebug assembleDebugAndroidTest
@@ -46,9 +46,9 @@ adb -s <your-emulator> shell am instrument -w dev.h516.shicang.verification.test
 
 ## 数据与限制
 
-最低 Android 7.0 / API24。SQLite schema1，备份 format3 支持照片和视频，读取旧格式1/2。备份包含私人资料且未加密，请自行选择安全的保存位置；应用锁不等于备份加密。
+最低 Android 7.0 / API24。SQLite schema1，备份 format6 保存混合媒体、文字、作者与搜索规则，读取旧格式1–5。备份包含私人资料且未加密，请自行选择安全的保存位置；应用锁不等于备份加密。
 
-v0.5 延续 v0.4 的资料与界面。更新资料从本项目公开 Release 匿名读取，不上传私人资料。模拟器和自动测试不能证明所有手机、大尺寸媒体或系统关联跳转均兼容。fork 后应配置自己的更新地址和包名，详见发布文档。
+0.17 沿用0.16的本地资料结构与备份格式。更新资料从本项目公开 Release 匿名读取，不上传私人资料。模拟器和自动测试不能证明所有手机、大尺寸媒体或系统关联跳转均兼容。fork 后应配置自己的更新地址和包名，详见发布文档。
 
 ## 许可与贡献
 
@@ -77,3 +77,9 @@ v0.5 延续 v0.4 的资料与界面。更新资料从本项目公开 Release 匿
 ## 云端开发入口
 
 后续开发默认使用云端：[打开开发工作区](https://codespaces.new/h516df/liuzheba) · [环境、检查命令与迁移边界](CLOUD_DEVELOPMENT.md)。
+
+## 0.17 档案与沉浸浏览重构
+
+一份档案可同时保存正文、照片和横竖视频。详情先阅读正文再浏览混合媒体；编辑时统一保存，返回自动留草稿。媒体可筛选、拖动排序、设封面和多选移除。底部保留「档案 / 发现」，设置从齿轮进入。
+
+沉浸浏览保留视频完整比例，支持手动横屏、进度恢复和不中断位置的文字阅读。导入结果持久记录，中断重试避免重复收录。实现范围、来源、自动检查与设备边界见 [重构记录](docs/REBUILD.md)。正式安装包只从 [GitHub Releases](https://github.com/h516df/liuzheba/releases/latest) 下载；候选源码或调试构建不代表正式发行已完成。

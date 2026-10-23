@@ -83,7 +83,7 @@ class ArchiveUiSnapshotTest {
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
             model.state.value.library.labels.none{it.id==category.id}
         }
-        compose.onNodeWithTag("nav-library").performClick()
+        compose.onNodeWithContentDescription("返回").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("4 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("移除分类筛选").assertDoesNotExist()
     })
@@ -170,7 +170,6 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithText("编辑").performClick()
         compose.onNode(hasSetTextAction() and hasText("一封旧信")).performTextReplacement("草稿里的新称呼")
         compose.onNodeWithContentDescription("返回").performClick()
-        compose.onNodeWithText("保留草稿并返回").performClick()
         compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy && model.state.value.editor==null}
         org.junit.Assert.assertEquals("草稿里的新称呼",runBlocking{model.store.load()}.drafts.single().name)
         compose.onNodeWithText("编辑").performClick()
@@ -216,8 +215,8 @@ class ArchiveUiSnapshotTest {
     })
     private fun verifyImmersiveViewer() {
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
-        // Fixtures use the default 全幅/铺满 appearance, so the renderer exposes its crop-mode label.
-        val photo=compose.onNodeWithContentDescription("全幅照片，双击或双指缩放")
+        // The new default keeps the entire image visible.
+        val photo=compose.onNodeWithContentDescription("完整照片，双击或双指缩放")
         compose.waitUntil(10000){compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"照片已显示")).fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("更多").assertExists()
         compose.onNodeWithText("保存到相册").assertDoesNotExist()

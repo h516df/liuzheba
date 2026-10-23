@@ -62,7 +62,7 @@ import androidx.compose.ui.semantics.semantics
     else Box(modifier.clip(RoundedCornerShape(16.dp)).background(c.surfaceVariant),contentAlignment=Alignment.Center){Text(a.name.take(1).ifBlank{"藏"},fontSize=26.sp,color=c.onSurfaceVariant)}
 }
 
-@Composable internal fun LibraryV19(model:AppModel,s:AppState,open:(String)->Unit,view:(Archive)->Unit) {
+@Composable internal fun ArchiveLibraryScreen(model:AppModel,s:AppState,open:(String)->Unit,view:(Archive)->Unit) {
     var deleteTarget by remember {mutableStateOf<Archive?>(null)}
     var query by rememberSaveable{mutableStateOf("")}
     var category by rememberSaveable{mutableStateOf("")}
@@ -159,70 +159,7 @@ import androidx.compose.ui.semantics.semantics
     if(filters) LabelPicker(s.library,selection.category,selection.tags,{category=it.first;tags=it.second;filters=false},{filters=false},"筛选档案")
 }
 
-@Composable internal fun DetailV19(model:AppModel,s:AppState,a:Archive,back:()->Unit,zoom:(String)->Unit,album:()->Unit,delete:()->Unit,openRelated:(String)->Unit={},addMedia:(()->Unit)?=null,authorSection:@Composable ()->Unit={}) {
-    val c=MaterialTheme.colorScheme
-    Column(Modifier.fillMaxSize()) {
-        PageBar("档案详情",back){GalleryTonalButton(onClick={model.edit(a)},enabled=!s.busy,shape=RoundedCornerShape(14.dp),modifier=Modifier.heightIn(min=48.dp)){Text("编辑")}}
-        LazyColumn(contentPadding=PaddingValues(start=20.dp,end=20.dp,top=20.dp,bottom=32.dp)) {
-            item {
-                Text(a.name,style=MaterialTheme.typography.headlineLarge,modifier=Modifier.padding(bottom=12.dp))
-                val labels=(listOf(a.category)+a.tags).map(s.library::labelName).filter{it.isNotBlank()}
-                if(labels.isNotEmpty()) FlowRow(Modifier.padding(bottom=12.dp),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                    labels.forEach{label->Surface(color=c.surfaceVariant,shape=RoundedCornerShape(8.dp)) {
-                        Text(label,Modifier.padding(horizontal=10.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
-                    }}
-                }
-                SectionTitle("照片与视频") {
-                    GalleryTextButton(onClick={addMedia?.invoke() ?: model.edit(a)},enabled=!s.busy){Text("添加")}
-                    if(a.photos.isNotEmpty()) GalleryTextButton(onClick=album){Text("查看全部",style=MaterialTheme.typography.labelMedium)}
-                }
-                if(a.photos.isEmpty()) Text("尚未添加照片与视频",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,modifier=Modifier.padding(bottom=16.dp))
-            }
-            if(a.photos.isNotEmpty()) item {
-                val cover=a.coverPhoto() ?: a.photos.first()
-                Box(Modifier.fillMaxWidth().aspectRatio(1.15f).clip(RoundedCornerShape(20.dp)).clickable{zoom(cover.id)}) {
-                    MediaThumb(cover,model,Modifier.fillMaxSize(),"浏览${a.name}的照片与视频")
-                    Surface(modifier=Modifier.align(Alignment.BottomEnd).padding(12.dp),color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(12.dp)) {
-                        Row(Modifier.padding(horizontal=12.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            FrameGlyph("全部照片",Color.White);Text("${a.photos.size} 项",color=Color.White,style=MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                if(a.photos.size>1) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp),contentPadding=PaddingValues(bottom=12.dp)) {
-                    items(a.photos.filter{it.id!=cover.id}.take(5),key={it.id}){p->MediaThumb(p,model,Modifier.size(76.dp).clip(RoundedCornerShape(12.dp)).clickable{zoom(p.id)},"查看${if(p.isVideo) "视频" else "照片"}")}
-                }
-            }
-            item { authorSection() }
-            val sourceFields=a.fields.filter{isArchiveSource(it)}
-            if(sourceFields.isNotEmpty()) item { SectionTitle("来源链接") }
-            items(sourceFields,key={it.id}){f->ArchiveFieldValue(f,model);Spacer(Modifier.height(8.dp))}
-            if(a.fields.any{!isArchiveSource(it)} || a.fields.isEmpty()) item{SectionTitle("资料")}
-
-            if(a.fields.isEmpty()) item{Surface(color=c.surface,shape=RoundedCornerShape(20.dp)){
-                Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("从一点一滴开始",style=MaterialTheme.typography.titleSmall)
-                    Text("添加备注、日期或链接，慢慢补全这份档案。",Modifier.padding(top=8.dp),color=c.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)
-                    GalleryTextButton(onClick={model.edit(a)},enabled=!s.busy,modifier=Modifier.padding(top=8.dp)){Text("补充资料")}
-                }
-            }}
-            items(a.fields.filterNot{isArchiveSource(it)},key={it.id}){f->
-                ArchiveFieldValue(f,model)
-                Spacer(Modifier.height(8.dp))
-            }
-            item {
-                val related=SearchAssistant.related(s.library,a)
-                if(related.isNotEmpty()) {
-                    SectionTitle("相关档案 · 供核对")
-                    related.forEach{hit->Column(Modifier.padding(vertical=8.dp)){GalleryTextButton(onClick={openRelated(hit.archive.id)}){Text(hit.archive.name)};Text(hit.reason,style=MaterialTheme.typography.bodySmall)}}
-                }
-            }
-            item{GalleryTextButton(onClick=delete,enabled=!s.busy,modifier=Modifier.padding(top=24.dp)){Text("移入回收站",style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)}}
-        }
-    }
-}
-
-@Composable private fun ArchiveFieldValue(f:Field,model:AppModel) {
+@Composable internal fun ArchiveFieldValue(f:Field,model:AppModel) {
     val c=MaterialTheme.colorScheme
     val context=LocalContext.current
     val url=if(f.type=="链接" || f.value.trim().startsWith("http")) Links.normalize(f.value) else null
@@ -248,7 +185,7 @@ private fun openLink(context:Context,url:String,model:AppModel) {
     runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))}.onFailure{model.message("没有找到可打开此链接的应用，请复制网址后使用浏览器")}
 }
 
-@Composable internal fun EditorV19(model:AppModel,s:AppState,choose:(String)->Unit,take:(String)->Unit,back:()->Unit,confirm:(String,()->Unit)->Unit,authorSection:@Composable ()->Unit={}) {
+@Composable internal fun ArchiveEditorScreen(model:AppModel,s:AppState,choose:(String)->Unit,take:(String)->Unit,back:()->Unit,confirm:(String,()->Unit)->Unit,authorSection:@Composable ()->Unit={}) {
     val a=s.editor ?: return
     val c=MaterialTheme.colorScheme
     var labels by remember{mutableStateOf(false)}
@@ -281,22 +218,16 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 item {
                     Text("档案名称",Modifier.padding(bottom=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     TextField(a.name,{change(a.copy(name=it))},Modifier.fillMaxWidth(),enabled=!s.busy,singleLine=true,shape=RoundedCornerShape(16.dp),placeholder={Text("名称或称呼",style=MaterialTheme.typography.headlineMedium)},textStyle=MaterialTheme.typography.headlineMedium,colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,disabledContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
+                    Spacer(Modifier.height(18.dp))
+                    Text("文字",style=MaterialTheme.typography.titleMedium,modifier=Modifier.padding(bottom=8.dp))
+                    val text=model.editorTextFor(a)
+                    TextField(text.note.body,model::changeArchiveText,modifier=Modifier.fillMaxWidth().testTag("archive-body"),
+                        enabled=!s.busy,minLines=5,maxLines=14,placeholder={Text("介绍、故事、来源或你想留下的话……")},
+                        shape=RoundedCornerShape(16.dp),textStyle=MaterialTheme.typography.bodyLarge,
+                        colors=TextFieldDefaults.colors(unfocusedContainerColor=c.surface,focusedContainerColor=c.surface,unfocusedIndicatorColor=Color.Transparent,focusedIndicatorColor=Color.Transparent))
                     SectionTitle("照片与视频"){GalleryTextButton(onClick={choose(a.id)},enabled=!s.busy){Text("相册")};GalleryTextButton(onClick={take(a.id)},enabled=!s.busy){Text("拍照")}}
                     if(a.photos.isEmpty()) Text("可稍后添加，只有资料也能保存。",fontSize=12.sp,color=c.onSurfaceVariant,modifier=Modifier.padding(vertical=10.dp))
-                    LazyRow(horizontalArrangement=Arrangement.spacedBy(10.dp)) {items(a.photos,key={it.id}){p->
-                        Column(Modifier.width(104.dp).clip(RoundedCornerShape(16.dp)).background(c.surface)) {
-                            Box {
-                                MediaThumb(p,model,Modifier.width(104.dp).height(116.dp),"${if(p.isVideo) "视频" else "照片"}${a.photos.indexOf(p)+1}")
-                                GalleryTextButton(onClick={change(a.copy(photos=a.photos-p))},enabled=!s.busy,modifier=Modifier.align(Alignment.TopEnd).size(48.dp).semantics{contentDescription="移除这项媒体"},contentPadding=PaddingValues(0.dp),colors=ButtonDefaults.textButtonColors(contentColor=Color.White,containerColor=Color.Black.copy(alpha=.5f))){Text("×",fontSize=20.sp)}
-                                if(a.coverPhoto()?.id==p.id) Text("封面",Modifier.align(Alignment.BottomEnd).background(Color.Black.copy(alpha=.6f)).padding(4.dp),color=Color.White,fontSize=10.sp)
-                            }
-                            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){
-                                GalleryTextButton(onClick={val ps=a.photos.toMutableList();val i=ps.indexOf(p);ps.removeAt(i);ps.add(i-1,p);change(a.copy(photos=ps))},enabled=!s.busy && a.photos.indexOf(p)>0,modifier=Modifier.width(48.dp),contentPadding=PaddingValues(0.dp)){Text("←")}
-                                GalleryTextButton(onClick={val ps=a.photos.toMutableList();val i=ps.indexOf(p);ps.removeAt(i);ps.add(i+1,p);change(a.copy(photos=ps))},enabled=!s.busy && a.photos.indexOf(p)<a.photos.lastIndex,modifier=Modifier.width(48.dp),contentPadding=PaddingValues(0.dp)){Text("→")}
-                            }
-                            GalleryTextButton(onClick={change(a.copy(cover=p.id))},enabled=!s.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp),contentPadding=PaddingValues(0.dp)){Text(if(a.coverPhoto()?.id==p.id) "当前封面" else "设为封面",style=MaterialTheme.typography.labelMedium)}
-                        }
-                    }}
+                    if(a.photos.isNotEmpty()) EditorMediaGrid(a,model,s.busy)
                     Spacer(Modifier.height(16.dp))
                     Row(Modifier.fillMaxWidth().clickable(enabled=!s.busy){labels=true}.padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

@@ -19,7 +19,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 data class Appearance(val style:String="极简画廊", val mode:String="浅色", val accent:String="苔绿",
-    val theme:String="月白", val skin:String="全幅", val fit:String="铺满") {
+    val theme:String="月白", val skin:String="全幅", val fit:String="完整") {
     fun json()=JSONObject().put("style",style).put("mode",mode).put("accent",accent).put("theme",theme).put("skin",skin).put("fit",fit)
     companion object {
         fun read(o:JSONObject):Appearance {
@@ -38,7 +38,8 @@ class Store(private val context: Context) {
     private val prefs=context.getSharedPreferences("device",Context.MODE_PRIVATE)
     private val gate=Mutex()
     private val protectionGate=Mutex()
-    private var generation=prefs.getString("generation","initial")!!
+    @Volatile private var generation=prefs.getString("generation","initial")!!
+    internal val generationToken get()=generation
     private var root=File(context.filesDir,"libraries/$generation").apply { mkdirs() }
     private var db=open(root)
     val photoDir get()=File(root,"photos").apply { mkdirs() }
@@ -194,10 +195,24 @@ class Store(private val context: Context) {
         }finally{db.endTransaction()}
     }}
     suspend fun deleteTemplate(id:String)=withContext(Dispatchers.IO) {gate.withLock {remove("template",id)}}
-    suspend fun draft(a: Archive)=withContext(Dispatchers.IO) { gate.withLock { put("draft",a.id,Codec.archive(a));settleImportedMedia() } }
-    suspend fun discard(id: String)=withContext(Dispatchers.IO) { gate.withLock { remove("draft",id) } }
+    suspend fun draft(a: Archive,text:ArchiveTextDraft?=null)=withContext(Dispatchers.IO) { gate.withLock {
+        text?.let { requireNoteGeneration(it.generation);require(it.note.type=="archive" && it.note.target==a.id);it.note.validated() }
+        db.beginTransaction()
+        try {
+            put("draft",a.id,Codec.archive(a))
+            text?.let { put("longNoteDraft",it.note.key,it.note.json()) }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        settleImportedMedia()
+    } }
+    suspend fun discard(id: String,text:ArchiveTextDraft?=null)=withContext(Dispatchers.IO) { gate.withLock {
+        text?.let { requireNoteGeneration(it.generation);require(it.note.target==id && it.note.type=="archive") }
+        db.beginTransaction()
+        try {remove("draft",id);text?.let{remove("longNoteDraft",it.note.key)};db.setTransactionSuccessful()}
+        finally {db.endTransaction()}
+    } }
     private fun saveTrash(t: PhotoTrash) { put("photoTrash",t.id,JSONObject().put("id",t.id).put("archiveId",t.archiveId).put("photo",Codec.photo(t.photo)).put("index",t.index).put("removed",t.removed)) }
-    suspend fun save(input: Archive)=withContext(Dispatchers.IO) { gate.withLock {
+    suspend fun save(input: Archive,text:ArchiveTextDraft?=null)=withContext(Dispatchers.IO) { gate.withLock {
         val a=input.copy(fields=input.fields.filter{it.name.isNotBlank() || it.value.isNotBlank()}.map {f -> if(f.type=="链接" && f.value.isNotBlank()) f.copy(value=Links.normalize(f.value) ?: error("${f.name.ifBlank{"链接"}}：请填写有效的网址或分享链接")) else f})
         require(a.name.isNotBlank()) { "请填写名称或称呼" }
         require(a.fields.all { it.name.isNotBlank() && (it.value.isBlank() || when(it.type) {
@@ -212,10 +227,21 @@ class Store(private val context: Context) {
         require((a.category.isEmpty() || library.labels.any{it.id==a.category && it.kind=="category"}) && a.tags.all{id -> library.labels.any{it.id==id && it.kind=="tag"}}) {"分类或标签已变更，请重新选择"}
         require(a.authorIds.distinct().size==a.authorIds.size && a.authorIds.all{id->library.authors.any{it.id==id}}) {"作者关联已变更，请重新选择"}
         val old=library.archives.firstOrNull { it.id==a.id }
+        text?.let {
+            requireNoteGeneration(it.generation)
+            require(it.note.type=="archive" && it.note.target==a.id){"文字关联已改变，请重新打开档案"}
+            it.note.validated()
+            require(library.archiveNote(a.id)==it.expected && old?.copy(updated=0)==it.original?.copy(updated=0)){"档案已在其他地方改变，当前草稿仍保留，请重新打开核对"}
+        }
         db.beginTransaction()
         try {
             old?.photos?.forEachIndexed { index,p -> if(a.photos.none { it.id==p.id }) saveTrash(PhotoTrash(archiveId=a.id,photo=p,index=index,removed=System.currentTimeMillis())) }
             put("archive",a.id,Codec.archive(a.copy(name=a.name.trim(),cover=a.coverPhoto()?.id.orEmpty(),updated=System.currentTimeMillis(),deleted=0)))
+            text?.let {
+                if(it.expected!=null || it.note.title.isNotBlank() || it.note.body.isNotBlank())
+                    put("longNote",it.note.key,it.note.copy(updated=System.currentTimeMillis()).json())
+                remove("longNoteDraft",it.note.key)
+            }
             remove("draft",a.id); db.setTransactionSuccessful()
         } finally { db.endTransaction() }
         settleImportedMedia()
@@ -291,14 +317,34 @@ class Store(private val context: Context) {
         return ImportResult(good,errors,sourceIndices)
     }
     /** Import and durably link in one store operation. Formal append never submits unrelated draft edits. */
-    internal suspend fun importIntoArchive(id:String,uris:List<Uri>,editor:Archive?=null,progress:(String)->Unit={},onLinked:(Archive)->Unit={}):Pair<ImportResult,Archive> = withContext(Dispatchers.IO) {gate.withLock {
+    internal suspend fun completedIncoming(keys:List<String>):Set<String> = withContext(Dispatchers.IO){gate.withLock {
+        val library=loadUnsafe()
+        keys.filter{key->row("incomingReceipt",key)?.let{receipt->
+            (library.archives+library.drafts).any{it.id==receipt.optString("archive") && it.photos.any{p->p.id==receipt.optString("media")}}
+        }==true}.toSet()
+    }}
+    internal suspend fun importIntoArchive(id:String,uris:List<Uri>,editor:Archive?=null,progress:(String)->Unit={},onLinked:(Archive)->Unit={},sourceKeys:List<String>?=null,text:ArchiveTextDraft?=null):Pair<ImportResult,Archive> = withContext(Dispatchers.IO) {gate.withLock {
         require(editor==null || editor.id==id){"编辑档案已变更"}
+        require(sourceKeys==null || sourceKeys.size==uris.size && sourceKeys.all(Codec::validId)){"收录任务编号无效"}
         val formal=row("archive",id)?.let(Codec::archive)?.takeIf{it.deleted==0L}
         val draft=row("draft",id)?.let(Codec::archive)
         val base=editor?.takeIf{it.id==id} ?: formal ?: draft ?: error("原档案或编辑草稿不存在，请重新选择")
-        val result=importPhotosUnsafe(uris,progress)
-        if(result.photos.isEmpty())return@withLock result to base
-        val next=base.copy(photos=base.photos+result.photos,updated=System.currentTimeMillis())
+        val acknowledged=mutableMapOf<Int,Photo>()
+        sourceKeys?.forEachIndexed{index,key->row("incomingReceipt",key)?.let{receipt->
+            if(receipt.optString("archive")==id)(formal?.photos.orEmpty()+draft?.photos.orEmpty()).firstOrNull{it.id==receipt.optString("media")}?.let{acknowledged[index]=it}
+        }}
+        text?.let {
+            requireNoteGeneration(it.generation);require(it.note.type=="archive" && it.note.target==id);it.note.validated()
+            db.beginTransaction()
+            try{put("draft",id,Codec.archive(base));put("longNoteDraft",it.note.key,it.note.json());db.setTransactionSuccessful()}
+            finally{db.endTransaction()}
+        }
+        val pending=uris.indices.filterNot{it in acknowledged}
+        val fresh=if(pending.isEmpty())ImportResult(emptyList(),emptyList()) else importPhotosUnsafe(pending.map{uris[it]},progress)
+        val result=ImportResult(acknowledged.values.toList()+fresh.photos,fresh.errors,
+            acknowledged.keys.toList()+fresh.sourceIndices.map{pending[it]})
+        if(fresh.photos.isEmpty())return@withLock result to base
+        val next=base.copy(photos=base.photos+fresh.photos,updated=System.currentTimeMillis())
         // No suspension or cancellation boundary can strand a successfully copied batch before linking it.
         // A failed SQL transaction removes only this batch's new copies; the picker sources stay untouched.
         var linked=false
@@ -309,8 +355,11 @@ class Store(private val context: Context) {
                     if(editor!=null || formal==null)put("draft",id,Codec.archive(next))
                     else {
                         put("archive",id,Codec.archive(next.copy(cover=next.coverPhoto()?.id.orEmpty())))
-                        draft?.let{put("draft",id,Codec.archive(it.copy(photos=it.photos+result.photos,updated=next.updated)))}
+                        draft?.let{put("draft",id,Codec.archive(it.copy(photos=it.photos+fresh.photos,updated=next.updated)))}
                     }
+                    sourceKeys?.let{keys->fresh.sourceIndices.forEachIndexed{photoIndex,sourceIndex->
+                        put("incomingReceipt",keys[pending[sourceIndex]],JSONObject().put("archive",id).put("media",fresh.photos[photoIndex].id))
+                    }}
                     db.setTransactionSuccessful()
                 }finally{db.endTransaction()}
                 linked=true
@@ -319,7 +368,7 @@ class Store(private val context: Context) {
                 onLinked(next)
                 settleImportedMedia()
             }
-        }finally{if(!linked)result.photos.forEach{File(photoDir,it.file).delete()}}
+        }finally{if(!linked)fresh.photos.forEach{File(photoDir,it.file).delete()}}
         result to next
     }}
     /** Append a separate derivative to the current archive, never replace its source or stale metadata. */

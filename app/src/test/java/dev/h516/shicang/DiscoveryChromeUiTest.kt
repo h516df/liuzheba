@@ -32,7 +32,7 @@ class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
         mediaNumber(3)
         compose.onNodeWithContentDescription("资料").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").assertIsDisplayed()
-        compose.onNodeWithText("查看档案").assertIsDisplayed()
+        compose.onNodeWithContentDescription("打开档案：合成留存档案").assertIsDisplayed()
         compose.onNodeWithTag("nav-library").assertIsDisplayed()
         compose.onNodeWithTag("nav-settings").assertIsDisplayed()
         screenshot("discovery-apple-dark-font200")

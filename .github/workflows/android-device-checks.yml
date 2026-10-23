@@ -9,6 +9,8 @@ on:
       - 'gradle.properties'
       - 'tools/verification.init.gradle'
       - '.github/workflows/android-device-checks.yml'
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:

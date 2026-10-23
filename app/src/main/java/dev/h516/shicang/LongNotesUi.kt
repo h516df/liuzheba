@@ -52,7 +52,7 @@ import kotlinx.coroutines.withContext
     Dialog(onDismissRequest=close,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
         Surface(Modifier.fillMaxSize()) {Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-                GalleryTextButton(onClick=close){Text("返回")}
+                GalleryTextButton(onClick=close,modifier=Modifier.testTag("note-reader-back")){Text("返回")}
                 GalleryTextButton(onClick=edit){Text(if(hasDraft) "继续编辑草稿" else "编辑笔记")}
             }
             SelectionContainer {Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {

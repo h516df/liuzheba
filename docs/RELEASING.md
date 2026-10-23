@@ -26,7 +26,7 @@ python3 tools/release/verify_apk.py \
 
 脚本核对真实APK签名、原证书公钥摘要、正式包名、递增versionCode、当前更新说明版本、非debug及更新大小上限；失败写入blocked回执并退出非零，不安装、不卸载、不清数据、不发布。metadata_passed只证明安装包身份元数据，不能代替旧版→新版安装及资料保留验收。当前独立verification测试包即使可安装，也不能替代该校验。
 
-2026-10-22已通过现有Make GitHub OAuth管理员连接读取本仓库Actions Secrets元数据，返回total_count=0；当前云端无密钥绑定，仓库environments=0。此前GH_TOKEN读取Secrets的403仅属该连接权限限制，不是Secrets存在与否的证据。当前可准备候选包，但尚无可用原正式私钥，不能生成同签名覆盖更新；不生成替代私钥冒充原证书。
+2026-10-23：原正式签名已在受保护的GitHub Environment `android-signing` 中准备并验证。开发工作区不绑定签名Secret。此前2026-10-22签名配置为空是历史状态。
 
 ## 公开更新
 
@@ -49,3 +49,13 @@ fork 必须更换 `UpdateConfig.kt` 中自己的更新仓库、包名与资产�
 当前仓库为 h516df/liuzheba（原 h516df/shicang，同一 GitHub repo ID 1422110562）。包名、证书、SHICANG_* 签名环境变量及历史 shicang-* Release 资产命名不变，避免旧安装包/签名或资产匹配失联。旧客户端不接受 API 仓库重定向，可能需要手动安装一次同签名迁移版本；不能把网页重定向当作旧 App 自动更新已通过。历史验收记录里的旧URL原样保留。
 
 2026-10-20 连接器读取旧 /repos/h516df/shicang/releases/latest 已返回 Moved Permanently，目标为 /repositories/1422110562/releases/latest（连接器未提供HTTP状态码）；另一路匿名云端curl因出口IP限流返回403，这两种结果不可混为一谈。旧手机App实际自动更新路径仍未执行验收。
+
+## 受控云端正式发行
+
+用户授权本轮正式发行后，整合main并等待该精确提交的Cloud development、Android device checks和Secret checks成功。执行：
+
+```sh
+gh workflow run production-release.yml --ref main -f expected_sha=<已核实的main完整SHA>
+```
+
+流水线分别执行unsigned构建、受保护环境隔离签名、一次性API35模拟器中正式0.16→新版的系统安装与真实备份比较、上传和回读正式Release。签名Secret不注入Gradle。安装包身份检查失败、资料/原件变化或测试未通过均阻止发布。APK、说明和校验和不覆盖已存在正式资产。正式包不添加调试入口。

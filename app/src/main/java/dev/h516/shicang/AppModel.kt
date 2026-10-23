@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-data class AppState(val authorBase:Author?=null,val authorsOpen:Boolean=false,val authorTarget:String?=null,val authorInput:String="",val authorPreview:Author?=null,val authorNotice:String="",val aiTagSource:Archive?=null,val aiTagLabels:List<Label> = emptyList(),val aiTagPreferences:SearchPreferences?=null,val aiTagSuggestions:List<TagSuggestion> = emptyList(),val aiTagArchive:String="",val aiTagBusy:Boolean=false,val localModelStatus:String="本机 AI 未下载 · 当前仅文字与别名搜索",val modelDownloading:Boolean=false,val protection:ProtectionState=ProtectionState(),val recoveryChoices:List<RecoveryChoice> = emptyList(),val protectionSelection:Uri?=null,val protectionRestoreOnly:Boolean=false,val library: Library = Library(),val editor: Archive?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
+data class AppState(val authorBase:Author?=null,val authorsOpen:Boolean=false,val authorTarget:String?=null,val authorInput:String="",val authorPreview:Author?=null,val authorNotice:String="",val aiTagSource:Archive?=null,val aiTagLabels:List<Label> = emptyList(),val aiTagPreferences:SearchPreferences?=null,val aiTagSuggestions:List<TagSuggestion> = emptyList(),val aiTagArchive:String="",val aiTagBusy:Boolean=false,val localModelStatus:String="本机 AI 未下载 · 当前仅文字与别名搜索",val modelDownloading:Boolean=false,val protection:ProtectionState=ProtectionState(),val recoveryChoices:List<RecoveryChoice> = emptyList(),val protectionSelection:Uri?=null,val protectionRestoreOnly:Boolean=false,val library: Library = Library(),val editor: Archive?=null,val archiveText:ArchiveTextDraft?=null,val appearance: Appearance=Appearance(),val ready: Boolean=false,val busy: Boolean=false,val progress: String="",val message: String="",val draftStatus: String="",val space: Map<String,Long> = emptyMap(),val shares:List<String> = emptyList(),val incomingMedia:List<Uri> = emptyList(),
     val exportRequest:MediaExportRequest?=null,val downloadsOpen:Boolean=false,val downloadInput:String="",
     val resolving:Boolean=false,val downloadError:String="",val mediaPlan:MediaPlan?=null,val downloads:List<MediaDownload> = emptyList())
 class AppModel(app: Application): AndroidViewModel(app) {
@@ -63,8 +63,11 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private var operation: Job?=null
     private var resolution:Job?=null
     private val mediaDownloads by lazy {MediaDownloads(app)}
+    private val incomingQueue=IncomingMediaQueue(app)
+    private fun incomingGeneration()=if(::store.isInitialized)store.generationToken else appGeneration()
+    private fun appGeneration()=getApplication<Application>().getSharedPreferences("device",0).getString("generation","initial")!!
     init {viewModelScope.launch {
-        try { withContext(Dispatchers.IO) {store=Store(app)};reload();mutable.value=mutable.value.copy(ready=true,localModelStatus=if(localTextModel.installed)"本机 AI 已下载 · 不上传资料" else mutable.value.localModelStatus)
+        try { withContext(Dispatchers.IO) {store=Store(app)};reload();restoreIncoming();mutable.value=mutable.value.copy(ready=true,localModelStatus=if(localTextModel.installed)"本机 AI 已下载 · 不上传资料" else mutable.value.localModelStatus)
             launch {store.protection.collect {value->mutable.value=mutable.value.copy(protection=value)}}
             launch {store.runAutomaticProtection()}
             launch {while(true) {runCatching{withContext(Dispatchers.IO){mediaDownloads.list()}}.onSuccess{jobs->mutable.value=mutable.value.copy(downloads=jobs)};delay(1200)}} }
@@ -85,7 +88,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         if(!mutable.value.ready || mutable.value.busy)return
         draftJob?.cancel()
         work("正在识别分享链接") {
-            mutable.value.editor?.let{store.draft(it)}
+            mutable.value.editor?.let{store.draft(it,editorTextFor(it))}
             val link=withContext(Dispatchers.IO){SharedLinks.resolve(text)} ?: error("链接无法识别")
             val draft=link.archive();store.draft(draft)
             mutable.value=mutable.value.copy(editor=draft,shares=mutable.value.shares.drop(1),draftStatus="草稿已保存 · 请核对识别结果")
@@ -116,6 +119,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
             val target=mutable.value.authorTarget.takeIf{newAuthor}
             val editor=mutable.value.editor?.takeIf{it.id==target}
             val next=editor?.copy(authorIds=(editor.authorIds+author.id).distinct())
+            if(editor!=null)store.draft(editor,editorTextFor(editor))
             store.saveAuthor(author,next,if(next==null)target else null)
             if(next!=null)mutable.update{it.copy(editor=next,draftStatus="草稿已保存")}
             mutable.update{it.copy(authorPreview=null,authorBase=null,authorInput="",authorNotice="作者卡已保存；同名作者不会自动合并")}
@@ -140,35 +144,55 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun shareMedia(a:Archive,photos:List<Photo>) {
         runCatching{MediaExport.share(getApplication(),MediaExportRequest(a,photos),::photoFile)}.onFailure{message("暂时无法分享原件")}
     }
-    fun receiveMedia(uris:List<Uri>) {
-        if(uris.isNotEmpty()) mutable.value=mutable.value.copy(incomingMedia=(mutable.value.incomingMedia+uris).distinct().take(100))
+    private suspend fun restoreIncoming() {
+        val queued=incomingQueue.read(store.generationToken)
+        val done=store.completedIncoming(queued.map{it.id})
+        val doneUris=queued.filter{it.id in done}.map{it.uri}.toSet()
+        val pending=(queued.filterNot{it.id in done}.map{it.uri}+mutable.value.incomingMedia.filterNot{it in doneUris}).distinct()
+        incomingQueue.write(store.generationToken,pending)
+        mutable.update{it.copy(incomingMedia=pending)}
     }
-    fun dismissMedia(){mutable.value=mutable.value.copy(incomingMedia=emptyList())}
+    fun receiveMedia(uris:List<Uri>) {
+        if(uris.isEmpty())return
+        val next=(mutable.value.incomingMedia+uris).distinct().take(100)
+        try {
+            uris.filter{it.scheme=="content"}.forEach{uri->runCatching{getApplication<Application>().contentResolver.takePersistableUriPermission(uri,android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)}}
+            incomingQueue.write(incomingGeneration(),next)
+            mutable.update{it.copy(incomingMedia=next)}
+        } catch(e:Exception){message(e.message ?: "待收录记录未保存，请保留来源")}
+    }
+    fun dismissMedia(){try{incomingQueue.write(incomingGeneration(),emptyList());mutable.update{it.copy(incomingMedia=emptyList())}}catch(e:Exception){message("待收录记录未能清除，请重试")}}
     private fun settleIncomingMedia(uris:List<Uri>,result:ImportResult) {
         val linked=result.sourceIndices.mapNotNull{uris.getOrNull(it)}.toSet()
-        // A partial import must retain failed selections and any media received during the copy.
-        mutable.update{it.copy(incomingMedia=it.incomingMedia.filterNot{uri->uri in linked})}
+        val remaining=mutable.value.incomingMedia.filterNot{it in linked}
+        incomingQueue.write(incomingGeneration(),remaining)
+        mutable.update{it.copy(incomingMedia=remaining)}
     }
-    fun importIncoming(targetId:String?=null) {
-        val uris=mutable.value.incomingMedia;if(uris.isEmpty())return
+    fun importIncoming(targetId:String?=null,selection:List<Uri>?=null) {
+        val requested=selection ?: mutable.value.incomingMedia
+        if(requested.isEmpty())return
         draftJob?.cancel()
         work("正在收录分享媒体") {
-            mutable.value.editor?.let{store.draft(it)}
+            val uris=requested.filter{it in mutable.value.incomingMedia}
+            if(uris.isEmpty()){message("这批媒体已完成收录");return@work}
+            val sources=incomingQueue.read(store.generationToken).associateBy{it.uri}
+            val keys=uris.map{sources.getValue(it).id}
             if(targetId!=null) {
                 val editor=mutable.value.editor?.takeIf{it.id==targetId}
                 val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
                 try {
-                    val (result,_)=store.importIntoArchive(targetId,uris,editor,onLinked=linked::set)
-                    require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
+                    val (result,_)=store.importIntoArchive(targetId,uris,editor,progress={text->mutable.update{it.copy(progress=text)}},onLinked=linked::set,sourceKeys=keys,text=editor?.let(::editorTextFor))
+                    require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"来源已不可读取，请重新选择媒体"}}
                     settleIncomingMedia(uris,result)
                     message("已添加 ${result.photos.size} 项"+if(result.errors.isEmpty()) "" else "；${result.errors.joinToString("；")}")
                 } finally {linked.get()?.let{next->if(editor!=null)mutable.update{it.copy(editor=next,draftStatus="草稿已保存")}}}
             } else {
+                mutable.value.editor?.let{store.draft(it,editorTextFor(it))}
                 val base=Archive(name="新收录")
                 val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
-                val result=try{store.importIntoArchive(base.id,uris,base,onLinked=linked::set).first}
-                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,draftStatus="已存为草稿 · 保存后完成收录")}}}
-                require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"没有可读取的媒体"}}
+                val result=try{store.importIntoArchive(base.id,uris,base,progress={text->mutable.update{it.copy(progress=text)}},onLinked=linked::set,sourceKeys=keys).first}
+                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,archiveText=null,draftStatus="已存为草稿 · 保存后完成收录")}}}
+                require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"来源已不可读取，请重新选择媒体"}}
                 settleIncomingMedia(uris,result)
                 if(result.errors.isNotEmpty())message("部分媒体未收录：${result.errors.joinToString("；")}")
             }
@@ -205,7 +229,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         work("正在收录 ${jobs.size} 项下载媒体") {
             val current=withContext(Dispatchers.IO){mediaDownloads.list()}
             require(jobs.all{job->current.any{it.id==job.id && it.state=="待收录"}}){"下载记录已变化，请重新选择"}
-            mutable.value.editor?.let{store.draft(it)}
+            mutable.value.editor?.let{store.draft(it,editorTextFor(it))}
             val uris=jobs.map{Uri.fromFile(mediaDownloads.file(it))}
             val editor=mutable.value.editor?.takeIf{it.id==targetId}
             var result:ImportResult
@@ -248,15 +272,33 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun edit(a: Archive?=null) {
         if(!mutable.value.ready || mutable.value.busy) return
         val target=a?.let { formal -> mutable.value.library.drafts.firstOrNull{it.id==formal.id} ?: formal } ?: Archive(fields=listOf(Field()))
-        mutable.value=mutable.value.copy(editor=target,draftStatus="正在保存草稿",message="")
+        val snapshot=mutable.value.library.archiveTextDraft(target,store.generationToken)
+        val text=if(a!=null && snapshot.original==null && mutable.value.library.drafts.none{it.id==a.id})snapshot.copy(original=a)else snapshot
+        mutable.value=mutable.value.copy(editor=target,archiveText=text,draftStatus="正在保存草稿",message="")
         change(target)
+    }
+    internal fun editorTextFor(a:Archive):ArchiveTextDraft = mutable.value.archiveText?.takeIf{it.note.target==a.id}
+        ?: mutable.value.library.archiveTextDraft(a,store.generationToken)
+    fun changeArchiveText(body:String) {
+        val a=mutable.value.editor ?: return
+        if(mutable.value.busy)return
+        if(body.length>LongNote.BODY_LIMIT){message("文字最多 ${LongNote.BODY_LIMIT} 字符，本次超长输入未写入");return}
+        val text=editorTextFor(a)
+        mutable.value=mutable.value.copy(archiveText=text.copy(note=text.note.copy(body=body,updated=System.currentTimeMillis())))
+        change(a)
     }
     fun change(a: Archive) {
         if(mutable.value.busy) return
         invalidateTagSuggestions()
-        mutable.value=mutable.value.copy(editor=a,draftStatus="正在保存草稿")
+        mutable.value=mutable.value.copy(editor=a,archiveText=editorTextFor(a),draftStatus="正在保存草稿")
         draftJob?.cancel()
-        draftJob=viewModelScope.launch {delay(200);try{store.draft(a);mutable.value=mutable.value.copy(draftStatus="草稿已保存");reload()}catch(e:CancellationException){throw e}catch(e:Exception){mutable.value=mutable.value.copy(draftStatus="草稿保存失败");message(e.message ?: "草稿保存失败")}}
+        val text=editorTextFor(a)
+        draftJob=viewModelScope.launch {delay(200);try {
+            store.draft(a,text)
+            mutable.update{current->if(current.editor?.id!=a.id)current else current.copy(draftStatus="草稿已保存",
+                library=current.library.copy(drafts=current.library.drafts.filterNot{it.id==a.id}+a,
+                    noteDrafts=current.library.noteDrafts.filterNot{it.key==text.note.key}+text.note))}
+        }catch(e:CancellationException){throw e}catch(e:Exception){mutable.value=mutable.value.copy(draftStatus="草稿保存失败");message(e.message ?: "草稿保存失败")}}
     }
     fun leaveEditor() {
         invalidateTagSuggestions()
@@ -264,28 +306,16 @@ class AppModel(app: Application): AndroidViewModel(app) {
         val a=mutable.value.editor ?: return
         draftJob?.cancel()
         // Keep the editor available on failure; leaving must not discard the debounce window.
-        work("保存编辑草稿") {store.draft(a);mutable.value=mutable.value.copy(editor=null,draftStatus="草稿已保存")}
+        val text=editorTextFor(a)
+        work("保存编辑草稿") {store.draft(a,text);mutable.value=mutable.value.copy(editor=null,archiveText=null,draftStatus="草稿已保存")}
     }
-    fun discardEditor() {invalidateTagSuggestions();val a=mutable.value.editor ?: return;draftJob?.cancel();work("放弃编辑") {store.discard(a.id);mutable.value=mutable.value.copy(editor=null)} }
-    fun saveEditor() {invalidateTagSuggestions();val a=mutable.value.editor ?: return;draftJob?.cancel();work("保存资料") {store.save(a);mutable.value=mutable.value.copy(editor=null);message("已保存「${a.name.trim()}」")} }
+    fun discardEditor() {invalidateTagSuggestions();val a=mutable.value.editor ?: return;draftJob?.cancel();val text=editorTextFor(a);work("放弃编辑") {store.discard(a.id,text);mutable.value=mutable.value.copy(editor=null,archiveText=null)} }
+    fun saveEditor() {invalidateTagSuggestions();val a=mutable.value.editor ?: return;draftJob?.cancel();val text=editorTextFor(a);work("保存资料") {store.save(a,text);mutable.value=mutable.value.copy(editor=null,archiveText=null);message("已保存「${a.name.trim()}」")} }
     fun importPhotos(id: String,uris: List<Uri>) {
-        if(uris.isEmpty()) return
-        if(!mutable.value.ready || mutable.value.busy) {viewModelScope.launch {state.first{it.ready && !it.busy};importPhotos(id,uris)};return}
-        draftJob?.cancel()
-        work("正在导入 ${uris.size} 项照片与视频") {
-            val editor=mutable.value.editor?.takeIf{it.id==id}
-            val committed=java.util.concurrent.atomic.AtomicReference<Archive?>()
-            try {
-                val (result,_)=store.importIntoArchive(id,uris,editor,
-                    progress={text->mutable.update{it.copy(progress=text)}},onLinked=committed::set)
-                if(result.errors.isNotEmpty()) message("已导入${result.photos.size}项；${result.errors.joinToString("；")}")
-                else if(editor==null)message("已添加 ${result.photos.size} 项照片与视频")
-            } finally {
-                // This non-suspending finalizer runs on Main even when the IO return is cancelled.
-                // Publish committed media before a later edit can overwrite it, without cross-thread editor writes.
-                committed.get()?.let{next->if(editor!=null)mutable.update{current->if(current.editor?.id==id)current.copy(editor=next,draftStatus="草稿已保存")else current}}
-            }
-        }
+        if(uris.isEmpty())return
+        if(!mutable.value.ready || mutable.value.busy){viewModelScope.launch{state.first{it.ready && !it.busy};importPhotos(id,uris)};return}
+        receiveMedia(uris)
+        importIncoming(id,uris)
     }
     fun preparePhotos(id: String,launch:()->Unit) {
         if(!mutable.value.ready || mutable.value.busy)return
@@ -295,7 +325,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
             else message("原档案已不存在，请重新打开")
             return
         }
-        draftJob?.cancel();work("保存编辑草稿") {store.draft(a);launch()}
+        draftJob?.cancel();work("保存编辑草稿") {store.draft(a,editorTextFor(a));launch()}
     }
     fun trash(a: Archive) = work("移入回收站") {store.trash(a.id);message("已移入回收站，可从设置恢复")}
     fun restore(a: Archive) = work("恢复档案") {store.trash(a.id,true);message("档案已恢复")}
@@ -305,7 +335,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         if(mutable.value.busy) return
         if(apply) draftJob?.cancel()
         work("保存${if(kind=="category") "分类" else "标签"}") {
-        val id=store.label(kind,name);mutable.value.editor?.let {if(apply) {val a=if(kind=="category") it.copy(category=id) else it.copy(tags=(it.tags+id).distinct());store.draft(a);mutable.value=mutable.value.copy(editor=a,draftStatus="草稿已保存")}}
+        val id=store.label(kind,name);mutable.value.editor?.let {if(apply) {val a=if(kind=="category") it.copy(category=id) else it.copy(tags=(it.tags+id).distinct());store.draft(a,editorTextFor(a));mutable.value=mutable.value.copy(editor=a,draftStatus="草稿已保存")}}
     }
     }
     fun renameLabel(item: Label,name: String)=work("修改名称") {store.renameLabel(item.id,name)}
@@ -315,9 +345,13 @@ class AppModel(app: Application): AndroidViewModel(app) {
         val draft=mutable.value.editor
         work("移除关联") {
             // Preserve edits still inside the debounce window before clearing associations.
-            if(draft!=null) store.draft(draft)
+            if(draft!=null) store.draft(draft,editorTextFor(draft))
             store.deleteLabel(item.id)
-            draft?.let {a->mutable.value=mutable.value.copy(editor=a.copy(category=if(a.category==item.id) "" else a.category,tags=a.tags-item.id),draftStatus="草稿已保存")}
+            draft?.let {a->
+                val current=store.load()
+                val text=editorTextFor(a).copy(original=current.archives.firstOrNull{it.id==a.id})
+                mutable.value=mutable.value.copy(editor=a.copy(category=if(a.category==item.id) "" else a.category,tags=a.tags-item.id),archiveText=text,draftStatus="草稿已保存")
+            }
         }
     }
     fun saveTemplate(name:String,replaceId:String?=null) {

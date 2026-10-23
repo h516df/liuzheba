@@ -131,7 +131,7 @@ import androidx.compose.ui.window.Dialog
         .border(.5.dp,if(immersive) Color.White.copy(alpha=.18f) else c.outlineVariant.copy(alpha=.5f),shape),
         shape=shape,color=if(immersive) Color(0xF2222224) else c.surface,shadowElevation=1.dp) {
         Row(Modifier.fillMaxWidth().selectableGroup().padding(4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
-            listOf("library" to "档案","frame" to "发现","settings" to "我的").forEach{(destination,label)->
+            listOf("library" to "档案","frame" to "发现").forEach{(destination,label)->
                 Column(Modifier.weight(1f).heightIn(min=54.dp).clip(RoundedCornerShape(28.dp))
                     .background(if(route==destination) {if(immersive) Color.White.copy(alpha=.14f) else c.surfaceVariant.copy(alpha=.6f)} else Color.Transparent)
                     .testTag("nav-$destination").semantics{contentDescription="切换到$label"}

@@ -28,7 +28,7 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Signing rejection policy (no credentials)
-        run: python3 -m unittest discover -s cloud -p test_sign_apk.py -v
+        run: python3 -m unittest discover -s cloud -p 'test_*.py' -v
       - name: Prepare cloud toolchain
         run: bash .devcontainer/setup.sh
       - name: Check this revision
@@ -40,6 +40,7 @@ jobs:
           name: development-${{ github.sha }}
           path: |
             **/build/outputs/apk/debug/*.apk
+            **/build/outputs/apk/androidTest/debug/*.apk
             **/build/test-results/**/*.xml
             **/build/reports/lint-results-debug.*
           retention-days: 3

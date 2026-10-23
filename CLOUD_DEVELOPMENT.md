@@ -1,3 +1,9 @@
+## 当前发布通道（2026-10-23）
+
+原正式签名已在GitHub受保护环境android-signing中准备并验证，云端开发环境不保存签名材料。普通debug使用.dev，自动验收使用.verification，正式包仍为dev.h516.shicang。
+
+正式发行使用production-release.yml：指定已检查的main完整SHA，先无Secret构建，再隔离签名、一次性模拟器真实0.16系统覆盖升级，最后上传并回读正式Release。调用仍需当前用户明确发行授权；本轮已获得。历史候选与旧“未配置”记录不代表当前环境状态。实际运行状态见HANDOFF。
+
 # 云端开发 · liuzheba
 
 自 2026-10-21 起，后续源码开发、测试与构建默认在云端执行。

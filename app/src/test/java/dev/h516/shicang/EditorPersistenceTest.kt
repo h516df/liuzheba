@@ -70,6 +70,19 @@ class EditorPersistenceTest {
         val reopened=runBlocking{reopenedLibrary()}
         assertEquals("旧标题",reopened.active.single().name);assertTrue(reopened.drafts.isEmpty())
     }
+    @Test fun immediateLabelCreationFlushesPendingBodyAndDeletionAllowsSave(){
+        val a=initial();model.changeArchiveText("尚未到自动保存窗口的正文")
+        model.label("tag","合成标签");await{!model.state.value.busy}
+        val draft=runBlocking{reopenedLibrary()}
+        assertEquals("尚未到自动保存窗口的正文",draft.noteDrafts.single().body)
+        model.saveEditor();await{!model.state.value.busy && model.state.value.editor==null}
+        val saved=model.state.value.library.active.single();model.edit(saved)
+        model.deleteLabel(model.state.value.library.labels.single());await{!model.state.value.busy}
+        model.saveEditor();await{!model.state.value.busy && model.state.value.editor==null}
+        val reopened=runBlocking{reopenedLibrary()}
+        assertEquals("尚未到自动保存窗口的正文",reopened.notes.single().body)
+        assertTrue(reopened.active.single().tags.isEmpty())
+    }
     @Test fun failedReturnKeepsEditorAndCanRetry(){
         val a=initial();model.change(a.copy(name="失败后仍保留"))
         val generation=app.getSharedPreferences("device",0).getString("generation",null)

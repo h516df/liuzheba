@@ -42,13 +42,13 @@ import androidx.compose.ui.unit.sp
             if(a.photos.isNotEmpty()) Surface(onClick=view,modifier=Modifier.align(Alignment.BottomEnd).padding(6.dp).semantics{contentDescription="浏览${a.name}的照片与视频"},
                 color=Color.Black.copy(alpha=.60f),contentColor=Color.White,shape=RoundedCornerShape(12.dp)) {
                 Row(Modifier.heightIn(min=48.dp).padding(horizontal=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                    FrameGlyph("全部照片",Color.White);Text("${a.photos.size}",style=MaterialTheme.typography.labelMedium)
+                    FrameGlyph("全部照片",Color.White);Text(a.mediaCountLabel(),style=MaterialTheme.typography.labelMedium)
                 }
             }
         }
         Column(Modifier.fillMaxWidth().clickable(onClickLabel="打开${a.name}的档案",onClick=open).padding(horizontal=6.dp,vertical=if(a.photos.isEmpty()) 16.dp else 10.dp)) {
             Text(a.name,style=MaterialTheme.typography.titleMedium,color=c.onSurface,maxLines=2,overflow=TextOverflow.Ellipsis)
-            val caption=archiveCaption(a,library)
+            val caption=library.archiveSummary(a)
             if(caption.isNotBlank()) Text(caption,Modifier.padding(top=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
         }
     }
@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.sp
         if(a.photos.isNotEmpty()) IdentityCover(a,model,Modifier.size(72.dp).clickable(onClick=view).semantics{contentDescription="浏览${a.name}的照片与视频"})
         Column(Modifier.weight(1f)) {
             Text(a.name,style=MaterialTheme.typography.titleMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
-            val caption=archiveCaption(a,library)
+            val caption=library.archiveSummary(a)
             if(caption.isNotBlank()) Text(caption,Modifier.padding(top=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
         }
         FrameGlyph("展开",c.outline)
