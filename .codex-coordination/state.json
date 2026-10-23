@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 60,
+  "revision": 61,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -489,11 +489,12 @@
       ],
       "base": "fcd10904f9e169753c116773788fe22f79e14bd0",
       "head": "fcd10904f9e169753c116773788fe22f79e14bd0",
-      "status": "active",
+      "status": "ready",
       "generation": 1,
-      "lease_until": 1792760137,
-      "updated_at": 1792752937,
-      "history": []
+      "lease_until": 0,
+      "updated_at": 1792752940,
+      "history": [],
+      "handoff": "Read-only actual-main input after PR39 squash; complete tree equals reviewed 07d72dd144dc756f96fb213cb0af396ee7de939c. Preserve original source branch. This actual-main commit, not its non-ancestor PR source, is the input for official signing, upgrade and publication."
     }
   },
   "batches": {
