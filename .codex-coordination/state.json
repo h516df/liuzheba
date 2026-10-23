@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 44,
+  "revision": 45,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -335,7 +335,7 @@
       "status": "active",
       "generation": 2,
       "lease_until": 1792751936,
-      "updated_at": 1792744736,
+      "updated_at": 1792745434,
       "history": [
         {
           "owner": "codex-rebuild-fed4015f19c9-publisher",
@@ -343,7 +343,43 @@
           "head": "4b801864486e933ae20bd2d98484c5b545a712be"
         }
       ],
-      "handoff": "PR38 publisher repair passed its exact-source policy/host/build checks and merged as 6d2f53750f9b4a7e45140e6be9d2a216e261e357; full tree equals 4b801864486e933ae20bd2d98484c5b545a712be, app tree equals published 6826b378061acb117eb08a2515d9070e792f1e3b. Keep the old branch frozen and move this same task to an isolated actual-main worktree. Wait its main checks and complete source integration only; v0.17 was already published and verified in the previous completed batch. No tag or asset replacement, no new APK."
+      "handoff": "PR38 publisher repair passed its exact-source policy/host/build checks and merged as 6d2f53750f9b4a7e45140e6be9d2a216e261e357; full tree equals 4b801864486e933ae20bd2d98484c5b545a712be, app tree equals published 6826b378061acb117eb08a2515d9070e792f1e3b. Keep the old branch frozen and move this same task to an isolated actual-main worktree. Wait its main checks and complete source integration only; v0.17 was already published and verified in the previous completed batch. No tag or asset replacement, no new APK.",
+      "receipt": {
+        "source_sha": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
+        "members": {
+          "publisher-input-20261023": "6826b378061acb117eb08a2515d9070e792f1e3b"
+        },
+        "checks": [
+          {
+            "name": "Secret checks",
+            "status": "passed",
+            "source_sha": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
+            "run_id": 39926118253,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39926118253"
+          },
+          {
+            "name": "Android device checks",
+            "status": "passed",
+            "source_sha": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
+            "run_id": 39926118374,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39926118374"
+          },
+          {
+            "name": "Android checks",
+            "status": "passed",
+            "source_sha": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
+            "run_id": 39926118268,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39926118268"
+          },
+          {
+            "name": "Cloud development",
+            "status": "passed",
+            "source_sha": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
+            "run_id": 39926118276,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39926118276"
+          }
+        ]
+      }
     }
   },
   "batches": {
