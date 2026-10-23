@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 59,
+  "revision": 60,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -477,6 +477,23 @@
           }
         ]
       }
+    },
+    "v018-publish-input-20261023": {
+      "owner": "codex-product-publish-input",
+      "workspace": "cloud-product-v018-input",
+      "batch": "v018-official-publication-20261023",
+      "role": "work",
+      "branch": "codex/v018-main-input-20261023",
+      "scopes": [
+        "app"
+      ],
+      "base": "fcd10904f9e169753c116773788fe22f79e14bd0",
+      "head": "fcd10904f9e169753c116773788fe22f79e14bd0",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792760137,
+      "updated_at": 1792752937,
+      "history": []
     }
   },
   "batches": {
@@ -495,6 +512,9 @@
     "product-experience-v018-20261023": {
       "status": "completed",
       "integrator": "product-v018-integration-20261023"
+    },
+    "v018-official-publication-20261023": {
+      "status": "open"
     }
   }
 }
