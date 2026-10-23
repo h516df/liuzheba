@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 16,
+  "revision": 17,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -43,6 +43,7 @@
         "CHANGELOG.md",
         "README.md",
         "app/build.gradle.kts",
+        "app/src/debug",
         "app/src/main/AndroidManifest.xml",
         "app/src/main/assets/release-notes.json",
         "app/src/main/python",
@@ -67,7 +68,7 @@
       "status": "active",
       "generation": 2,
       "lease_until": 1792739632,
-      "updated_at": 1792732432,
+      "updated_at": 1792732713,
       "history": [
         {
           "owner": "codex-91839c4ac19c-release",
