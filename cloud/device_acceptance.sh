@@ -3,10 +3,13 @@ set -euo pipefail
 adb shell settings put secure show_ime_with_hard_keyboard 1
 adb shell wm size 720x1280
 adb shell wm density 240
-status=0
-./gradlew --no-daemon --max-workers=1 -I tools/verification.init.gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.h516.shicang.DeviceAcceptanceTest || status=$?
-adb shell run-as dev.h516.shicang.verification cat files/device-acceptance-media3.txt || true
-if [ "$status" -ne 0 ]; then exit "$status"; fi
+# PR/main run native acceptance; optional manual runs exercise only the upgrade harness.
+if [ -z "${REFERENCE_SHA:-}" ]; then
+  status=0
+  ./gradlew --no-daemon --max-workers=1 -I tools/verification.init.gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.h516.shicang.DeviceAcceptanceTest || status=$?
+  adb shell run-as dev.h516.shicang.verification cat files/device-acceptance-media3.txt || true
+  exit "$status"
+fi
 if [ -n "${REFERENCE_SHA:-}" ]; then
   # The candidate is from a prior reviewed main SHA. This validates only the current harness.
   python3 cloud/run_official_upgrade.py \

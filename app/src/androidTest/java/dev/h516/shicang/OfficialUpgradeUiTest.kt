@@ -102,7 +102,7 @@ class OfficialUpgradeUiTest {
         click("我的");clickScrolling("备份与恢复");clickScrolling("导出备份文件（换机或留存）");click("确认")
         val name=waitNode("system backup filename"){it.isEditable && it.packageName?.toString()?.contains("documentsui")==true}
         setText(name,filename)
-        click(waitNode("system save action"){it.isEnabled && (it.viewIdResourceName?.endsWith(":id/action_menu_save")==true || it.text?.toString() in listOf("Save","保存"))})
+        click(waitNode("system save action"){it.isEnabled && (it.viewIdResourceName?.endsWith(":id/action_menu_save")==true || it.text?.toString().equals("Save",ignoreCase=true) || it.text?.toString()=="保存")})
         waitText("完整备份已保存并校验，可在所选文件位置找到")
     }
     private fun nodes():List<AccessibilityNodeInfo> {
