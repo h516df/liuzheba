@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 27,
+  "revision": 28,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -138,6 +138,37 @@
       "updated_at": 1792735320,
       "history": [],
       "handoff": "冻结PR35经GitHub squash合并后的精确主线，根树02de1f7360b80a665e01ca214c069002c2a01c2e与受测开发提交d9633d2完全一致。原开发分支保留旧成员祖先，本发布批以真实主线SHA冻结，不冒称旧成员是squash主线祖先。仅冻结源码，289/7 PR证据已核实；正式发布仍待精确主线检查、签名、覆盖安装与资产回读。"
+    },
+    "v017-official-publish-20261023": {
+      "owner": "codex-rebuild-fed4015f19c9",
+      "workspace": "cloud-rebuild-fed4015f19c9-publish",
+      "batch": "v017-main-publication-20261023",
+      "role": "integrator",
+      "branch": "codex/v017-official-release-20261023",
+      "scopes": [
+        ".github/workflows",
+        "AGENTS.md",
+        "CHANGELOG.md",
+        "CLOUD_DEVELOPMENT.md",
+        "HANDOFF.md",
+        "README.md",
+        "cloud",
+        "docs/REBUILD.md",
+        "docs/RELEASING.md",
+        "docs/acceptance/v0.17",
+        "docs/releases",
+        "docs/tasks",
+        "release",
+        "@integration",
+        "@publish"
+      ],
+      "base": "f78d239748665216a6cdbeec01ba6b87a79510b1",
+      "head": "f78d239748665216a6cdbeec01ba6b87a79510b1",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792742523,
+      "updated_at": 1792735323,
+      "history": []
     }
   },
   "batches": {
@@ -146,7 +177,8 @@
       "integrator": "release-v017-cloud-20261022"
     },
     "v017-main-publication-20261023": {
-      "status": "open"
+      "status": "sealed",
+      "integrator": "v017-official-publish-20261023"
     }
   }
 }
