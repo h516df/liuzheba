@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 63,
+  "revision": 64,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -489,10 +489,10 @@
       ],
       "base": "fcd10904f9e169753c116773788fe22f79e14bd0",
       "head": "fcd10904f9e169753c116773788fe22f79e14bd0",
-      "status": "ready",
+      "status": "integrated",
       "generation": 1,
       "lease_until": 0,
-      "updated_at": 1792752940,
+      "updated_at": 1792754303,
       "history": [],
       "handoff": "Read-only actual-main input after PR39 squash; complete tree equals reviewed 07d72dd144dc756f96fb213cb0af396ee7de939c. Preserve original source branch. This actual-main commit, not its non-ancestor PR source, is the input for official signing, upgrade and publication."
     },
@@ -508,10 +508,10 @@
       ],
       "base": "fcd10904f9e169753c116773788fe22f79e14bd0",
       "head": "fcd10904f9e169753c116773788fe22f79e14bd0",
-      "status": "active",
+      "status": "integrated",
       "generation": 1,
-      "lease_until": 1792760142,
-      "updated_at": 1792753616,
+      "lease_until": 0,
+      "updated_at": 1792754303,
       "history": [],
       "receipt": {
         "source_sha": "fcd10904f9e169753c116773788fe22f79e14bd0",
@@ -548,6 +548,16 @@
             "url": "https://github.com/h516df/liuzheba/actions/runs/39942493493"
           }
         ]
+      },
+      "publication": {
+        "source_sha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+        "url": "https://github.com/h516df/liuzheba/releases/tag/v0.18",
+        "tag": "v0.18",
+        "apk_sha256": "31b3c046fabd61933c5fbe1b8fa3f0bd6c7da680be3f6a3735d9279c6489910f",
+        "certificate_sha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26",
+        "anonymous_assets_verified": true,
+        "official_upgrade": "passed-on-disposable-emulator",
+        "physical_phone": "not_run"
       }
     }
   },
@@ -569,7 +579,7 @@
       "integrator": "product-v018-integration-20261023"
     },
     "v018-official-publication-20261023": {
-      "status": "sealed",
+      "status": "completed",
       "integrator": "v018-official-publish-20261023"
     }
   }
