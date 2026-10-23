@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 61,
+  "revision": 62,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -495,6 +495,24 @@
       "updated_at": 1792752940,
       "history": [],
       "handoff": "Read-only actual-main input after PR39 squash; complete tree equals reviewed 07d72dd144dc756f96fb213cb0af396ee7de939c. Preserve original source branch. This actual-main commit, not its non-ancestor PR source, is the input for official signing, upgrade and publication."
+    },
+    "v018-official-publish-20261023": {
+      "owner": "codex-product-publish-v018",
+      "workspace": "cloud-product-publication-v018",
+      "batch": "v018-official-publication-20261023",
+      "role": "integrator",
+      "branch": "codex/v018-publication-20261023",
+      "scopes": [
+        "@integration",
+        "@publish"
+      ],
+      "base": "fcd10904f9e169753c116773788fe22f79e14bd0",
+      "head": "fcd10904f9e169753c116773788fe22f79e14bd0",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792760142,
+      "updated_at": 1792752942,
+      "history": []
     }
   },
   "batches": {
@@ -515,7 +533,8 @@
       "integrator": "product-v018-integration-20261023"
     },
     "v018-official-publication-20261023": {
-      "status": "open"
+      "status": "sealed",
+      "integrator": "v018-official-publish-20261023"
     }
   }
 }
