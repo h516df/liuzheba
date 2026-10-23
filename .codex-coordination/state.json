@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 24,
+  "revision": 25,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -21,10 +21,10 @@
       ],
       "base": "1f4eadda7813ddcd22e721e3852cdea27d0e8359",
       "head": "9993abeba616b22764968935edc966114b5f206d",
-      "status": "ready",
+      "status": "integrated",
       "generation": 1,
       "lease_until": 0,
-      "updated_at": 1792660220,
+      "updated_at": 1792735314,
       "history": [],
       "handoff": "导入失败保护已推送PR31，实现e021dca，最终文档head 9993abeba616b22764968935edc966114b5f206d，app树8bb2132ea2c573b9ecd835699528432323ea5a29；同树23/23宿主数据检查通过。部分失败/新输入选择保留，既有PNG/视频/草稿SQL失败+重开摘要一致。正式覆盖更新未发布：云端无签名绑定、仓库环境0、Secrets元数据403，原签名不可用；不能将verification测试APK当正式覆盖包。用户要求代理自行处理，不再问签名位置；后续按HANDOFF核对可访问配置与原签名通道。"
     },
@@ -67,10 +67,10 @@
       ],
       "base": "9993abeba616b22764968935edc966114b5f206d",
       "head": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
-      "status": "active",
+      "status": "integrated",
       "generation": 2,
-      "lease_until": 1792741541,
-      "updated_at": 1792735310,
+      "lease_until": 0,
+      "updated_at": 1792735314,
       "history": [
         {
           "owner": "codex-91839c4ac19c-release",
@@ -124,7 +124,7 @@
   },
   "batches": {
     "experience-refactor-20261022": {
-      "status": "sealed",
+      "status": "completed",
       "integrator": "release-v017-cloud-20261022"
     }
   }
