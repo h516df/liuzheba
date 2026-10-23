@@ -87,6 +87,34 @@ class DeviceAcceptanceTest {
         }
     }
 
+    @Test fun wildcardShareImportsOrderedPhotoAndVideoThroughActualActivity() = runBlocking {
+        val (_, video) = importVideo()
+        val image = File(context.cacheDir, "camera/shared-${uid()}.png").also { fixtures += it }
+        android.graphics.Bitmap.createBitmap(160, 160, android.graphics.Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.BLUE)
+            image.outputStream().use { compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        val uris = listOf(image, video).map { FileProvider.getUriForFile(context, "${context.packageName}.files", it) }
+        start()
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).setPackage(context.packageName).setType("*/*")
+            .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            .apply { clipData = android.content.ClipData.newUri(context.contentResolver, "mixed media", uris.first()).apply { addItem(android.content.ClipData.Item(uris.last())) } }
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        assertEquals(MainActivity::class.java.name, intent.resolveActivity(context.packageManager)?.className)
+        context.startActivity(intent)
+        click("新建档案")
+        await("ordered mixed media imported") {
+            onMain { (activity as MainActivity).model.state.value.let { !it.busy && it.editor?.photos?.size == 2 } }
+        }
+        editName("合成混合分享档案"); click("保存")
+        await("archive saved") { onMain { (activity as MainActivity).model.state.value.library.active.any { it.name == "合成混合分享档案" } } }
+        val saved = store.load().active.single { it.name == "合成混合分享档案" }
+        assertEquals(listOf(false, true), saved.photos.map { it.isVideo })
+        assertEquals(listOf(image, video).map(::sha), saved.photos.map { it.sha256 })
+        saved.photos.forEach { assertEquals(it.sha256, sha(File(store.photoDir, it.file))) }
+    }
+
     @Test fun contentUriImportPlaysSeeksAndRetainsPositionAfterBackground() = runBlocking {
         val (photo, source) = importVideo()
         assertEquals(source.length(), photo.bytes)

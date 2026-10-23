@@ -42,7 +42,7 @@ class OfficialUpgradeUiTest {
         }
     }
     @Suppress("DEPRECATION") private fun installedCode()=context.packageManager.getPackageInfo(production,0).longVersionCode
-    private fun launchOfficial(){context.startActivity(checkNotNull(context.packageManager.getLaunchIntentForPackage(production)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitText("搜索档案")}
+    private fun launchOfficial(){context.startActivity(checkNotNull(context.packageManager.getLaunchIntentForPackage(production)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitNode("official app window"){it.packageName?.toString()==production};returnToLibrary()}
 
     private fun seed() {
         check(installedCode()==17L){"Seed requires the published 0.16 installation"}
@@ -57,7 +57,8 @@ class OfficialUpgradeUiTest {
         }
         val media=listOf(FileProvider.getUriForFile(context,"${context.packageName}.files",image))+sources
         val clips=ClipData.newUri(context.contentResolver,"synthetic mixed media",media.first()).apply{media.drop(1).forEach{addItem(ClipData.Item(it))}}
-        context.startActivity(Intent(Intent.ACTION_SEND_MULTIPLE).setClassName(production,"$production.MainActivity").setType("*/*")
+        // 0.16 only routes image/* or video/*; each URI still has its real provider MIME type.
+        context.startActivity(Intent(Intent.ACTION_SEND_MULTIPLE).setClassName(production,"$production.MainActivity").setType("image/*")
             .putParcelableArrayListExtra(Intent.EXTRA_STREAM,ArrayList(media)).apply{clipData=clips}
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
         click("新建档案");waitText("新建档案")
@@ -105,6 +106,7 @@ class OfficialUpgradeUiTest {
         waitText("完整备份已保存并校验，可在所选文件位置找到")
     }
     private fun nodes():List<AccessibilityNodeInfo> {
+        ui.clearCache()
         val result=mutableListOf<AccessibilityNodeInfo>()
         fun visit(node:AccessibilityNodeInfo?){if(node==null)return;result+=node;repeat(node.childCount){visit(node.getChild(it))}}
         visit(ui.rootInActiveWindow);return result
@@ -115,7 +117,7 @@ class OfficialUpgradeUiTest {
     }
     private fun waitText(text:String)=waitNode(text){it.text?.toString()==text || it.contentDescription?.toString()==text}
     private fun click(text:String)=click(waitText(text))
-    private fun clickAny(vararg text:String)=click(waitNode(text.joinToString("/")){it.text?.toString() in text || it.contentDescription?.toString() in text})
+    private fun clickAny(vararg text:String)=click(waitNode(text.joinToString("/")){node->text.any{it.equals(node.text?.toString(),ignoreCase=true) || it.equals(node.contentDescription?.toString(),ignoreCase=true)}})
     private fun click(node:AccessibilityNodeInfo) {
         var target:AccessibilityNodeInfo?=node
         while(target!=null && !target.isClickable)target=target.parent

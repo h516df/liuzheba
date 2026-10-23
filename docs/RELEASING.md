@@ -59,3 +59,6 @@ gh workflow run production-release.yml --ref main -f expected_sha=<已核实的m
 ```
 
 流水线分别执行unsigned构建、受保护环境隔离签名、一次性API35模拟器中正式0.16→新版的系统安装与真实备份比较、上传和回读正式Release。签名Secret不注入Gradle。安装包身份检查失败、资料/原件变化或测试未通过均阻止发布。APK、说明和校验和不覆盖已存在正式资产。正式包不添加调试入口。
+
+
+可先在开发分支验证覆盖升级测试工具，避免在正式签名后才发现旧版UI兼容问题：手动运行`android-device-checks.yml`，同时传入`signed_reference_run`与`signed_reference_sha`。仅接收本仓库main上production-release.yml生成的已有签名候选；验证原证书和固定0.16摘要后，在一次性模拟器运行真实UI覆盖升级。`upgrade-harness-*`附件分别记录当前工具SHA及参考候选SHA；它只证明工具与参考候选的验收，不能当作新源码发布证据。正式发行仍须对精确新main候选重做完整验收。

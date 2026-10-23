@@ -8,10 +8,24 @@ on:
       - '*.gradle.kts'
       - 'gradle.properties'
       - 'tools/verification.init.gradle'
+      - 'cloud/device_acceptance.sh'
+      - 'cloud/prepare_upgrade_reference.py'
+      - 'cloud/run_official_upgrade.py'
+      - 'cloud/verify_upgrade.py'
+      - 'tools/release/verify_apk.py'
       - '.github/workflows/android-device-checks.yml'
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      signed_reference_run:
+        description: Optional prior main production-release run for upgrade harness validation
+        type: string
+        default: ''
+      signed_reference_sha:
+        description: Exact source SHA of that already signed reference candidate
+        type: string
+        default: ''
 
 concurrency:
   group: android-device-${{ github.event.pull_request.number || github.ref }}
@@ -19,6 +33,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   device:
@@ -47,6 +62,28 @@ jobs:
           ./gradlew --no-daemon --max-workers=1 -I tools/verification.init.gradle assembleDebug assembleDebugAndroidTest
       - name: Verify the actual isolated APK before any device test
         run: python3 cloud/check_apk_identity.py app/build/outputs/apk/debug/app-debug.apk dev.h516.shicang.verification
+      - name: Validate optional signed reference origin
+        if: inputs.signed_reference_run != '' || inputs.signed_reference_sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REFERENCE_RUN: ${{ inputs.signed_reference_run }}
+          REFERENCE_SHA: ${{ inputs.signed_reference_sha }}
+        run: python3 cloud/prepare_upgrade_reference.py
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        if: inputs.signed_reference_run != ''
+        with:
+          name: signed-candidate-${{ inputs.signed_reference_sha }}
+          run-id: ${{ inputs.signed_reference_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/reference
+      - name: Verify reference APK and published baseline
+        if: inputs.signed_reference_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.16 --repo h516df/liuzheba --pattern shicang-v0.16-universal.apk --dir "$RUNNER_TEMP/reference"
+          python3 -c 'import hashlib,json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"],"reference","shicang-v0.16-universal.apk"); assert hashlib.sha256(p.read_bytes()).hexdigest()==json.load(open("release/signing-identity.json"))["publishedApkSha256"]'
+          python3 tools/release/verify_apk.py --candidate "$RUNNER_TEMP/reference/official.apk" --previous "$RUNNER_TEMP/reference/shicang-v0.16-universal.apk" --receipt "$RUNNER_TEMP/reference/identity.json"
       # This permission is restricted to GitHub's disposable hosted VM, never a user's computer.
       - name: Enable KVM on the disposable runner
         run: |
@@ -71,6 +108,8 @@ jobs:
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Exercise offline synthetic device flows
+        env:
+          REFERENCE_SHA: ${{ inputs.signed_reference_sha }}
         # Official v2.37.0, including Node 24 and build-tools 36 support.
         # https://github.com/ReactiveCircus/android-emulator-runner/releases/tag/v2.37.0
         uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
@@ -84,11 +123,15 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: |
-            adb shell settings put secure show_ime_with_hard_keyboard 1
-            adb shell wm size 720x1280
-            adb shell wm density 240
-            status=0; ./gradlew --no-daemon --max-workers=1 -I tools/verification.init.gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.h516.shicang.DeviceAcceptanceTest || status=$?; adb shell run-as dev.h516.shicang.verification cat files/device-acceptance-media3.txt || true; exit "$status"
+          script: bash cloud/device_acceptance.sh
+      - name: Preserve optional reference harness receipt
+        if: success() && inputs.signed_reference_run != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: upgrade-harness-${{ github.sha }}
+          path: ${{ runner.temp }}/reference-upgrade/*.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Preserve text-only test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
