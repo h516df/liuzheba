@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 66,
+  "revision": 67,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -572,11 +572,12 @@
       ],
       "base": "fcd10904f9e169753c116773788fe22f79e14bd0",
       "head": "0b749b996e89a8cd88adc44c15920e45761c92dd",
-      "status": "active",
+      "status": "ready",
       "generation": 1,
-      "lease_until": 1792761513,
-      "updated_at": 1792754313,
-      "history": []
+      "lease_until": 0,
+      "updated_at": 1792754988,
+      "history": [],
+      "handoff": "Documentation-only exact release receipts; app tree equal released fcd10904f9e169753c116773788fe22f79e14bd0. PR checks passed; no source writer remains."
     }
   },
   "batches": {
