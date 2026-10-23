@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 46,
+  "revision": 47,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -380,6 +380,28 @@
           }
         ]
       }
+    },
+    "product-experience-20261023": {
+      "owner": "codex-product-b4acbc1bae46",
+      "workspace": "cloud-product-2fdb3d90ceb2",
+      "batch": "product-experience-v018-20261023",
+      "role": "work",
+      "branch": "codex/product-experience-20261023",
+      "scopes": [
+        "AGENTS.md",
+        "README.md",
+        "app",
+        "docs/PRODUCT_REWORK.md",
+        "docs/acceptance/v0.18",
+        "docs/releases/v0.18.md"
+      ],
+      "base": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
+      "head": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792755981,
+      "updated_at": 1792748781,
+      "history": []
     }
   },
   "batches": {
@@ -394,6 +416,9 @@
     "publisher-draft-id-20261023": {
       "status": "completed",
       "integrator": "publisher-draft-id-fix-20261023"
+    },
+    "product-experience-v018-20261023": {
+      "status": "open"
     }
   }
 }
