@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 49,
+  "revision": 50,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -390,6 +390,8 @@
       "scopes": [
         ".github/workflows/production-release.yml",
         "AGENTS.md",
+        "CHANGELOG.md",
+        "HANDOFF.md",
         "README.md",
         "app",
         "cloud/run_official_upgrade.py",
@@ -404,7 +406,7 @@
       "status": "active",
       "generation": 1,
       "lease_until": 1792756802,
-      "updated_at": 1792749729,
+      "updated_at": 1792750123,
       "history": []
     }
   },
