@@ -62,3 +62,8 @@ gh workflow run production-release.yml --ref main -f expected_sha=<已核实的m
 
 
 可先在开发分支验证覆盖升级测试工具，避免在正式签名后才发现旧版UI兼容问题：手动运行`android-device-checks.yml`，同时传入`signed_reference_run`与`signed_reference_sha`。仅接收本仓库main上production-release.yml生成的已有签名候选；验证原证书和固定0.16摘要后，在一次性模拟器运行真实UI覆盖升级。`upgrade-harness-*`附件分别记录当前工具SHA及参考候选SHA；它只证明工具与参考候选的验收，不能当作新源码发布证据。正式发行仍须对精确新main候选重做完整验收。
+
+
+2026-10-23草稿API修复：未公开草稿可能尚无Git标签，`GET /releases/tags/{tag}`会返回404。发行脚本分页检查含草稿的版本占用，并检查Git标签；通过创建Release的POST响应取得ID，之后按`/releases/{id}`核对身份/资产、公开与回读。既有草稿或标签均阻止重复创建；不覆盖资产。正文从当前版本的`docs/releases/{tag}.md`读取。
+
+0.17发行中首次遇到该404：构建、原签名和真实覆盖升级已通过，三资产也已上传，随后经Release ID421590291逐项核对后公开原草稿，未重传或替换资产。原工作流publish失败记录保留；Release的源码/标签为6826b378061acb117eb08a2515d9070e792f1e3b，后续脚本修复不改变已发布安装包。遇到部分发布失败应先检查现存Release ID、target源码及签名/升级/资产摘要，再接续；不要盲目重跑创建步骤或删除已公开发行。

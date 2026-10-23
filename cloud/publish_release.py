@@ -34,23 +34,42 @@ def main():
     version=notes["versionName"]
     if not re.fullmatch(r"\d+\.\d+(?:\.\d+)?",version):raise SystemExit("Invalid release version")
     tag="v"+version
-    existing=gh("api",f"repos/{repo}/releases/tags/{tag}",check=False)
-    if existing.returncode==0 or "404" not in existing.stderr:raise SystemExit("Release tag is occupied or cannot be safely checked")
+    # Drafts may have no Git tag yet and are invisible to GET /releases/tags/{tag}.
+    # List releases with authenticated pagination so a retry cannot create a second draft.
+    occupied=gh("api","--paginate",f"repos/{repo}/releases?per_page=100",
+        "--jq",f'.[] | select(.tag_name == "{tag}") | .id').stdout.strip()
+    if occupied:raise SystemExit("Release tag is occupied, including an unpublished draft")
+    existing=gh("api",f"repos/{repo}/git/ref/tags/{tag}",check=False)
+    if existing.returncode==0 or not re.search(r"\bHTTP 404\b",existing.stderr):raise SystemExit("Git tag is occupied or cannot be safely checked")
     official=directory/f"shicang-{tag}-universal.apk";shutil.copyfile(apk,official)
     notes_path=directory/f"shicang-{tag}-release-notes.json";shutil.copyfile("app/src/main/assets/release-notes.json",notes_path)
     checksums=directory/f"shicang-{tag}-SHA256.txt"
     checksums.write_text("".join(f"{digest(path)}  {path.name}\n" for path in (official,notes_path)))
     body=directory/"release-body.md"
-    body.write_text(Path("docs/releases/v0.17.md").read_text()+f"\n\n源码：`{sha}`。\n\n[云端验证与发布记录](https://github.com/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']})。\n")
-    gh("release","create",tag,"--repo",repo,"--target",sha,"--title",f"留着吧 {tag} · 档案与沉浸浏览重构","--notes-file",body,"--draft")
+    body.write_text(Path(f"docs/releases/{tag}.md").read_text()+f"\n\n源码：`{sha}`。\n\n[云端验证与发布记录](https://github.com/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']})。\n")
+    request=directory/"release-request.json"
+    request.write_text(json.dumps(dict(tag_name=tag,target_commitish=sha,
+        name=f"留着吧 {tag} · 档案与沉浸浏览重构",body=body.read_text(),draft=True,prerelease=False),ensure_ascii=False))
+    created=json.loads(gh("api",f"repos/{repo}/releases","--method","POST","--input",request).stdout)
+    release_id=created.get("id")
+    if not (type(release_id) is int and release_id>0 and created.get("draft") is True
+        and created.get("prerelease") is False and created.get("tag_name")==tag and created.get("target_commitish")==sha):
+        raise SystemExit("Created draft does not match the reviewed source")
     gh("release","upload",tag,official,notes_path,checksums,"--repo",repo)
-    draft=json.loads(gh("api",f"repos/{repo}/releases/tags/{tag}").stdout)
+    draft=json.loads(gh("api",f"repos/{repo}/releases/{release_id}").stdout)
+    if not (draft.get("id")==release_id and draft.get("draft") is True and draft.get("prerelease") is False
+        and draft.get("tag_name")==tag and draft.get("target_commitish")==sha):
+        raise SystemExit("Draft identity changed; refusing publication")
+    if len(draft["assets"])!=3 or {a["name"] for a in draft["assets"]}!={official.name,notes_path.name,checksums.name}:
+        raise SystemExit("Unexpected uploaded assets; release remains a draft")
     for path in (official,notes_path,checksums):
         matches=[a for a in draft["assets"] if a["name"]==path.name]
         if len(matches)!=1 or matches[0]["state"]!="uploaded" or matches[0]["size"]!=path.stat().st_size or matches[0].get("digest")!="sha256:"+digest(path):
             raise SystemExit("Uploaded asset verification failed; release remains a draft")
-    gh("release","edit",tag,"--repo",repo,"--draft=false","--latest")
-    release=json.loads(gh("api",f"repos/{repo}/releases/tags/{tag}").stdout)
+    publish_request=directory/"publish-request.json"
+    publish_request.write_text(json.dumps(dict(draft=False,prerelease=False,make_latest="true")))
+    gh("api",f"repos/{repo}/releases/{release_id}","--method","PATCH","--input",publish_request)
+    release=json.loads(gh("api",f"repos/{repo}/releases/{release_id}").stdout)
     latest=json.loads(gh("api",f"repos/{repo}/releases/latest").stdout)
     if release["draft"] or release["prerelease"] or latest["id"]!=release["id"]:raise SystemExit("Final release state verification failed")
     tag_ref=json.loads(gh("api",f"repos/{repo}/git/ref/tags/{tag}").stdout)
