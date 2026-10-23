@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /** External UI acceptance on a disposable emulator. Never instruments, clears or uninstalls production. */
-@androidx.annotation.RequiresApi(28)
+@androidx.test.filters.SdkSuppress(minSdkVersion=28)
 @RunWith(AndroidJUnit4::class)
 class OfficialUpgradeUiTest {
     private val instrumentation=InstrumentationRegistry.getInstrumentation()
