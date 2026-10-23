@@ -15,7 +15,7 @@
 ## 成熟交互参考
 
 - [Apple Photos使用指南](https://support.apple.com/guide/iphone/view-photos-and-videos-iph3d267610/ios)：完整媒体观看、按需控制与返回上下文。
-- [Day One媒体说明](https://dayoneapp.com/guides/tips-and-tutorials/media/): 文字与多媒体归属同一记录。
+- [Day One使用指南](https://dayoneapp.com/guides/): 文字与多媒体归属同一记录。
 - [Ente Photos](https://ente.io/photos/): 私人媒体浏览与本地数据边界。
 - [Android Media3 PlayerView](https://developer.android.com/media/media3/ui/playerview)：视频比例、生命周期与播放器复用。
 - [Android照片选择器](https://developer.android.com/training/data-storage/shared/photopicker)：选择授权与持久读取边界。

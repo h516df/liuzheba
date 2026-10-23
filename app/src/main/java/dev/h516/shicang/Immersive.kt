@@ -73,7 +73,7 @@ import java.io.File
     busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={}, discovery:DiscoveryActions?=null
 ) {
     val pager=rememberPagerState(initialPage=photoIndex(a,initialPhoto),pageCount={a.photos.size.coerceAtLeast(1)})
-    var videoPlaying by remember {mutableStateOf(false)}
+    var playingVideo by remember {mutableStateOf<String?>(null)}
     var controls by rememberSaveable {mutableStateOf(true)}
     var menu by remember {mutableStateOf(false)}
     var information by remember {mutableStateOf(false)}
@@ -85,6 +85,8 @@ import java.io.File
     val context=LocalContext.current
     val accessibility=remember {context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager}
     val current=a.photos.getOrNull(pager.currentPage)
+    val videoPlaying=playingVideo!=null && playingVideo==current?.id
+    LaunchedEffect(videoPlaying){if(!videoPlaying){controls=true;activity++}}
     val imageStates=remember(a.id) {mutableStateMapOf<String,ZoomableImageState>()}
     val zoomed=(imageStates[current?.id]?.zoomableState?.zoomFraction ?: 0f)>.001f
     val complete=appearance.skin!="全幅" || appearance.fit=="完整"
@@ -130,7 +132,7 @@ import java.io.File
                     val width=minOf((maxWidth-40.dp).coerceAtLeast(1.dp),(maxHeight-140.dp).coerceAtLeast(1.dp)*ratio)
                     val canvas=if(framed && !p.isVideo) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
-                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && !reading && editingVideo==null && !busy,true,{videoPlaying=it;touch()},controlsInset=if(discovery!=null)bottomInset else 0.dp,readText=archiveNote?.let{{touch();reading=true}}){touch();controls=!controls}
+                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && !reading && editingVideo==null && !busy,true,{playing->if(playing)playingVideo=p.id else if(playingVideo==p.id)playingVideo=null;touch()},controlsInset=if(discovery!=null)bottomInset else 0.dp,readText=archiveNote?.let{{touch();reading=true}}){touch();controls=!controls}
                 else {
                     // Keep the renderer and its decoded image stable across the pager midpoint.
                     val imageState=rememberZoomableImageState()
