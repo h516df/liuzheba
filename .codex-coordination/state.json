@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 67,
+  "revision": 68,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -578,6 +578,24 @@
       "updated_at": 1792754988,
       "history": [],
       "handoff": "Documentation-only exact release receipts; app tree equal released fcd10904f9e169753c116773788fe22f79e14bd0. PR checks passed; no source writer remains."
+    },
+    "v018-docs-integration-20261023": {
+      "owner": "codex-product-final-docs-integration",
+      "workspace": "cloud-product-final-docs-integration",
+      "batch": "v018-delivery-evidence-20261023",
+      "role": "integrator",
+      "branch": "codex/v018-docs-integration-20261023",
+      "scopes": [
+        "@integration",
+        "@publish"
+      ],
+      "base": "0b749b996e89a8cd88adc44c15920e45761c92dd",
+      "head": "0b749b996e89a8cd88adc44c15920e45761c92dd",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792762191,
+      "updated_at": 1792754991,
+      "history": []
     }
   },
   "batches": {
@@ -602,7 +620,8 @@
       "integrator": "v018-official-publish-20261023"
     },
     "v018-delivery-evidence-20261023": {
-      "status": "open"
+      "status": "sealed",
+      "integrator": "v018-docs-integration-20261023"
     }
   }
 }
