@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 45,
+  "revision": 46,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -312,10 +312,10 @@
       ],
       "base": "6826b378061acb117eb08a2515d9070e792f1e3b",
       "head": "6826b378061acb117eb08a2515d9070e792f1e3b",
-      "status": "ready",
+      "status": "integrated",
       "generation": 1,
       "lease_until": 0,
-      "updated_at": 1792743668,
+      "updated_at": 1792745438,
       "history": [],
       "handoff": "Freeze the actual v0.17 published source and publisher baseline. Release ID421590291 is public/latest with original assets and verified anonymous downloads; its publication receipt is complete in the prior task. This input branch is read-only and retained at the tag commit. Fix only the draft lookup/publication automation in a new branch; do not replace released assets."
     },
@@ -332,10 +332,10 @@
       ],
       "base": "6826b378061acb117eb08a2515d9070e792f1e3b",
       "head": "6d2f53750f9b4a7e45140e6be9d2a216e261e357",
-      "status": "active",
+      "status": "integrated",
       "generation": 2,
-      "lease_until": 1792751936,
-      "updated_at": 1792745434,
+      "lease_until": 0,
+      "updated_at": 1792745438,
       "history": [
         {
           "owner": "codex-rebuild-fed4015f19c9-publisher",
@@ -392,7 +392,7 @@
       "integrator": "v017-official-publish-20261023"
     },
     "publisher-draft-id-20261023": {
-      "status": "sealed",
+      "status": "completed",
       "integrator": "publisher-draft-id-fix-20261023"
     }
   }
