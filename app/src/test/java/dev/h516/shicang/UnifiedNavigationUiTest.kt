@@ -26,8 +26,8 @@ abstract class UnifiedNavigationFixture {
     @Before fun bind(){Dispatchers.setMain(android.os.Handler(android.os.Looper.getMainLooper()).asCoroutineDispatcher().immediate)}
     @After fun reset(){Dispatchers.resetMain();RuntimeEnvironment.setFontScale(1f)}
     protected fun idle(check:()->Boolean){compose.waitUntil(15000){Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();check()}}
-    protected fun screenshot(name:String){val file=File("build/outputs/unified-navigation/$name.png");file.parentFile!!.mkdirs();compose.onRoot().captureRoboImage(file.absolutePath)}
-    protected fun fixture(video:Boolean=false,font:Float=1f,check:(AppModel,Archive)->Unit) {
+    protected fun screenshot(name:String){val file=File("build/outputs/unified-navigation/$name.png");file.parentFile!!.mkdirs();compose.onAllNodes(isRoot()).onLast().captureRoboImage(file.absolutePath)}
+    protected fun fixture(video:Boolean=false,font:Float=1f,choose:(String)->Unit={},take:(String)->Unit={},check:(AppModel,Archive)->Unit) {
         RuntimeEnvironment.setFontScale(font)
         val app=RuntimeEnvironment.getApplication()
         android.graphics.Bitmap.createBitmap(1,1,android.graphics.Bitmap.Config.ARGB_8888).apply{copyPixelsToBuffer(java.nio.ByteBuffer.allocate(4));recycle()}
@@ -48,7 +48,7 @@ abstract class UnifiedNavigationFixture {
         val loader=coil3.ImageLoader.Builder(app).components{add(coil3.decode.BitmapFactoryDecoder.Factory())}.build();coil3.SingletonImageLoader.setUnsafe(loader)
         val model=AppModel(app);val owners=androidx.lifecycle.ViewModelStore().apply{put("fixture",model)}
         try {
-            compose.setContent{ShicangApp(model,true,{},{},{},{},{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
+            compose.setContent{ShicangApp(model,true,{},{},choose,take,{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
             check(model,a)
         } finally {owners.clear();idle{model.resourcesClosed};loader.shutdown()}
     }
@@ -65,21 +65,20 @@ class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
         compose.onNodeWithTag("nav-library").assertIsDisplayed();compose.onNodeWithTag("nav-settings").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").performClick();compose.onNodeWithText("查看资料").performClick();compose.onNodeWithText("打开完整档案").performClick()
         compose.onNodeWithText("档案详情").assertExists();compose.onNodeWithTag("nav-frame").assertDoesNotExist()
-        compose.onNodeWithText("写长笔记").performScrollTo().performClick();idle{model.noteEditor.state.value?.loaded==true}
-        compose.onNodeWithTag("note-body").performTextInput("合成记忆：不丢草稿")
-        compose.onNodeWithText("返回").performClick();idle{model.noteEditor.state.value==null}
+        compose.onNodeWithText("写文字").performScrollTo().performClick();idle{model.state.value.editor!=null}
+        compose.onNodeWithTag("archive-body").performTextInput("合成记忆：不丢草稿")
+        compose.onNodeWithContentDescription("返回").performClick();idle{model.state.value.editor==null}
         assertEquals("合成记忆：不丢草稿",runBlocking{model.store.load()}.noteDrafts.single().body)
-        compose.onNodeWithText("写长笔记").performScrollTo().performClick();idle{model.noteEditor.state.value?.loaded==true}
-        compose.onNodeWithTag("note-body").assertTextContains("不丢草稿",substring=true)
-        compose.onNodeWithText("保存笔记").performClick();idle{model.noteEditor.state.value==null && model.state.value.library.notes.size==1}
-        compose.onNodeWithText("展开笔记").performScrollTo().performClick()
-        compose.onNodeWithTag("note-reader").assertTextContains("不丢草稿",substring=true)
+        compose.onNodeWithText("写文字").performScrollTo().performClick();idle{model.state.value.editor!=null}
+        compose.onNodeWithTag("archive-body").assertTextContains("不丢草稿",substring=true)
+        compose.onNodeWithText("保存").performClick();idle{model.state.value.editor==null && model.state.value.library.notes.size==1}
+        compose.onNodeWithText("展开全文").performScrollTo().performClick()
+        compose.onNodeWithTag("archive-text").assertTextContains("不丢草稿",substring=true)
         assertNull(model.noteEditor.state.value)
         screenshot("archive-note-reader")
-        compose.onNodeWithText("返回").performClick()
         compose.onNodeWithContentDescription("返回").performClick()
         assertEquals(first,mediaNumber(3));compose.onNodeWithTag("nav-frame").assertIsSelected()
-        compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithTag("nav-frame").performClick()
+        compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithContentDescription("返回").performClick()
         assertEquals(first,mediaNumber(3))
         val saved=runBlocking{model.store.load()};assertEquals(a.authorIds,saved.active.single().authorIds);assertEquals(a.photos,saved.active.single().photos)
         screenshot("discovery-return")
@@ -89,7 +88,7 @@ class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
 class UnifiedLibraryReturnUiTest:UnifiedNavigationFixture() {
     @Test fun filterAndArchiveEditorCancellationStayInContext()=fixture {model,_->
         compose.onNodeWithContentDescription("搜索档案").performTextInput("合成")
-        compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithTag("nav-library").performClick()
+        compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithContentDescription("搜索档案").assertTextContains("合成")
         compose.onNodeWithText("合成留存档案").performClick()
         compose.onNodeWithText("编辑",useUnmergedTree=true).performClick();idle{model.state.value.editor!=null}
@@ -103,7 +102,7 @@ class UnifiedLibraryReturnUiTest:UnifiedNavigationFixture() {
 
 class UnifiedBackupLargeTextUiTest:UnifiedNavigationFixture() {
     @Test fun singleBackupDestinationAtTwoHundredPercent()=fixture(font=2f) {_,_->
-        compose.onNodeWithTag("nav-settings").performClick().assertIsSelected()
+        compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithText("我的").assertExists()
         screenshot("mine-font200")
         compose.onNodeWithText("资料与备份").assertDoesNotExist()
         compose.onNodeWithText("自动保护 · 未开启").assertDoesNotExist()
@@ -122,7 +121,7 @@ class UnifiedBackupLargeTextUiTest:UnifiedNavigationFixture() {
         compose.onNodeWithText("撤销最近一次恢复").performScrollTo().assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("暂无可撤销的恢复").assertIsDisplayed()
         screenshot("backup-font200")
-        compose.onNodeWithContentDescription("返回").performClick();compose.onNodeWithTag("nav-settings").assertIsSelected()
+        compose.onNodeWithContentDescription("返回").performClick();compose.onNodeWithText("我的").assertExists()
     }
 }
 
@@ -148,23 +147,24 @@ class UnifiedVideoReturnUiTest:UnifiedNavigationFixture() {
 class UnifiedKeyboardUiTest:UnifiedNavigationFixture() {
     @Test fun noteSaveRemainsReachableWithLargeTextAndInjectedIme()=fixture(font=2f) {model,_->
         compose.onNodeWithText("合成留存档案").performClick()
-        compose.onNodeWithText("写长笔记").performScrollTo().performClick();idle{model.noteEditor.state.value?.loaded==true}
-        compose.onNodeWithTag("note-body").performScrollTo().performTextInput("合成输入法检查")
+        compose.onNodeWithText("写文字").performScrollTo().performClick();idle{model.state.value.editor!=null}
+        compose.onNodeWithTag("archive-body").performScrollTo().performTextInput("合成输入法检查")
         compose.runOnIdle {
             android.view.inspector.WindowInspector.getGlobalWindowViews().last().dispatchApplyWindowInsets(android.view.WindowInsets.Builder()
                 .setInsets(android.view.WindowInsets.Type.ime(),android.graphics.Insets.of(0,0,0,600))
                 .setVisible(android.view.WindowInsets.Type.ime(),true).build())
         }
-        compose.onNodeWithText("保存笔记").assertIsDisplayed()
+        compose.onNodeWithText("保存").assertIsDisplayed()
         screenshot("note-font200-injected-ime")
-        compose.onNodeWithText("保存笔记").performClick();idle{model.noteEditor.state.value==null && model.state.value.library.notes.isNotEmpty()}
+        compose.onNodeWithText("保存").performClick();idle{model.state.value.editor==null && model.state.value.library.notes.isNotEmpty()}
         assertEquals("合成输入法检查",model.state.value.library.notes.single().body)
     }
 }
 
 class UnifiedCreateUiTest:UnifiedNavigationFixture() {
     @Test fun newArchiveShowsDistinctCreationAndOpensOnlyAfterSave()=fixture {model,_->
-        compose.onNodeWithContentDescription("＋ 新建").performClick()
+        compose.onNodeWithContentDescription("收录").performClick()
+        compose.onNodeWithText("文字档案").performClick()
         compose.onNodeWithText("新建档案").assertExists()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("新建合成档案")
         compose.onNodeWithText("保存").performClick()

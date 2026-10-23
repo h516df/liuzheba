@@ -35,14 +35,14 @@ class ArchiveUiSnapshotTest {
     @Test fun libraryDark()=render("library-dark",dark=true)
     @Test fun detailLight()=render("detail-light",detail=true)
     @Test fun settingsLight()=render("settings-light",settings=true)
-    @Test fun finalReleaseNotesOpenFromSettings()=render("v016-update-notes",settings=true,verify={model->
+    @Test fun finalReleaseNotesOpenFromSettings()=render("v017-update-notes",settings=true,verify={model->
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于与检查更新"))
         compose.onNodeWithText("关于与检查更新").performClick()
         compose.onNodeWithText("检查更新").assertExists()
-        compose.onNodeWithText("本版说明 0.16").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("本版说明 0.17").performScrollTo().assertIsDisplayed()
         val notes=model.updater.currentNotes()!!
-        org.junit.Assert.assertEquals("0.16",notes.version)
-        org.junit.Assert.assertEquals(17,notes.code)
+        org.junit.Assert.assertEquals("0.17",notes.version)
+        org.junit.Assert.assertEquals(18,notes.code)
         notes.sections.flatMap{it.second}.forEach {line->
             compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
         }
@@ -83,7 +83,7 @@ class ArchiveUiSnapshotTest {
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
             model.state.value.library.labels.none{it.id==category.id}
         }
-        compose.onNodeWithTag("nav-library").performClick()
+        compose.onNodeWithContentDescription("返回").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("4 份档案").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("移除分类筛选").assertDoesNotExist()
     })
@@ -95,6 +95,7 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun localAiOptInCanCancelWithoutDownloading()=render("local-ai-opt-in",verify={model->
         compose.onNodeWithText("按意思找 · AI").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("按意思找 · AI").performClick()
         compose.onNodeWithText("下载 / 校验本机 AI 模型").performClick()
@@ -107,24 +108,26 @@ class ArchiveUiSnapshotTest {
     @Test fun cancelledRuleDraftDoesNotRewriteLibrary()=render("search-rules-cancel",verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("旧回忆")
         compose.onNodeWithText("对应的原名称或关键词").performTextInput("一封旧信")
         compose.onNodeWithText("添加 / 更新别名").performClick()
         compose.onNodeWithText("取消").performClick()
-        compose.onNodeWithText("收起选项").assertExists()
+        compose.onNodeWithText("我的别名").assertExists()
         compose.onNodeWithText("定制规则").assertExists()
         org.junit.Assert.assertEquals(before,model.state.value.library)
     })
     @Test fun rulesBackDiscardsDraft()=render("search-rules-back",verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("不保存")
         compose.onNodeWithContentDescription("返回").performClick()
-        compose.onNodeWithText("收起选项").assertExists()
+        compose.onNodeWithText("我的别名").assertExists()
         org.junit.Assert.assertEquals(before,runBlocking{model.store.load()})
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").assert(hasText("不保存",substring=true).not())
@@ -133,13 +136,14 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithText("添加 / 更新别名").performClick()
         androidx.test.espresso.Espresso.pressBack()
         compose.onNodeWithText("定制规则").assertExists()
-        compose.onNodeWithText("收起选项").assertExists()
+        compose.onNodeWithText("我的别名").assertExists()
         org.junit.Assert.assertEquals(before,runBlocking{model.store.load()})
     })
     @Test @Config(qualifiers="zh-rCN-w320dp-h900dp-xhdpi")
     fun narrowRulesSaveOnlyOnExplicitAction()=render("rules-320-font200",fontScale=2f,verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithText("显示").performClick()
         compose.onNodeWithText("搜索选项").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performScrollTo().performTextInput("旧回忆")
@@ -166,7 +170,6 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithText("编辑").performClick()
         compose.onNode(hasSetTextAction() and hasText("一封旧信")).performTextReplacement("草稿里的新称呼")
         compose.onNodeWithContentDescription("返回").performClick()
-        compose.onNodeWithText("保留草稿并返回").performClick()
         compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy && model.state.value.editor==null}
         org.junit.Assert.assertEquals("草稿里的新称呼",runBlocking{model.store.load()}.drafts.single().name)
         compose.onNodeWithText("编辑").performClick()
@@ -212,8 +215,8 @@ class ArchiveUiSnapshotTest {
     })
     private fun verifyImmersiveViewer() {
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
-        // Fixtures use the default 全幅/铺满 appearance, so the renderer exposes its crop-mode label.
-        val photo=compose.onNodeWithContentDescription("全幅照片，双击或双指缩放")
+        // The new default keeps the entire image visible.
+        val photo=compose.onNodeWithContentDescription("完整照片，双击或双指缩放")
         compose.waitUntil(10000){compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"照片已显示")).fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("更多").assertExists()
         compose.onNodeWithText("保存到相册").assertDoesNotExist()

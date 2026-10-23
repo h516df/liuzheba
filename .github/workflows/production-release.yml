@@ -1,0 +1,184 @@
+name: Publish verified official release
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact reviewed main commit whose push checks have passed
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: official-release
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'h516df/liuzheba' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Require exact-source checks
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: python3 cloud/release_gate.py
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' >/dev/null
+      - run: bash gradlew --no-daemon --max-workers=2 assembleRelease -PunsignedRelease=true
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: development-${{ github.sha }}
+          run-id: ${{ steps.gate.outputs.cloud_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/verification
+      - name: Collect immutable candidate and previous official APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/product"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/product/unsigned.apk"
+          find "$RUNNER_TEMP/verification" -name app-debug.apk -exec cp '{}' "$RUNNER_TEMP/product/verification.apk" \;
+          find "$RUNNER_TEMP/verification" -name app-debug-androidTest.apk -exec cp '{}' "$RUNNER_TEMP/product/verification-test.apk" \;
+          test -s "$RUNNER_TEMP/product/verification-test.apk"
+          gh release download v0.16 --repo h516df/liuzheba --pattern shicang-v0.16-universal.apk --dir "$RUNNER_TEMP/product"
+          python3 -c 'import hashlib,json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"],"product","shicang-v0.16-universal.apk"); assert hashlib.sha256(p.read_bytes()).hexdigest()==json.load(open("release/signing-identity.json"))["publishedApkSha256"]'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-inputs-${{ github.sha }}
+          path: ${{ runner.temp }}/product/*
+          if-no-files-found: error
+          retention-days: 7
+  sign:
+    needs: build
+    environment: android-signing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'build-tools;36.0.0' >/dev/null
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: official-inputs-${{ github.sha }}
+          path: ${{ runner.temp }}/product
+      - name: Sign only the verified non-debug candidate
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SHICANG_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SHICANG_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SHICANG_KEY_PASSWORD }}
+        run: |
+          python3 cloud/sign_apk.py --input "$RUNNER_TEMP/product/unsigned.apk" --output "$RUNNER_TEMP/product/official.apk" > "$RUNNER_TEMP/product/signature.json"
+      - run: python3 tools/release/verify_apk.py --candidate "$RUNNER_TEMP/product/official.apk" --previous "$RUNNER_TEMP/product/shicang-v0.16-universal.apk" --receipt "$RUNNER_TEMP/product/identity.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: signed-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/product/official.apk
+            ${{ runner.temp }}/product/signature.json
+            ${{ runner.temp }}/product/identity.json
+          if-no-files-found: error
+          retention-days: 7
+  upgrade:
+    needs: sign
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: official-inputs-${{ github.sha }}
+          path: ${{ runner.temp }}/product
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: signed-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/product
+      - name: Enable the disposable emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -c /dev/kvm
+          sudo chmod 0666 /dev/kvm
+      - uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          ram-size: 2048M
+          disable-animations: true
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: python3 cloud/run_official_upgrade.py --previous "$RUNNER_TEMP/product/shicang-v0.16-universal.apk" --candidate "$RUNNER_TEMP/product/official.apk" --verification "$RUNNER_TEMP/product/verification.apk" --tests "$RUNNER_TEMP/product/verification-test.apk" --source-sha "$GITHUB_SHA" --output "$RUNNER_TEMP/upgrade"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-upgrade-${{ github.sha }}
+          path: ${{ runner.temp }}/upgrade/official-upgrade.json
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    needs: upgrade
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: signed-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/publish
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: official-upgrade-${{ github.sha }}
+          path: ${{ runner.temp }}/publish
+      - name: Publish original assets and read back final release state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 cloud/publish_release.py --directory "$RUNNER_TEMP/publish"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: publication-${{ github.sha }}
+          path: ${{ runner.temp }}/publish/publication.json
+          if-no-files-found: error
+          retention-days: 30

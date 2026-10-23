@@ -59,7 +59,7 @@ class ArchiveWorkflowUiTest {
             click("${photo.name}的封面");waitFor("全幅照片，双击或双指缩放");waitFor("返回")
             screenshot("media-tap-viewer")
             click("返回");waitFor("2 份档案")
-            click("搜索选项");waitFor("定制规则");click("收起选项");assertNull(find("定制规则"))
+            click("显示");click("搜索选项");waitFor("定制规则");click("显示");click("收起选项");assertNull(find("定制规则"))
             click(text.name);waitFor("编辑");waitFor("尚未添加照片与视频");waitFor("添加");screenshot("text-detail")
             click("编辑");waitFor("编辑档案");setName("取消的修改")
             click("取消");waitFor("确认");click("确认");waitFor("档案")

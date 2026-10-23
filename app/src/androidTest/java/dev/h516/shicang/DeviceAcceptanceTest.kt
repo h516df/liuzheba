@@ -125,6 +125,34 @@ class DeviceAcceptanceTest {
         assertEquals(listOf(photo), store.load().active.single().photos)
     }
 
+    @Test fun portraitAndLandscapeVideoKeepFitAndTextReadingPreservesPause() = runBlocking {
+        val (portrait, _) = importVideo("sample-portrait-video.mp4")
+        val (landscape, _) = importVideo("sample-long-video.mp4")
+        val archive=Archive(name="合成横竖视频档案",photos=listOf(portrait,landscape),cover=portrait.id)
+        store.save(archive)
+        val note=LongNote("archive",archive.id,body="这份档案同时包含横屏、竖屏视频和文字。")
+        store.saveNote(note,null,store.generationToken)
+        prefs.edit().putBoolean("discoveryRandomMedia",false).commit()
+        start();click("发现");click("播放视频")
+        await("portrait decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.height>it.videoSize.width}==true}}
+        click("横屏观看")
+        await("manual landscape layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE}
+        await("rotation keeps the same video"){onMain{player()?.videoSize?.height ?: 0}>0}
+        click("恢复方向")
+        await("restored portrait layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT}
+        click("暂停");val paused=onMain{checkNotNull(player()).currentPosition}
+        click("阅读文字");waitText(note.body)
+        assertNull(onMain{player()})
+        click("返回");waitText("收起播放")
+        await("reader returns to paused position"){onMain{player()?.let{!it.playWhenReady && kotlin.math.abs(it.currentPosition-paused)<500}==true}}
+        click("收起播放");click("更多");click("全部媒体")
+        click("查看第2项照片或视频");click("播放视频")
+        await("landscape decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.width>it.videoSize.height}==true}}
+        assertEquals(listOf(portrait,landscape),store.load().active.single().photos)
+        assertEquals(note.body,store.load().archiveNote(archive.id)!!.body)
+        listOf(portrait,landscape).forEach{assertEquals(it.sha256,sha(File(store.photoDir,it.file)))}
+    }
+
     @Test fun media3TrimCropAndMaskProduceDecodableIndependentCopy() = runBlocking {
         val (photo, _) = importVideo()
         val original = File(store.photoDir, photo.file)

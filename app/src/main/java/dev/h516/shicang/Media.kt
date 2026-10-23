@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -69,7 +70,7 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
                 val reader=MediaMetadataRetriever()
                 try {
                     reader.setDataSource(original.path)
-                    val frame=if(Build.VERSION.SDK_INT>=27) reader.getScaledFrameAtTime(0,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,480,640) else null
+                    val frame=if(Build.VERSION.SDK_INT>=27) reader.getScaledFrameAtTime(0,MediaMetadataRetriever.OPTION_CLOSEST_SYNC,480,640) else reader.getFrameAtTime(0,MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     requireNotNull(frame)
                     val tmp=File(folder,"${p.sha256}-${uid()}.pending")
                     try {tmp.outputStream().use{frame.compress(android.graphics.Bitmap.CompressFormat.JPEG,82,it)};check(tmp.renameTo(file) || file.exists())} finally {frame.recycle();tmp.delete()}
@@ -90,20 +91,30 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
 
 /** A player exists only for the visible, explicitly started video. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,playback:(Boolean)->Unit={},tap:()->Unit) {
+@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,playback:(Boolean)->Unit={},controlsInset:Dp=0.dp,readText:(()->Unit)?=null,tap:()->Unit) {
     var started by rememberSaveable(p.id){mutableStateOf(false)}
     var playIntent by rememberSaveable(p.id){mutableStateOf(true)}
     var muted by rememberSaveable(p.id){mutableStateOf(true)}
-    var position by rememberSaveable(p.id){mutableLongStateOf(0L)}
+    val checkpoint=LocalContext.current.getSharedPreferences("playback",0)
+    var position by rememberSaveable(p.id){mutableLongStateOf(checkpoint.getLong(p.id,0L).let{if(p.duration>0 && it>=p.duration)0L else it.coerceAtLeast(0L)})}
     var speed by rememberSaveable(p.id){mutableFloatStateOf(1f)}
     val context=LocalContext.current
+    val activity=remember(context){generateSequence(context){(it as? android.content.ContextWrapper)?.baseContext}.filterIsInstance<android.app.Activity>().firstOrNull()}
+    var landscape by rememberSaveable(p.id){mutableStateOf(false)}
+    val originalOrientation=rememberSaveable(p.id){activity?.requestedOrientation ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED}
+    DisposableEffect(activity,active,started,landscape) {
+        val ownsOrientation=active && started
+        if(ownsOrientation)activity?.requestedOrientation=if(landscape)android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else originalOrientation
+        onDispose{if(ownsOrientation && activity?.isChangingConfigurations!=true)activity?.requestedOrientation=originalOrientation}
+    }
     val lifecycle=LocalLifecycleOwner.current
     LaunchedEffect(active,started){playback(active && started)}
     DisposableEffect(Unit){onDispose{playback(false)}}
     androidx.activity.compose.BackHandler(active && started){started=false}
+    androidx.activity.compose.BackHandler(active && started && landscape){landscape=false}
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if(!active || !started) {
-            MediaThumb(p,model,Modifier.fillMaxSize().clickable{tap()},scale=if(fit) ContentScale.Fit else ContentScale.Crop)
+            MediaThumb(p,model,Modifier.fillMaxSize().clickable{tap()},scale=ContentScale.Fit)
             if(active) FilledTonalButton(onClick={playIntent=true;started=true},modifier=Modifier.align(Alignment.Center)){
                 Text(if(position>0) "继续播放 · ${durationLabel(position)}" else "播放视频")
             }
@@ -121,7 +132,7 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
             DisposableEffect(player,lifecycle) {
                 val observer=LifecycleEventObserver{_,event->
                     when(event) {
-                        Lifecycle.Event.ON_PAUSE -> {position=player.currentPosition;player.pause()}
+                        Lifecycle.Event.ON_PAUSE -> {position=player.currentPosition;checkpoint.edit().putLong(p.id,position).apply();player.pause()}
                         Lifecycle.Event.ON_RESUME -> if(playIntent && active && !failure) player.play()
                         else -> Unit
                     }
@@ -140,16 +151,19 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
                 lifecycle.lifecycle.addObserver(observer);player.addListener(listener)
                 onDispose {
                     position=if(player.playbackState==Player.STATE_ENDED) 0L else player.currentPosition
+                    checkpoint.edit().putLong(p.id,position).apply()
                     lifecycle.lifecycle.removeObserver(observer);player.removeListener(listener);player.release()
                 }
             }
-            LaunchedEffect(player) {while(true){position=if(player.playbackState==Player.STATE_ENDED)0L else player.currentPosition;delay(250)}}
+            LaunchedEffect(player) {while(true){position=if(player.playbackState==Player.STATE_ENDED)0L else player.currentPosition;delay(500)}}
+            LaunchedEffect(player,p.id){while(true){delay(2000);checkpoint.edit().putLong(p.id,position).apply()}}
             AndroidView(factory={PlayerView(it).apply{useController=false}},
                 update={view->view.player=player;view.keepScreenOn=playing
-                    view.resizeMode=if(fit) AspectRatioFrameLayout.RESIZE_MODE_FIT else AspectRatioFrameLayout.RESIZE_MODE_ZOOM},
+                    view.resizeMode=AspectRatioFrameLayout.RESIZE_MODE_FIT},
                 modifier=Modifier.fillMaxSize(),onRelease={it.player=null;it.keepScreenOn=false})
             PlayerControls(player,speed,muted,{speed=it;player.setPlaybackSpeed(it)},
-                {muted=!muted;player.volume=if(muted)0f else 1f},{position=player.currentPosition;started=false},playIntentChange={playIntent=it})
+                {muted=!muted;player.volume=if(muted)0f else 1f},{position=player.currentPosition;landscape=false;started=false},playIntentChange={playIntent=it},bottomInset=controlsInset,
+                landscape=landscape,rotate={landscape=!landscape},readText=readText)
             if(buffering && !failure) CircularProgressIndicator(Modifier.align(Alignment.Center),color=Color.White)
             if(failure) Surface(Modifier.align(Alignment.Center),color=Color.Black.copy(alpha=.85f)){
                 Column(Modifier.padding(16.dp),horizontalAlignment=Alignment.CenterHorizontally){
