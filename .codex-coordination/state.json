@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 23,
+  "revision": 24,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -70,7 +70,7 @@
       "status": "active",
       "generation": 2,
       "lease_until": 1792741541,
-      "updated_at": 1792735067,
+      "updated_at": 1792735310,
       "history": [
         {
           "owner": "codex-91839c4ac19c-release",
@@ -109,6 +109,14 @@
             "status": "passed",
             "source_sha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
             "url": "https://github.com/h516df/liuzheba/actions/runs/39907289881"
+          },
+          {
+            "name": "GitHub squash merge with identical complete source tree",
+            "status": "passed",
+            "source_sha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
+            "main_sha": "f78d239748665216a6cdbeec01ba6b87a79510b1",
+            "tree_sha": "02de1f7360b80a665e01ca214c069002c2a01c2e",
+            "url": "https://github.com/h516df/liuzheba/pull/35"
           }
         ]
       }
