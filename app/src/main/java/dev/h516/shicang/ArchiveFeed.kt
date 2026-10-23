@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
     archives:List<Archive>, initial:String, model:AppModel, appearance:Appearance,
     positions:Map<String,String>, rememberPhoto:(String,String)->Unit, selected:(String)->Unit,
     library:()->Unit, details:(String)->Unit, photos:(String)->Unit,
-    settings:()->Unit, edit:(Archive)->Unit, create:()->Unit, busy:Boolean, enabled:Boolean=true
+    settings:()->Unit, edit:(Archive)->Unit, create:()->Unit, busy:Boolean, enabled:Boolean=true,close:(()->Unit)?=null
 ) {
     val ids=archives.filter { it.deleted == 0L }.map {it.id}
     val prefs=LocalContext.current.getSharedPreferences("device",0)
@@ -59,7 +59,9 @@ import kotlinx.coroutines.launch
             discoveryPreview(archive,index / order.size,seed,random)
         }
         val pageKey="$index:${archive.id}"
-        val shown=viewed[pageKey]?.takeIf { id->archive.photos.any{it.id==id} } ?: preview?.id.orEmpty()
+        val shown=viewed[pageKey]?.takeIf { id->archive.photos.any{it.id==id} }
+            ?: (if(index==0 && source.id==anchor)positions[source.id]?.takeIf{id->archive.photos.any{it.id==id}} else null)
+            ?: preview?.id.orEmpty()
         // A new mode/availability must reset the horizontal pager; recomposition must not.
         key(seed,index,random,available?.map{it.id}) {
             FullPhotoFrame(archive,model,appearance,shown,
@@ -71,7 +73,7 @@ import kotlinx.coroutines.launch
                 ({scope.launch{if(pager.currentPage>=pageCount-1)pageCount+=order.size;pager.animateScrollToPage(index+1)};Unit}),
                 if(index>0) ({scope.launch{pager.animateScrollToPage(index-1)};Unit}) else null,
                 library,{details(archive.id)},{photos(archive.id)},settings,{edit(source)},create,busy,
-                active=enabled && index==pager.settledPage && !pager.isScrollInProgress,
+                close=close,active=enabled && index==pager.settledPage && !pager.isScrollInProgress,
                 onPagingAllowed={if(index==pager.settledPage) gestureEnabled=it},discovery=actions)
         }
     }

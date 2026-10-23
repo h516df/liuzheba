@@ -34,7 +34,7 @@ import kotlinx.coroutines.withContext
 @Composable internal fun LongNotesUi(model:AppModel,library:Library,listOpen:Boolean,closeList:()->Unit) {
     val editing by model.noteEditor.state.collectAsState()
     var reading by remember {mutableStateOf<LongNote?>(null)}
-    reading?.let {note->NoteReaderDialog(note,library.noteLabel(note),library.noteDrafts.any{it.key==note.key},{reading=null},{reading=null;model.noteEditor.open(note.type,note.target,library.noteLabel(note))})}
+    reading?.let {note->NoteReaderDialog(note,library.noteLabel(note),library.noteDrafts.any{it.key==note.key},{reading=null},{reading=null;model.editRelatedNote(note,library)})}
     if(listOpen && editing==null && reading==null)Dialog(onDismissRequest=closeList,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
         Surface(Modifier.fillMaxSize()) {Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             PageBar("全部笔记",closeList)
@@ -53,7 +53,7 @@ import kotlinx.coroutines.withContext
         Surface(Modifier.fillMaxSize()) {Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                 GalleryTextButton(onClick=close,modifier=Modifier.testTag("note-reader-back")){Text("返回")}
-                GalleryTextButton(onClick=edit){Text(if(hasDraft) "继续编辑草稿" else "编辑笔记")}
+                GalleryTextButton(onClick=edit){Text(if(note.type=="archive") "编辑档案" else if(hasDraft) "继续编辑草稿" else "编辑笔记")}
             }
             SelectionContainer {Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                 Text(note.title.ifBlank{label},style=MaterialTheme.typography.titleLarge)

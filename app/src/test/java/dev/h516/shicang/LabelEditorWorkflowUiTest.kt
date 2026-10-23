@@ -48,7 +48,7 @@ class LabelEditorWorkflowUiTest:UnifiedNavigationFixture() {
         assertEquals(a.photos,saved.active.single().photos)
         a.photos.forEach{assertEquals(it.sha256,sha(model.photoFile(it)))}
         compose.onNodeWithContentDescription("返回").performClick()
-        compose.onNodeWithText("放弃修改").assertExists()
+        compose.onNodeWithContentDescription("编辑选项").assertExists()
     }
 
     @Test fun localRemovalDoesNotDeleteDefinitionAndBackRetainsDraft()=fixture {model,a->
@@ -67,7 +67,7 @@ class LabelEditorWorkflowUiTest:UnifiedNavigationFixture() {
 
     @Test fun narrowLargeTextShowsDraftAndExplicitDiscardWithoutClearingSavedFields()=fixture(font=2f) {model,a->
         model.edit(a);idle{model.state.value.editor!=null}
-        compose.onNodeWithText("放弃修改").assertIsDisplayed()
+        compose.onNodeWithContentDescription("编辑选项").assertIsDisplayed()
         compose.onNodeWithText("保存").assertIsDisplayed()
         compose.onNodeWithText("返回保留草稿",substring=true).assertIsDisplayed()
         screenshot("editor-large-text")
@@ -76,7 +76,7 @@ class LabelEditorWorkflowUiTest:UnifiedNavigationFixture() {
         compose.onNodeWithText("添加可选资料（作者、来源、字段）").performScrollTo().performClick()
         compose.onNodeWithTag("archive-editor-fields").performScrollToNode(hasText("旧备注"))
         compose.onNodeWithText("旧备注").assertExists()
-        compose.onNodeWithText("放弃修改").performClick();compose.onNodeWithText("确认").performClick()
+        compose.onNodeWithContentDescription("编辑选项").performClick();compose.onNodeWithText("放弃修改").performClick();compose.onNodeWithText("确认").performClick()
         idle{model.state.value.editor==null && !model.state.value.busy}
         assertEquals(a.fields,runBlocking{model.store.load()}.active.single().fields)
     }

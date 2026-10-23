@@ -35,14 +35,14 @@ class ArchiveUiSnapshotTest {
     @Test fun libraryDark()=render("library-dark",dark=true)
     @Test fun detailLight()=render("detail-light",detail=true)
     @Test fun settingsLight()=render("settings-light",settings=true)
-    @Test fun finalReleaseNotesOpenFromSettings()=render("v017-update-notes",settings=true,verify={model->
+    @Test fun finalReleaseNotesOpenFromSettings()=render("v018-update-notes",settings=true,verify={model->
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于与检查更新"))
         compose.onNodeWithText("关于与检查更新").performClick()
         compose.onNodeWithText("检查更新").assertExists()
-        compose.onNodeWithText("本版说明 0.17").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("本版说明 0.18").performScrollTo().assertIsDisplayed()
         val notes=model.updater.currentNotes()!!
-        org.junit.Assert.assertEquals("0.17",notes.version)
-        org.junit.Assert.assertEquals(18,notes.code)
+        org.junit.Assert.assertEquals("0.18",notes.version)
+        org.junit.Assert.assertEquals(19,notes.code)
         notes.sections.flatMap{it.second}.forEach {line->
             compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
         }
@@ -174,7 +174,7 @@ class ArchiveUiSnapshotTest {
         org.junit.Assert.assertEquals("草稿里的新称呼",runBlocking{model.store.load()}.drafts.single().name)
         compose.onNodeWithText("编辑").performClick()
         compose.onNode(hasSetTextAction() and hasText("草稿里的新称呼")).assertExists()
-        compose.onNodeWithText("放弃修改").performClick()
+        compose.onNodeWithContentDescription("编辑选项").performClick();compose.onNodeWithText("放弃修改").performClick()
         compose.onNodeWithText("确认").performClick()
         compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy && model.state.value.editor==null}
         org.junit.Assert.assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
@@ -184,7 +184,7 @@ class ArchiveUiSnapshotTest {
         compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
         val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.onNodeWithContentDescription("浏览山间的一个下午的照片与视频").performClick()
         verifyImmersiveViewer()
         compose.onNodeWithText("返回").performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
@@ -198,7 +198,7 @@ class ArchiveUiSnapshotTest {
     @Test fun mediaViewerPreservesScrolledWall()=render("viewer-scrolled-return",longLibrary=true,verify={
         compose.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText("山间的一个下午"))
         val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.onNodeWithContentDescription("浏览山间的一个下午的照片与视频").performClick()
         compose.onNodeWithContentDescription("搜索档案").assertDoesNotExist()
         compose.onNodeWithText("返回").assertExists().performClick()
         compose.waitUntil(10000){compose.onAllNodesWithText("山间的一个下午").fetchSemanticsNodes().isNotEmpty()}
@@ -209,7 +209,7 @@ class ArchiveUiSnapshotTest {
     fun narrowImmersiveViewer()=render("viewer-320-font200",fontScale=2f,verify={
         compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
         compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription("山间的一个下午的封面").performClick()
+        compose.onNodeWithContentDescription("浏览山间的一个下午的照片与视频").performClick()
         compose.onNodeWithText("返回").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").assertIsDisplayed()
     })
@@ -218,15 +218,25 @@ class ArchiveUiSnapshotTest {
         // The new default keeps the entire image visible.
         val photo=compose.onNodeWithContentDescription("完整照片，双击或双指缩放")
         compose.waitUntil(10000){compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"照片已显示")).fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription("更多").assertExists()
-        compose.onNodeWithText("保存到相册").assertDoesNotExist()
-        compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-tools.png").absolutePath)
-        photo.performTouchInput{click(center)}
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithContentDescription("更多").assertDoesNotExist()
-        compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-clean.png").absolutePath)
-        photo.performTouchInput{click(center)}
-        compose.mainClock.advanceTimeBy(600)
+        // Decoding and screenshot capture can cross the viewer's four-second auto-hide.
+        // Establish visible controls explicitly, then test taps with a fixed animation clock.
+        val automatic=compose.mainClock.autoAdvance
+        compose.mainClock.autoAdvance=false
+        try {
+            if(compose.onAllNodesWithContentDescription("更多").fetchSemanticsNodes().isEmpty()) {
+                photo.performTouchInput{click(center)};compose.mainClock.advanceTimeBy(600)
+            }
+            compose.onNodeWithContentDescription("更多").assertExists()
+            compose.onNodeWithText("保存到相册").assertDoesNotExist()
+            compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-tools.png").absolutePath)
+            photo.performTouchInput{click(center)}
+            compose.mainClock.advanceTimeBy(600)
+            compose.onNodeWithContentDescription("更多").assertDoesNotExist()
+            compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-clean.png").absolutePath)
+            photo.performTouchInput{click(center)}
+            compose.mainClock.advanceTimeBy(600)
+            compose.onNodeWithContentDescription("更多").assertExists()
+        } finally {compose.mainClock.autoAdvance=automatic}
         compose.onNodeWithContentDescription("资料").performClick()
         compose.onNodeWithText("打开完整档案").assertExists()
         compose.onNodeWithText("沿着山路慢慢走，天色刚刚好。").assertExists()
@@ -241,6 +251,10 @@ class ArchiveUiSnapshotTest {
     private fun render(name:String,dark:Boolean=false,detail:Boolean=false,settings:Boolean=false,empty:Boolean=false,fontScale:Float=1f,longLibrary:Boolean=false,verify:(AppModel)->Unit={}) {
         RuntimeEnvironment.setFontScale(fontScale)
         val app=RuntimeEnvironment.getApplication()
+        // Warm native Bitmap JNI on the sandbox's test thread before Coil decoder workers.
+        android.graphics.Bitmap.createBitmap(1,1,android.graphics.Bitmap.Config.ARGB_8888).apply {
+            copyPixelsToBuffer(java.nio.ByteBuffer.allocate(4));recycle()
+        }
         app.getSharedPreferences("device",0).edit().putString("generation",uid()).putBoolean("libraryCovers",true).putBoolean("frameHintV2",true).apply()
         val store=Store(app)
         runBlocking {

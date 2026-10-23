@@ -32,6 +32,7 @@ class AuthorProfilesTest {
         listOf("https://weibo.com/login", "https://weibo.com/status", "https://weibo.com/123/abcdef").forEach { assertNull(AuthorProfiles.parse(it)) }
     }
     @Test fun rejectsWorksSpoofsCredentialsPortsAndUnverifiedPaths() {
+        // privacy-ok synthetic URL user-info rejection fixture; no real account or credential.
         listOf("https://www.douyin.com/video/123", "https://www.xiaohongshu.com/explore/123", "https://www.kuaishou.com/short-video/123", "https://weibo.com/detail/123", "https://douyin.com.evil.test/user/abc", "https://evil.douyin.com/user/abc", "https://user@www.douyin.com/user/abc", "http://www.douyin.com/user/abc", "https://www.douyin.com:8080/user/abc", "https://www.douyin.com/user/%2e%2e", "https://live.kuaishou.com/profile/abc", "https://LIVE.KUAISHOU.COM/profile/abc", "https://xhslink.com/user/profile/abc", "https://v.douyin.com/user/abc", "https://v.kuaishou.com/profile/abc").forEach { assertNull(it, AuthorProfiles.parse(it)) }
     }
     @Test fun rejectsInternalAndReservedDnsAddresses() {
@@ -82,6 +83,7 @@ class AuthorProfilesTest {
         assertEquals("分享链接",SharedLinks.parse(url)!!.kind)
         assertNull(AuthorProfiles.parse(url))
         assertNull(AuthorProfiles.parse("https://xhslink.cn/user/profile/fake"))
+        // privacy-ok synthetic URL user-info rejection fixture; no real account or credential.
         listOf("https://xhslink.cn.evil.test/o/a","https://evil.xhslink.cn/o/a","http://xhslink.cn/o/a","https://user@xhslink.cn/o/a","https://xhslink.cn:8443/o/a").forEach { assertNull(AuthorProfiles.sourceLink(it)) }
     }
     @Test fun fourPlatformShareTextPreservesCaseAndSeparatesExtractionFromResolution() {

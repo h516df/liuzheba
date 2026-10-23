@@ -31,18 +31,18 @@ class LongNoteAppEntryTest {
         try {
             compose.setContent{ShicangApp(model,true,{},{},{},{},{},{})};idle{model.state.value.ready}
             compose.onNodeWithText("合成记录").performClick()
-            compose.onNodeWithText("写文字").performScrollTo().performClick();idle{model.state.value.editor!=null}
+            compose.onNodeWithText("编辑").performClick();idle{model.state.value.editor!=null}
             compose.onNodeWithTag("archive-body").performTextInput("合成雪夜\n第二段观察")
             compose.onNodeWithContentDescription("返回").performClick();idle{model.state.value.editor==null}
             assertEquals("合成雪夜\n第二段观察",runBlocking{model.store.load()}.noteDrafts.single().body)
-            compose.onNodeWithText("写文字").performScrollTo().performClick();idle{model.state.value.editor!=null}
+            compose.onNodeWithText("编辑").performClick();idle{model.state.value.editor!=null}
             compose.onNodeWithTag("archive-body").assertTextContains("第二段观察",substring=true)
             compose.onNodeWithText("保存").performClick();idle{model.state.value.editor==null && model.state.value.library.notes.isNotEmpty()}
             val saved=runBlocking{model.store.load()};assertTrue(saved.noteDrafts.isEmpty());assertEquals("不能改变",saved.active.single().fields.single().value);assertEquals(archive.id,saved.find("雪夜").single().id)
-            compose.onNodeWithText("展开全文").performScrollTo().performClick()
+            compose.onNodeWithTag("archive-text").performScrollTo().assertIsDisplayed()
             compose.onNodeWithTag("archive-text").assertTextContains("第二段观察",substring=true)
             assertNull(model.noteEditor.state.value)
-            compose.onNodeWithText("编辑文字").performClick();idle{model.state.value.editor!=null}
+            compose.onNodeWithText("编辑").performClick();idle{model.state.value.editor!=null}
             compose.onNodeWithTag("archive-body").assertTextContains("第二段观察",substring=true)
         }finally {models.clear();idle{model.resourcesClosed}}
     }

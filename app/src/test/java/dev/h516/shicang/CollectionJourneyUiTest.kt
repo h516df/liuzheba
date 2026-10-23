@@ -37,7 +37,7 @@ class CollectionJourneyUiTest:UnifiedNavigationFixture() {
         fixture(choose={picked=it}) {model,a->
             compose.onNodeWithText(a.name).performClick()
             screenshot("refactor-detail")
-            compose.onNodeWithText("添加").performClick()
+            compose.onNodeWithContentDescription("档案选项").performClick();compose.onNodeWithText("添加照片或视频").performClick()
             assertEquals(a.id,picked)
             assertNull(model.state.value.editor)
             compose.runOnIdle{model.importPhotos(a.id,listOf(Uri.fromFile(model.photoFile(a.photos.first()))))}

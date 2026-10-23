@@ -82,9 +82,12 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
             }.getOrNull()
         }}
     }
+    var failed by remember(p.id,thumbnail){mutableStateOf(false)}
+    val available by produceState(true,original,p.sha256){value=withContext(Dispatchers.IO){original.isFile}}
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
-        if(thumbnail!=null) AsyncImage(model=thumbnail,contentDescription=description,contentScale=scale,modifier=Modifier.fillMaxSize())
-        else Text(if(p.isVideo) "视频" else "加载中",Modifier.align(Alignment.Center),fontSize=12.sp)
+        if(!available || failed) Text(if(!available)"原件不可用" else "预览不可用",Modifier.align(Alignment.Center),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        if(available && thumbnail!=null) AsyncImage(model=thumbnail,contentDescription=description,contentScale=scale,modifier=Modifier.fillMaxSize(),onError={failed=true})
+        else if(available) Text(if(p.isVideo) "视频" else "加载中",Modifier.align(Alignment.Center),fontSize=12.sp)
         if(p.isVideo) Text("视频 ${durationLabel(p.duration)}",Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha=.65f)).padding(horizontal=5.dp,vertical=3.dp),color=Color.White,fontSize=10.sp)
     }
 }

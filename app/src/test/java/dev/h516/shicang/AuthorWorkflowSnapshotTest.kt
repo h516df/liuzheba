@@ -42,7 +42,7 @@ class AuthorWorkflowSnapshotTest {
         shot("author-saved-card")
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText(archive.name).performClick()
-        compose.onNodeWithText("打开微博主页").performScrollTo().assertExists()
+        compose.onNodeWithText("来源与补充资料").performScrollTo().performClick();compose.onNodeWithText("打开微博主页").performScrollTo().assertExists()
     }
     @Test fun cancelledPreviewNeverCreatesAuthorOrAssociation()=render("author-cancel") {model,archive->
         compose.runOnIdle{model.openAuthors(archive.id);model.previewAuthor(fixtureAuthor())}

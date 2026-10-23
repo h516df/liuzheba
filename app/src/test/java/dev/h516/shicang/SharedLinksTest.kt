@@ -13,6 +13,7 @@ class SharedLinksTest {
  }
  @Test fun keepsOriginalAndPrefillsEditableFields(){val text="小林的主页 https://v.douyin.com/abc/";val result=SharedLinks.parse(text,"https://www.douyin.com/user/123")!!;assertEquals("个人主页",result.kind);assertEquals("小林的主页",result.name);assertEquals(text,result.archive().fields.last().value);assertEquals("链接",result.archive().fields[2].type)}
  @Test fun shortLinkNeverPretendsToBeVerifiedVideo(){assertEquals("分享链接",SharedLinks.parse("https://xhslink.com/a/abc")!!.kind)}
+        // privacy-ok synthetic URL user-info rejection fixture; no real account or credential.
  @Test fun spoofedHostsAndCredentialsAreRejected(){listOf("https://douyin.com.evil.test/user/a","https://notdouyin.com/a","https://name:secret@douyin.com/a","hello").forEach{assertNull(SharedLinks.parse(it))}}
  @Test fun concreteWorkPathWinsOverShareProse(){
   listOf("https://www.douyin.com/video/123", "https://www.xiaohongshu.com/explore/123", "https://www.kuaishou.com/short-video/123", "https://weibo.com/detail/123", "https://weibo.com/status/123", "https://weibo.com/123/Abc456").forEach { url ->

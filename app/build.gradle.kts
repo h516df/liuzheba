@@ -12,8 +12,8 @@ android {
         applicationId = "dev.h516.shicang"
         minSdk = 24
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.17"
+        versionCode = 19
+        versionName = "0.18"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

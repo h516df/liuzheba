@@ -13,42 +13,57 @@ import org.junit.Test
 
 /** Real navigation with synthetic media; covers the new one-tap archive action. */
 class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
-    @Test fun titleOpensArchiveDirectlyAndReturnKeepsMedia()=fixture {_,a->
+    @Test fun discoveryAndLibraryShareReaderAndRetainScroll()=fixture {_,a->
         compose.onNodeWithTag("nav-frame").performClick()
-        val first=mediaNumber(3)
-        compose.onNodeWithContentDescription("资料").assertIsDisplayed()
-        screenshot("discovery-apple-light")
-        compose.onNodeWithContentDescription("打开档案：${a.name}").assertIsDisplayed().performClick()
+        val card=compose.onNodeWithTag("story-${a.id}").fetchSemanticsNode().boundsInRoot
+        screenshot("product-discovery-light")
+        compose.onNodeWithText(a.name).performClick()
         compose.onNodeWithText("档案详情").assertExists()
+        compose.onNodeWithText("编辑").assertIsDisplayed()
         compose.onNodeWithContentDescription("返回").performClick()
-        assertEquals(first,mediaNumber(3))
         compose.onNodeWithTag("nav-frame").assertIsSelected()
+        assertEquals(card,compose.onNodeWithTag("story-${a.id}").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithTag("nav-library").performClick()
+        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithText("档案详情").assertExists()
     }
 
-    @Test fun darkLargeTextKeepsInformationAndNavigationReachable()=fixture(font=2f) {model,_->
-        compose.runOnIdle {model.appearance(model.state.value.appearance.copy(mode="深色"))}
-        idle{!model.state.value.busy && model.state.value.appearance.mode=="深色"}
+    @Test fun largeTextKeepsBothDestinationsAndSharedActionsReachable()=fixture(font=2f) {model,a->
+        compose.runOnIdle {model.appearance(model.state.value.appearance.copy(theme="曜石"))}
+        idle{!model.state.value.busy && model.state.value.appearance.theme=="曜石"}
         compose.onNodeWithTag("nav-frame").performClick()
-        mediaNumber(3)
-        compose.onNodeWithContentDescription("资料").assertIsDisplayed()
-        compose.onNodeWithContentDescription("更多").assertIsDisplayed()
-        compose.onNodeWithContentDescription("打开档案：合成留存档案").assertIsDisplayed()
         compose.onNodeWithTag("nav-library").assertIsDisplayed()
         compose.onNodeWithTag("nav-settings").assertIsDisplayed()
-        screenshot("discovery-apple-dark-font200")
-        compose.onNodeWithContentDescription("资料").performClick()
-        compose.onNodeWithText("打开完整档案").performScrollTo().assertIsDisplayed().performClick()
-        compose.onNodeWithText("档案详情").assertExists()
+        val left=compose.onNodeWithTag("nav-frame").fetchSemanticsNode().boundsInRoot
+        val right=compose.onNodeWithTag("nav-library").fetchSemanticsNode().boundsInRoot
+        assertTrue(left.right<=right.left)
+        screenshot("product-discovery-dark-font200")
+        compose.onNodeWithTag("discovery-stories").performScrollToNode(hasText(a.name))
+        compose.onNodeWithText(a.name).performClick()
+        screenshot("product-detail-dark-font200");compose.onNodeWithText("编辑").assertIsDisplayed().performClick()
+        compose.onNodeWithText("保存").assertIsDisplayed()
     }
 
-    @Test fun emptyDiscoveryKeepsAnExitToTheLibrary()=fixture {model,a->
+    @Test fun emptyDiscoveryHasAnActualCreationAction()=fixture {model,a->
         compose.runOnIdle {model.trash(a)}
         idle{!model.state.value.busy && model.state.value.library.active.isEmpty()}
         compose.onNodeWithTag("nav-frame").performClick()
-        compose.onNodeWithText("让照片成为主角").assertIsDisplayed()
-        screenshot("discovery-apple-empty")
-        compose.onNodeWithText("去档案添加媒体").performClick()
-        compose.onNodeWithTag("nav-library").assertIsSelected()
+        compose.onNodeWithText("值得留下的，都在这里").assertIsDisplayed()
+        screenshot("product-discovery-empty")
+        compose.onNodeWithText("新建第一份档案").performClick()
+        idle{model.state.value.editor!=null}
+        compose.onNodeWithText("新建档案").assertExists()
+    }
+
+    @Test fun pureTextIsDiscoverableAndOpeningItNeverCreatesDrafts()=fixture {model,a->
+        model.edit(a);model.change(a.copy(photos=emptyList()));model.changeArchiveText("只有文字，也是一份完整收藏。")
+        model.saveEditor();idle{model.state.value.editor==null && !model.state.value.busy}
+        compose.onNodeWithTag("nav-frame").performClick()
+        compose.onNodeWithText("只有文字，也是一份完整收藏。").assertExists()
+        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithTag("archive-text").assertTextContains("完整收藏",substring=true)
+        assertTrue(model.state.value.library.drafts.isEmpty())
+        assertTrue(model.state.value.library.noteDrafts.isEmpty())
     }
 }
 
