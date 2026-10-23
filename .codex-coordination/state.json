@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 39,
+  "revision": 40,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -299,6 +299,24 @@
         "publish_recovery": "failed on draft-by-tag 404; recovered by release ID after asset verification",
         "physical_phone": "not_run"
       }
+    },
+    "publisher-input-20261023": {
+      "owner": "codex-rebuild-fed4015f19c9-publisher",
+      "workspace": "cloud-rebuild-fed4015f19c9-publisher-input",
+      "batch": "publisher-draft-id-20261023",
+      "role": "work",
+      "branch": "codex/v017-publication-20261023",
+      "scopes": [
+        "HANDOFF.md",
+        "cloud"
+      ],
+      "base": "6826b378061acb117eb08a2515d9070e792f1e3b",
+      "head": "6826b378061acb117eb08a2515d9070e792f1e3b",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792750864,
+      "updated_at": 1792743664,
+      "history": []
     }
   },
   "batches": {
@@ -309,6 +327,9 @@
     "v017-main-publication-20261023": {
       "status": "completed",
       "integrator": "v017-official-publish-20261023"
+    },
+    "publisher-draft-id-20261023": {
+      "status": "open"
     }
   }
 }
