@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 41,
+  "revision": 42,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -318,6 +318,25 @@
       "updated_at": 1792743668,
       "history": [],
       "handoff": "Freeze the actual v0.17 published source and publisher baseline. Release ID421590291 is public/latest with original assets and verified anonymous downloads; its publication receipt is complete in the prior task. This input branch is read-only and retained at the tag commit. Fix only the draft lookup/publication automation in a new branch; do not replace released assets."
+    },
+    "publisher-draft-id-fix-20261023": {
+      "owner": "codex-rebuild-fed4015f19c9-publisher",
+      "workspace": "cloud-rebuild-fed4015f19c9-publisher-fix",
+      "batch": "publisher-draft-id-20261023",
+      "role": "integrator",
+      "branch": "codex/publisher-draft-id-20261023",
+      "scopes": [
+        "docs/RELEASING.md",
+        "@integration",
+        "@publish"
+      ],
+      "base": "6826b378061acb117eb08a2515d9070e792f1e3b",
+      "head": "6826b378061acb117eb08a2515d9070e792f1e3b",
+      "status": "active",
+      "generation": 1,
+      "lease_until": 1792750871,
+      "updated_at": 1792743671,
+      "history": []
     }
   },
   "batches": {
@@ -330,7 +349,8 @@
       "integrator": "v017-official-publish-20261023"
     },
     "publisher-draft-id-20261023": {
-      "status": "open"
+      "status": "sealed",
+      "integrator": "publisher-draft-id-fix-20261023"
     }
   }
 }
