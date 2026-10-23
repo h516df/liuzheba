@@ -1,0 +1,117 @@
+{
+  "status": "published-and-anonymously-verified",
+  "releaseSourceSha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+  "prSourceSha": "07d72dd144dc756f96fb213cb0af396ee7de939c",
+  "releaseUrl": "https://github.com/h516df/liuzheba/releases/tag/v0.18",
+  "apk": {
+    "name": "shicang-v0.18-universal.apk",
+    "bytes": 105700012,
+    "sha256": "31b3c046fabd61933c5fbe1b8fa3f0bd6c7da680be3f6a3735d9279c6489910f",
+    "url": "https://github.com/h516df/liuzheba/releases/download/v0.18/shicang-v0.18-universal.apk",
+    "anonymousDownload": "passed"
+  },
+  "certificateSha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26",
+  "packageName": "dev.h516.shicang",
+  "version": "0.18",
+  "versionCode": 19,
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "host": {
+    "sourceSha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+    "runId": 39942493493,
+    "artifactId": 12496694039,
+    "zipSha256": "b063d5ed25e9ec246d2c88dbd6fadbdf66dd033d10481b9ba69247c2bcfae6c8",
+    "suites": 59,
+    "lint": {
+      "Warning": 88,
+      "Hint": 1
+    },
+    "tests": 300,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "native": {
+    "sourceSha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+    "runId": 39942493510,
+    "artifactId": 12495939316,
+    "zipSha256": "682849e2502c4d641738800a46db7d8426126ffd0fe2f8ff75e263dbb193d688",
+    "cases": [
+      "media3CropRetainsTheSelectedColorBarsAndMasksDisplayCenter",
+      "portraitAndLandscapeVideoKeepFitAndTextReadingPreservesPause",
+      "contentUriImportPlaysSeeksAndRetainsPositionAfterBackground",
+      "media3TrimCropAndMaskProduceDecodableIndependentCopy",
+      "cancellingRunningMedia3ExportKeepsOriginalAndRemovesScratchFile",
+      "nativeImeArchiveCancelValidationAndSavePreserveOtherFields",
+      "systemSafBackupCancelThenSaveRoundTripsSyntheticMedia",
+      "wildcardShareImportsOrderedPhotoAndVideoThroughActualActivity"
+    ],
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "mainRuns": {
+    "Secret checks": {
+      "id": 39942493476,
+      "url": "https://github.com/h516df/liuzheba/actions/runs/39942493476"
+    },
+    "Android device checks": {
+      "id": 39942493510,
+      "url": "https://github.com/h516df/liuzheba/actions/runs/39942493510"
+    },
+    "Cloud development": {
+      "id": 39942493532,
+      "url": "https://github.com/h516df/liuzheba/actions/runs/39942493532"
+    },
+    "Android checks": {
+      "id": 39942493493,
+      "url": "https://github.com/h516df/liuzheba/actions/runs/39942493493"
+    }
+  },
+  "productionRun": 39943830940,
+  "officialUpgrade": {
+    "status": "passed",
+    "sourceSha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+    "candidateSha256": "31b3c046fabd61933c5fbe1b8fa3f0bd6c7da680be3f6a3735d9279c6489910f",
+    "environment": "disposable API35 x86_64 emulator",
+    "physicalPhone": "not_run",
+    "route": "official 0.16 UI seed -> system installer confirmation -> new UI export",
+    "archives": 1,
+    "images": 1,
+    "videos": 2,
+    "notes": 1,
+    "dataAndOrderUnchanged": true,
+    "originalHashesUnchanged": true
+  },
+  "anonymousAssets": [
+    {
+      "name": "shicang-v0.18-release-notes.json",
+      "bytes": 1005,
+      "sha256": "a59c7f9fb93200889cffe80a57a00d14b9bf1ec510c534ead656a2b6bca9b6c8",
+      "url": "https://github.com/h516df/liuzheba/releases/download/v0.18/shicang-v0.18-release-notes.json",
+      "anonymousDownload": "passed"
+    },
+    {
+      "name": "shicang-v0.18-SHA256.txt",
+      "bytes": 193,
+      "sha256": "51904e4c187254904f181ec2d71cb7ad26bf3e1b60d94edaade771ff9a73c3c6",
+      "url": "https://github.com/h516df/liuzheba/releases/download/v0.18/shicang-v0.18-SHA256.txt",
+      "anonymousDownload": "passed"
+    },
+    {
+      "name": "shicang-v0.18-universal.apk",
+      "bytes": 105700012,
+      "sha256": "31b3c046fabd61933c5fbe1b8fa3f0bd6c7da680be3f6a3735d9279c6489910f",
+      "url": "https://github.com/h516df/liuzheba/releases/download/v0.18/shicang-v0.18-universal.apk",
+      "anonymousDownload": "passed"
+    }
+  ],
+  "embeddedNotesMatch": true,
+  "physicalPhone": "not_run",
+  "userVisualApproval": "not_claimed",
+  "documentationOnlyFollowup": true,
+  "publishedV017Unchanged": true
+}
