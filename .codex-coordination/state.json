@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 62,
+  "revision": 63,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -511,8 +511,44 @@
       "status": "active",
       "generation": 1,
       "lease_until": 1792760142,
-      "updated_at": 1792752942,
-      "history": []
+      "updated_at": 1792753616,
+      "history": [],
+      "receipt": {
+        "source_sha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+        "members": {
+          "v018-publish-input-20261023": "fcd10904f9e169753c116773788fe22f79e14bd0"
+        },
+        "checks": [
+          {
+            "name": "Secret checks",
+            "status": "passed",
+            "source_sha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+            "run_id": 39942493476,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39942493476"
+          },
+          {
+            "name": "Android device checks",
+            "status": "passed",
+            "source_sha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+            "run_id": 39942493510,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39942493510"
+          },
+          {
+            "name": "Cloud development",
+            "status": "passed",
+            "source_sha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+            "run_id": 39942493532,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39942493532"
+          },
+          {
+            "name": "Android checks",
+            "status": "passed",
+            "source_sha": "fcd10904f9e169753c116773788fe22f79e14bd0",
+            "run_id": 39942493493,
+            "url": "https://github.com/h516df/liuzheba/actions/runs/39942493493"
+          }
+        ]
+      }
     }
   },
   "batches": {
