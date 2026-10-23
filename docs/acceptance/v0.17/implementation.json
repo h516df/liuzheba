@@ -1,0 +1,32 @@
+{
+  "implementationSha": "d9633d2d5902c0a890dd045a4ddae3acb1cf327f",
+  "initialMainSquashSha": "f78d239748665216a6cdbeec01ba6b87a79510b1",
+  "identicalSourceTree": "02de1f7360b80a665e01ca214c069002c2a01c2e",
+  "appTree": "533fd8573da65edbc5fb3483c132aefa5605451f",
+  "cloud": {
+    "run": 39907289864,
+    "tests": 289,
+    "suites": 57,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "artifactArchiveSha256": "05e8e165186d8415be0357232b58b29b5278d93db4d66596d95438f9be062838"
+  },
+  "native": {
+    "run": 39907289905,
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "artifactArchiveSha256": "6cc82215db078f1af5317eca67fb4fc39c3fd62563b70c09279ae4dc223ca66d"
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 88,
+    "hints": 1
+  },
+  "pythonTests": 12,
+  "workflowActionlint": "1.7.7 passed",
+  "physicalPhone": "not_run",
+  "publication": "consult exact-main release workflow and coordination publication receipt"
+}
