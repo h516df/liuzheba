@@ -218,15 +218,25 @@ class ArchiveUiSnapshotTest {
         // The new default keeps the entire image visible.
         val photo=compose.onNodeWithContentDescription("完整照片，双击或双指缩放")
         compose.waitUntil(10000){compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription,"照片已显示")).fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription("更多").assertExists()
-        compose.onNodeWithText("保存到相册").assertDoesNotExist()
-        compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-tools.png").absolutePath)
-        photo.performTouchInput{click(center)}
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithContentDescription("更多").assertDoesNotExist()
-        compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-clean.png").absolutePath)
-        photo.performTouchInput{click(center)}
-        compose.mainClock.advanceTimeBy(600)
+        // Decoding and screenshot capture can cross the viewer's four-second auto-hide.
+        // Establish visible controls explicitly, then test taps with a fixed animation clock.
+        val automatic=compose.mainClock.autoAdvance
+        compose.mainClock.autoAdvance=false
+        try {
+            if(compose.onAllNodesWithContentDescription("更多").fetchSemanticsNodes().isEmpty()) {
+                photo.performTouchInput{click(center)};compose.mainClock.advanceTimeBy(600)
+            }
+            compose.onNodeWithContentDescription("更多").assertExists()
+            compose.onNodeWithText("保存到相册").assertDoesNotExist()
+            compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-tools.png").absolutePath)
+            photo.performTouchInput{click(center)}
+            compose.mainClock.advanceTimeBy(600)
+            compose.onNodeWithContentDescription("更多").assertDoesNotExist()
+            compose.onRoot().captureRoboImage(File("build/outputs/archive-ui/viewer-clean.png").absolutePath)
+            photo.performTouchInput{click(center)}
+            compose.mainClock.advanceTimeBy(600)
+            compose.onNodeWithContentDescription("更多").assertExists()
+        } finally {compose.mainClock.autoAdvance=automatic}
         compose.onNodeWithContentDescription("资料").performClick()
         compose.onNodeWithText("打开完整档案").assertExists()
         compose.onNodeWithText("沿着山路慢慢走，天色刚刚好。").assertExists()
