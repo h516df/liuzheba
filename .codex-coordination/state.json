@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 38,
+  "revision": 39,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -132,10 +132,10 @@
       ],
       "base": "f78d239748665216a6cdbeec01ba6b87a79510b1",
       "head": "f78d239748665216a6cdbeec01ba6b87a79510b1",
-      "status": "ready",
+      "status": "integrated",
       "generation": 1,
       "lease_until": 0,
-      "updated_at": 1792735320,
+      "updated_at": 1792743628,
       "history": [],
       "handoff": "冻结PR35经GitHub squash合并后的精确主线，根树02de1f7360b80a665e01ca214c069002c2a01c2e与受测开发提交d9633d2完全一致。原开发分支保留旧成员祖先，本发布批以真实主线SHA冻结，不冒称旧成员是squash主线祖先。仅冻结源码，289/7 PR证据已核实；正式发布仍待精确主线检查、签名、覆盖安装与资产回读。"
     },
@@ -164,10 +164,10 @@
       ],
       "base": "f78d239748665216a6cdbeec01ba6b87a79510b1",
       "head": "6826b378061acb117eb08a2515d9070e792f1e3b",
-      "status": "active",
+      "status": "integrated",
       "generation": 3,
-      "lease_until": 1792749006,
-      "updated_at": 1792742350,
+      "lease_until": 0,
+      "updated_at": 1792743628,
       "history": [
         {
           "owner": "codex-rebuild-fed4015f19c9",
@@ -216,6 +216,88 @@
             "url": "https://github.com/h516df/liuzheba/actions/runs/39920417493"
           }
         ]
+      },
+      "publication": {
+        "source_sha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+        "url": "https://github.com/h516df/liuzheba/releases/tag/v0.17",
+        "tag": "v0.17",
+        "draft": false,
+        "prerelease": false,
+        "latest": true,
+        "anonymous_downloads": [
+          {
+            "name": "shicang-v0.17-release-notes.json",
+            "bytes": 1267,
+            "sha256": "834a53c84e638e40780c01f2b2521d4bdce78d206b2297d5ebd643dd219de9f1",
+            "url": "https://github.com/h516df/liuzheba/releases/download/v0.17/shicang-v0.17-release-notes.json",
+            "anonymousDownload": "passed"
+          },
+          {
+            "name": "shicang-v0.17-SHA256.txt",
+            "bytes": 193,
+            "sha256": "2b02bdc7931796a61ec9395dfa13ac2e748c6c0dcd612b6cb3db3416d47db327",
+            "url": "https://github.com/h516df/liuzheba/releases/download/v0.17/shicang-v0.17-SHA256.txt",
+            "anonymousDownload": "passed"
+          },
+          {
+            "name": "shicang-v0.17-universal.apk",
+            "bytes": 105700012,
+            "sha256": "87faaa47e0a87ea025188130dbbccf88114fd3d8bc057bf6e299577bebb5e411",
+            "url": "https://github.com/h516df/liuzheba/releases/download/v0.17/shicang-v0.17-universal.apk",
+            "anonymousDownload": "passed"
+          }
+        ],
+        "apk_identity": {
+          "package": "dev.h516.shicang",
+          "code": 18,
+          "version": "0.17",
+          "certificate_sha256": "67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26",
+          "bytes": 105700012,
+          "sha256": "87faaa47e0a87ea025188130dbbccf88114fd3d8bc057bf6e299577bebb5e411"
+        },
+        "official_upgrade": {
+          "status": "passed",
+          "sourceSha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+          "candidateSha256": "87faaa47e0a87ea025188130dbbccf88114fd3d8bc057bf6e299577bebb5e411",
+          "environment": "disposable API35 x86_64 emulator",
+          "physicalPhone": "not_run",
+          "route": "official 0.16 UI seed -> system installer confirmation -> new UI export",
+          "archives": 1,
+          "images": 1,
+          "videos": 2,
+          "notes": 1,
+          "dataAndOrderUnchanged": true,
+          "originalHashesUnchanged": true
+        },
+        "host_tests": {
+          "sourceSha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+          "run": 39920417493,
+          "artifactSha256": "758fa87d8847936b8b12f609aa3ec3f549d8a204b4df24fedeb326d8681cbdbb",
+          "suites": 58,
+          "counts": {
+            "tests": 292,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "lint": {
+            "Warning": 88,
+            "Hint": 1
+          }
+        },
+        "native_tests": {
+          "sourceSha": "6826b378061acb117eb08a2515d9070e792f1e3b",
+          "run": 39920417485,
+          "artifactSha256": "c3ea0fa216f1a8cb0264a13e9725456e9b130ca4aee651ce56ac63746580a071",
+          "name": "dev.h516.shicang.DeviceAcceptanceTest",
+          "tests": "8",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        "workflow_run": 39921469593,
+        "publish_recovery": "failed on draft-by-tag 404; recovered by release ID after asset verification",
+        "physical_phone": "not_run"
       }
     }
   },
@@ -225,7 +307,7 @@
       "integrator": "release-v017-cloud-20261022"
     },
     "v017-main-publication-20261023": {
-      "status": "sealed",
+      "status": "completed",
       "integrator": "v017-official-publish-20261023"
     }
   }
