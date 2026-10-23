@@ -1,7 +1,7 @@
 {
   "version": 1,
   "project": "h516df/liuzheba",
-  "revision": 30,
+  "revision": 31,
   "tasks": {
     "experience-refactor-20261022": {
       "owner": "codex-91839c4ac19c",
@@ -163,11 +163,11 @@
         "@publish"
       ],
       "base": "f78d239748665216a6cdbeec01ba6b87a79510b1",
-      "head": "7702a303c7db282c3b3b70124159a8e97a5980df",
-      "status": "paused",
+      "head": "c792c008db166d5ab73208c87aa4a6b31d795505",
+      "status": "active",
       "generation": 2,
-      "lease_until": 0,
-      "updated_at": 1792736138,
+      "lease_until": 1792743344,
+      "updated_at": 1792736144,
       "history": [
         {
           "owner": "codex-rebuild-fed4015f19c9",
