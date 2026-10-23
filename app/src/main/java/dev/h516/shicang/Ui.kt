@@ -79,6 +79,8 @@ private val Muted: Color
         var route by rememberSaveable{mutableStateOf("library")}
         var detailReturn by rememberSaveable {mutableStateOf("library")}
         var photosReturn by rememberSaveable {mutableStateOf("detail")}
+        var photosReturnMedia by rememberSaveable {mutableStateOf("")}
+        var photosReturnSelected by rememberSaveable {mutableStateOf("")}
         var settingsReturn by rememberSaveable {mutableStateOf("frame")}
         var appearanceOpen by rememberSaveable {mutableStateOf(false)}
         var settingsPhoto by rememberSaveable {mutableStateOf("")}
@@ -145,7 +147,10 @@ private val Muted: Color
             selected=id;zoomPhoto="";route="detail"
         }
         fun openPhotos(id:String) {
-            if(route!="photos" && !(route=="detail" && detailReturn=="photos")) photosReturn=route
+            if(route!="photos" && !(route=="detail" && detailReturn=="photos")) {
+                photosReturn=route;photosReturnSelected=selected
+                photosReturnMedia=if(zoomPhoto.isNotEmpty())positions[id] ?: zoomPhoto else ""
+            }
             selected=id;zoomPhoto="";route="photos"
         }
         fun openSettings(photo:String="") {
@@ -156,7 +161,10 @@ private val Muted: Color
                 zoomPhoto.isNotEmpty()->zoomPhoto=""
                 editing->requestLeaveEditor()
                 route=="detail"->route=detailReturn
-                route=="photos"->route=photosReturn
+                route=="photos"->{
+                    route=photosReturn;selected=photosReturnSelected;zoomPhoto=photosReturnMedia
+                    photosReturnMedia="";photosReturnSelected=""
+                }
                 route=="settings"->{route=settingsReturn;zoomPhoto=settingsPhoto;settingsPhoto=""}
                 route in listOf("bin","labels","updates","backup")->route="settings"
                 else->route="library"

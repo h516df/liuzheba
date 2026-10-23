@@ -101,4 +101,17 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
         assertEquals(before,compose.onNodeWithText(a.name).fetchSemanticsNode().boundsInRoot)
     }
 
+    @Test fun allMediaBackReturnsToTheExactViewerRatherThanLeavingIt()=fixture {_,a->
+        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithTag("archive-media-${a.photos[1].id}").performScrollTo().performClick()
+        assertEquals(2,mediaNumber(3))
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.onNodeWithText("全部媒体").performClick()
+        compose.onNodeWithContentDescription("查看第2项照片或视频").assertExists()
+        compose.onNodeWithContentDescription("返回").performClick()
+        assertEquals(2,mediaNumber(3))
+        compose.onNodeWithText("返回").performClick()
+        compose.onNodeWithText("档案详情").assertExists()
+    }
+
 }
