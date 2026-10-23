@@ -386,13 +386,15 @@ class DeviceAcceptanceTest {
         click("确认")
         waitDocumentsUi()
         // DocumentsUI may first consume Back to dismiss its filename keyboard.
-        repeat(3) {
+        repeat(2) {
             if (documentNodes().isNotEmpty()) {
                 assertTrue(ui.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK))
-                Thread.sleep(400)
+                ui.waitForIdle(700, 6000)
             }
         }
-        await("cancel returns from SAF") { documentNodes().isEmpty() }
+        await("cancel returns to the real backup page") {
+            documentNodes().isEmpty() && findText("导出备份文件（换机或留存）") != null
+        }
         assertEquals(0L, store.lastBackup())
         assertFalse(prefs.contains("backupLocation"))
         assertEquals(before, store.load())
@@ -525,13 +527,17 @@ class DeviceAcceptanceTest {
     }
 
     private fun clickScrolling(text: String) {
-        repeat(8) {
-            findText(text)?.let { click(it); return }
-            val scrolled = nodes().filter { it.isScrollable }.any { it.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) }
-            check(scrolled) { "Cannot scroll to $text" }
-            Thread.sleep(300)
+        await("scroll to $text", 20000) {
+            if (findText(text) != null) true else {
+                // During activity return there may briefly be no app window or scroll container.
+                // Wait for the real page; an absent container is not a completed navigation.
+                nodes().filter { it.isScrollable }.any {
+                    it.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                }
+                false
+            }
         }
-        error("Cannot find $text after scrolling")
+        click(text)
     }
 
     private fun setText(node: AccessibilityNodeInfo, value: String) {
