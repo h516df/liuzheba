@@ -2,6 +2,9 @@ package dev.h516.shicang
 
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -25,7 +28,17 @@ class MediaBrowserActivity:ComponentActivity() {
         if(url==null){finish();return}
         if(getSharedPreferences("device",0).getBoolean("appLock",false))window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-        root.addView(Button(this).apply{text="返回留着吧 · 完成验证后重新解析";setOnClickListener{finish()}})
+        root.addView(Button(this).apply{text="返回并解析当前网页";setOnClickListener{
+            CookieManager.getInstance().flush()
+            val current=web?.url.orEmpty()
+            val target=runCatching{MediaLinks.validUrl(current)}.getOrNull()
+            val path=target?.let{Uri.parse(it).path.orEmpty()}.orEmpty()
+            if(target!=null && path!="/" && !path.startsWith("/404") && !path.startsWith("/login") &&
+                Links.title(target) in listOf("小红书","抖音","快手","微博","哔哩哔哩")) {
+                setResult(Activity.RESULT_OK,Intent().setData(Uri.parse(target)))
+            }
+            finish()
+        }})
         val label=TextView(this).apply{text=Links.host(url);setPadding(20,8,20,12)};root.addView(label)
         web=WebView(this).apply {
             settings.javaScriptEnabled=true;settings.domStorageEnabled=true

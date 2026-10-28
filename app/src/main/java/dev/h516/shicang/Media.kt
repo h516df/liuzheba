@@ -94,13 +94,17 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
 
 /** A player exists only for the visible, explicitly started video. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,playback:(Boolean)->Unit={},controlsInset:Dp=0.dp,readText:(()->Unit)?=null,tap:()->Unit) {
+@Composable internal fun VideoMedia(p:Photo,model:AppModel,active:Boolean,fit:Boolean,playback:(Boolean)->Unit={},controlsInset:Dp=0.dp,readText:(()->Unit)?=null,autoplay:Boolean=false,tap:()->Unit) {
     var started by rememberSaveable(p.id){mutableStateOf(false)}
+    var autoStarted by rememberSaveable(p.id){mutableStateOf(false)}
     var playIntent by rememberSaveable(p.id){mutableStateOf(true)}
     var muted by rememberSaveable(p.id){mutableStateOf(true)}
     val checkpoint=LocalContext.current.getSharedPreferences("playback",0)
     var position by rememberSaveable(p.id){mutableLongStateOf(checkpoint.getLong(p.id,0L).let{if(p.duration>0 && it>=p.duration)0L else it.coerceAtLeast(0L)})}
     var speed by rememberSaveable(p.id){mutableFloatStateOf(1f)}
+    // Only the visible discovery page starts automatically; sound stays muted by default.
+    // A manual stop is respected until the user explicitly presses play again.
+    LaunchedEffect(active,autoplay) {if(active && autoplay && !autoStarted){autoStarted=true;started=true}}
     val context=LocalContext.current
     val activity=remember(context){generateSequence(context){(it as? android.content.ContextWrapper)?.baseContext}.filterIsInstance<android.app.Activity>().firstOrNull()}
     var landscape by rememberSaveable(p.id){mutableStateOf(false)}

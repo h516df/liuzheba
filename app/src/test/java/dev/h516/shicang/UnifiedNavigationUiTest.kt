@@ -61,8 +61,8 @@ abstract class UnifiedNavigationFixture {
 class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
     @Test fun discoveryNoteDraftSaveAndReturnKeepsOriginalMedia()=fixture {model,a->
         compose.onNodeWithTag("nav-frame").performClick().assertIsSelected()
-        compose.onNodeWithTag("nav-library").assertIsDisplayed();compose.onNodeWithTag("nav-settings").assertIsDisplayed()
-        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithTag("nav-library").assertIsDisplayed();compose.onNodeWithContentDescription("更多").assertIsDisplayed()
+        compose.onNodeWithContentDescription("打开档案：${a.name}").performClick()
         compose.onNodeWithText("档案详情").assertExists();compose.onNodeWithTag("nav-frame").assertDoesNotExist()
         compose.onNodeWithText("编辑").performClick();idle{model.state.value.editor!=null}
         compose.onNodeWithTag("archive-body").performTextInput("合成记忆：不丢草稿")
@@ -77,8 +77,10 @@ class UnifiedDiscoveryNoteUiTest:UnifiedNavigationFixture() {
         screenshot("archive-note-reader")
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText(a.name).assertExists();compose.onNodeWithTag("nav-frame").assertIsSelected()
+        compose.onNodeWithContentDescription("打开档案：${a.name}").assertExists()
+        compose.onNodeWithTag("nav-library").performClick()
         compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithContentDescription("返回").performClick()
-        compose.onNodeWithText(a.name).assertExists()
+        compose.onNodeWithTag("nav-frame").performClick()
         val saved=runBlocking{model.store.load()};assertEquals(a.authorIds,saved.active.single().authorIds);assertEquals(a.photos,saved.active.single().photos)
         screenshot("discovery-return")
     }
@@ -126,7 +128,7 @@ class UnifiedBackupLargeTextUiTest:UnifiedNavigationFixture() {
 
 class UnifiedVideoReturnUiTest:UnifiedNavigationFixture() {
     @Test fun editorEntryCancelAndSyntheticSaveBoundaryKeepTheViewedOriginal()=fixture(video=true) {model,a->
-        compose.onNodeWithTag("nav-frame").performClick();compose.onNodeWithContentDescription("浏览${a.name}的照片与视频").performClick();val first=mediaNumber(3)
+        compose.onNodeWithTag("nav-frame").performClick();val first=mediaNumber(3)
         compose.onNodeWithContentDescription("更多").performClick();compose.onNodeWithText("编辑视频").performClick()
         idle{compose.onAllNodesWithTag("video-region").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("返回").performScrollTo().performClick()

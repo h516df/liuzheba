@@ -30,15 +30,14 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
         screenshot("product-reading")
     }
 
-    @Test fun discoveryViewerReturnsToSameStoryAfterReadingAndEditing()=fixture {model,a->
+    @Test fun discoveryFeedReturnsToSameMediaAfterReadingAndEditing()=fixture {model,a->
         model.edit(a);model.changeArchiveText("这是一份照片、视频与文字的档案。");model.saveEditor()
         idle{model.state.value.editor==null && !model.state.value.busy}
         compose.onNodeWithTag("nav-frame").performClick()
         screenshot("product-discovery")
-        val before=compose.onNodeWithText(a.name).fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithContentDescription("浏览${a.name}的照片与视频").performClick()
-        assertEquals(1,mediaNumber(3))
+        val before=mediaNumber(3)
         compose.onNodeWithText("阅读文字").performClick()
+        idle { compose.onAllNodesWithTag("note-reader").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("note-reader").assertTextContains("照片、视频与文字",substring=true)
         compose.onNodeWithTag("note-reader-back").performClick()
         compose.onNodeWithContentDescription("更多").performClick()
@@ -48,10 +47,8 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
         screenshot("product-editing")
         compose.onNodeWithContentDescription("返回").performClick()
         idle{model.state.value.editor==null}
-        assertEquals(1,mediaNumber(3))
-        compose.onNodeWithText("返回").performClick()
+        assertEquals(before,mediaNumber(3))
         compose.onNodeWithTag("nav-frame").assertIsSelected()
-        assertEquals(before,compose.onNodeWithText(a.name).fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithTag("nav-library").performClick()
         screenshot("product-library")
     }
@@ -83,22 +80,21 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
         screenshot("product-missing-original")
     }
 
-    @Test fun fullscreenSwitchesArchivesAndReturnsToTheOriginalDiscoveryPosition()=fixture {model,a->
+    @Test fun discoverSwipeSwitchesArchivesAndKeepsPositionAcrossTabs()=fixture {model,a->
         val other=Archive(name="另一份合成收藏",photos=listOf(a.photos.last()))
         runBlocking{model.store.save(other)}
         model.appearance(model.state.value.appearance)
         idle{!model.state.value.busy && model.state.value.library.active.size==2}
         compose.onNodeWithTag("nav-frame").performClick()
-        compose.onNodeWithTag("discovery-stories").performScrollToNode(hasContentDescription("浏览${a.name}的照片与视频"))
-        val before=compose.onNodeWithText(a.name).fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithContentDescription("浏览${a.name}的照片与视频").performClick()
-        assertEquals(1,mediaNumber(3))
+        val first=if(compose.onAllNodesWithContentDescription("打开档案：${a.name}").fetchSemanticsNodes().isNotEmpty())a.name else other.name
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("下一份").performScrollTo().performClick()
-        idle{compose.onAllNodesWithContentDescription("打开档案：${other.name}").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("返回").performClick()
-        compose.onNodeWithTag("nav-frame").assertIsSelected()
-        assertEquals(before,compose.onNodeWithText(a.name).fetchSemanticsNode().boundsInRoot)
+        val second=if(first==a.name)other.name else a.name
+        idle{compose.onAllNodesWithContentDescription("打开档案：$second").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("nav-library").performClick()
+        compose.onNodeWithTag("nav-library").assertIsSelected()
+        compose.onNodeWithTag("nav-frame").performClick()
+        compose.onNodeWithContentDescription("打开档案：$second").assertExists()
     }
 
     @Test fun allMediaBackReturnsToTheExactViewerRatherThanLeavingIt()=fixture {_,a->

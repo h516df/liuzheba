@@ -15,14 +15,14 @@ import org.junit.Test
 class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
     @Test fun discoveryAndLibraryShareReaderAndRetainScroll()=fixture {_,a->
         compose.onNodeWithTag("nav-frame").performClick()
-        val card=compose.onNodeWithTag("story-${a.id}").fetchSemanticsNode().boundsInRoot
+        val media=mediaNumber(a.photos.size)
         screenshot("product-discovery-light")
-        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithContentDescription("打开档案：${a.name}").performClick()
         compose.onNodeWithText("档案详情").assertExists()
         compose.onNodeWithText("编辑").assertIsDisplayed()
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithTag("nav-frame").assertIsSelected()
-        assertEquals(card,compose.onNodeWithTag("story-${a.id}").fetchSemanticsNode().boundsInRoot)
+        assertEquals(media,mediaNumber(a.photos.size))
         compose.onNodeWithTag("nav-library").performClick()
         compose.onNodeWithText(a.name).performClick()
         compose.onNodeWithText("档案详情").assertExists()
@@ -33,13 +33,12 @@ class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
         idle{!model.state.value.busy && model.state.value.appearance.theme=="曜石"}
         compose.onNodeWithTag("nav-frame").performClick()
         compose.onNodeWithTag("nav-library").assertIsDisplayed()
-        compose.onNodeWithTag("nav-settings").assertIsDisplayed()
+        compose.onNodeWithContentDescription("更多").assertIsDisplayed()
         val left=compose.onNodeWithTag("nav-frame").fetchSemanticsNode().boundsInRoot
         val right=compose.onNodeWithTag("nav-library").fetchSemanticsNode().boundsInRoot
         assertTrue(left.right<=right.left)
         screenshot("product-discovery-dark-font200")
-        compose.onNodeWithTag("discovery-stories").performScrollToNode(hasText(a.name))
-        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithContentDescription("打开档案：${a.name}").performClick()
         screenshot("product-detail-dark-font200");compose.onNodeWithText("编辑").assertIsDisplayed().performClick()
         compose.onNodeWithText("保存").assertIsDisplayed()
     }
@@ -59,17 +58,19 @@ class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
         model.edit(a);model.change(a.copy(photos=emptyList()));model.changeArchiveText("只有文字，也是一份完整收藏。")
         model.saveEditor();idle{model.state.value.editor==null && !model.state.value.busy}
         compose.onNodeWithTag("nav-frame").performClick()
-        compose.onNodeWithText("只有文字，也是一份完整收藏。").assertExists()
-        compose.onNodeWithText(a.name).performClick()
+        compose.onNodeWithContentDescription("打开档案：${a.name}").assertExists()
+        compose.onNodeWithContentDescription("打开档案：${a.name}").performClick()
         compose.onNodeWithTag("archive-text").assertTextContains("完整收藏",substring=true)
         assertTrue(model.state.value.library.drafts.isEmpty())
         assertTrue(model.state.value.library.noteDrafts.isEmpty())
     }
 
-    @Test fun aSingleArchiveDoesNotOfferARefreshThatCannotChangeAnything()=fixture {_,_->
+    @Test fun aSingleArchiveOffersMediaShuffleButNoCardList()=fixture {_,_->
         compose.onNodeWithTag("nav-frame").performClick()
-        compose.onNodeWithText("你的收藏").assertExists()
+        compose.onNodeWithTag("discovery-stories").assertDoesNotExist()
         compose.onNodeWithText("换个顺序").assertDoesNotExist()
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.onNodeWithText("换一轮").assertExists()
     }
 }
 

@@ -21,19 +21,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-/** Two perspectives on the same archives. Neither discovery nor collection owns a second reader. */
-@Composable internal fun DiscoveryScreen(model:AppModel,s:AppState,open:(String)->Unit,view:(Archive)->Unit) {
-    val seed=rememberSaveable {kotlin.random.Random.nextLong()}
-    var rotation by rememberSaveable {mutableIntStateOf(0)}
+/** Discover is for consuming archives, while the library owns searching and managing them. */
+@Composable internal fun DiscoveryScreen(
+    model:AppModel,s:AppState,positions:Map<String,String>,rememberPhoto:(String,String)->Unit,
+    open:(String)->Unit,photos:(String)->Unit,settings:()->Unit,library:()->Unit,
+    enabled:Boolean=true
+) {
     val active=s.library.active
-    val order=remember(active.map{it.id},seed,rotation){
-        val shuffled=discoveryOrder(active.map{it.id},seed,"")
-        if(shuffled.isEmpty()) shuffled else shuffled.drop(rotation%shuffled.size)+shuffled.take(rotation%shuffled.size)
-    }
-    val archives=remember(active,order){val byId=active.associateBy{it.id};order.mapNotNull(byId::get)}
-    val list=rememberLazyListState()
-    val scope=rememberCoroutineScope()
-    if(archives.isEmpty()) {
+    if(active.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
             ArchiveNameplate("留",Modifier.size(88.dp))
             Text("值得留下的，都在这里",Modifier.padding(top=24.dp),style=MaterialTheme.typography.titleLarge)
@@ -42,18 +37,8 @@ import kotlinx.coroutines.launch
         }
         return
     }
-    LazyColumn(state=list,modifier=Modifier.fillMaxSize().testTag("discovery-stories"),contentPadding=PaddingValues(start=20.dp,end=20.dp,bottom=24.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
-        item(key="intro") {
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(if(archives.size==1) "你的收藏" else "重新遇见你的收藏",style=MaterialTheme.typography.titleMedium)
-                    Text("${archives.size} 份档案",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if(archives.size>1) GalleryTextButton(onClick={scope.launch{list.scrollToItem(0);rotation++}},enabled=!s.busy){Text("换个顺序")}
-            }
-        }
-        items(archives,key={it.id}){a->ArchiveStoryCard(a,s.library,model,compact=false,open={open(a.id)},view={view(a)})}
-    }
+    ArchiveFeed(active,"",model,s.appearance,positions,rememberPhoto,{},library,open,photos,
+        settings,{model.edit(it)},{model.edit()},s.busy,enabled=enabled,autoplay=true,navigationInset=72.dp)
 }
 
 /** Shared cover, type and action placement across discovery and the archive wall. */

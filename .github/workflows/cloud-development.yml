@@ -29,6 +29,10 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Signing rejection policy (no credentials)
         run: python3 -m unittest discover -s cloud -p 'test_*.py' -v
+      - name: Offline social media extraction checks
+        run: |
+          python3 -m pip install --disable-pip-version-check 'yt-dlp==2026.8.19'
+          python3 tools/tests/test_media_bridge.py
       - name: Prepare cloud toolchain
         run: bash .devcontainer/setup.sh
       - name: Check this revision

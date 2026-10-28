@@ -50,12 +50,31 @@ object MediaLinks {
             CookieManager.getInstance().getCookie(cookieUrl).orEmpty()
         }
         try {read(Python.getInstance().getModule("liuce_media").callAttr("resolve",url,cookies).toString())}
-        catch(e:Exception) {throw IllegalStateException("暂时无法解析。可先打开网页完成验证后重试，或从其他 App 分享图片、视频到留着吧。",e)}
+        catch(e:Exception) {
+            val platform=SharedLinks.platform(url)
+            val hint=if(platform=="小红书" || platform=="抖音")
+                "$platform 没有返回可下载的原图或视频。请点「打开网页验证」，完成验证后返回重新解析；部分作品可能禁止下载。"
+            else "此作品没有返回可直接下载的媒体。可先打开网页验证后重试；部分平台只提供在线播放或限制下载。"
+            throw IllegalStateException(hint,e)
+        }
     }
 }
 
 data class MediaDownload(val id:String,val title:String,val source:String,val kind:String,val ext:String,val managerId:Long,
-    val generation:String,val state:String="等待下载",val percent:Int=0,val bytes:Long=0,val archiveId:String="")
+    val generation:String,val state:String="等待下载",val percent:Int=0,val bytes:Long=0,val archiveId:String="",val failure:String="")
+
+/** DownloadManager separates HTTP rejections from transient transport and storage failures. */
+internal fun mediaDownloadFailure(reason:Int):String = when(reason) {
+    401,403->"平台拒绝访问：请打开网页验证，再重新解析"
+    404,410->"媒体链接不存在或已过期：请重新解析作品链接"
+    429->"平台请求过于频繁：稍后再试"
+    in 500..599->"平台服务器暂时不可用：稍后再试"
+    DownloadManager.ERROR_INSUFFICIENT_SPACE->"手机存储空间不足"
+    DownloadManager.ERROR_CANNOT_RESUME->"下载中断且无法续传：请重新解析"
+    DownloadManager.ERROR_TOO_MANY_REDIRECTS->"平台跳转过多：请打开网页验证"
+    DownloadManager.ERROR_HTTP_DATA_ERROR->"网络传输失败：请检查网络后重试"
+    else->"下载失败（系统代码 $reason），请重新解析"
+}
 /** DownloadManager owns background transport and recovery across process death/reboots. */
 class MediaDownloads(private val context:Context) {
     private val prefs=context.getSharedPreferences("media-downloads",Context.MODE_PRIVATE)
@@ -106,7 +125,8 @@ class MediaDownloads(private val context:Context) {
                 DownloadManager.STATUS_PAUSED->"等待网络"
                 else->"等待下载"
             }
-            job.copy(state=state,percent=percent,bytes=bytes)
+            val failure=if(status==DownloadManager.STATUS_FAILED) mediaDownloadFailure(c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))) else ""
+            job.copy(state=state,percent=percent,bytes=bytes,failure=failure)
         }
     }
     @Synchronized fun imported(id:String,archive:String) {val jobs=read();write(jobs.map{if(it.id==id)it.copy(archiveId=archive) else it});jobs.firstOrNull{it.id==id}?.let{manager.remove(it.managerId)}}

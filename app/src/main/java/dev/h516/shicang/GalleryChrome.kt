@@ -121,11 +121,11 @@ import androidx.compose.ui.window.Dialog
     }
 }
 
-@Composable internal fun GalleryTabBar(route:String,select:(String)->Unit) {
+@Composable internal fun GalleryTabBar(route:String,immersive:Boolean=false,select:(String)->Unit) {
     val c=MaterialTheme.colorScheme
-    Surface(Modifier.fillMaxWidth().navigationBarsPadding(),color=c.background) {
+    Surface(Modifier.fillMaxWidth().navigationBarsPadding(),color=if(immersive)Color.Black.copy(alpha=.64f) else c.background) {
         Column {
-            HorizontalDivider(color=c.outlineVariant.copy(alpha=.35f))
+            HorizontalDivider(color=if(immersive)Color.White.copy(alpha=.16f) else c.outlineVariant.copy(alpha=.35f))
             Row(Modifier.fillMaxWidth().selectableGroup().padding(horizontal=20.dp,vertical=4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
                 listOf("frame" to "发现","library" to "档案").forEach{(destination,label)->
                     val selected=route==destination
@@ -133,7 +133,7 @@ import androidx.compose.ui.window.Dialog
                         .testTag("nav-$destination").semantics{contentDescription="切换到$label"}
                         .selectable(selected,onClick={select(destination)},role=Role.Tab,interactionSource=remember{MutableInteractionSource()},indication=null)
                         .padding(horizontal=8.dp,vertical=6.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)) {
-                        val color=if(selected)c.primary else c.onSurfaceVariant
+                        val color=if(immersive){if(selected)Color.White else Color.White.copy(alpha=.58f)} else if(selected)c.primary else c.onSurfaceVariant
                         FrameGlyph(label,color)
                         Text(label,style=MaterialTheme.typography.labelSmall,color=color)
                     }
