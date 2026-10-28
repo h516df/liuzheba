@@ -1,3 +1,13 @@
+# 当前接续：0.19 正式覆盖更新（2026-10-28，发布前）
+
+- **用户目标与设备起点**：用户指出仅保留Draft PR不能在真实手机试用；其当前手机仍安装0.17。要求将已完成的界面/交互改动公开发布到GitHub，使其使用原签名同包名APK直接覆盖升级，而不是安装debug、卸载或清除资料。
+- **已核实基线**：仓库当前latest为正式v0.18/code19，main源`50287d5743a287c23153a4ed4b82be5d36447319`，其原证书和0.16→0.18模拟器升级验收见下方。PR [#41](https://github.com/h516df/liuzheba/pull/41)的0.18交互代码head`6341011c5600ecac42a498cc5935473507edf8a9`，四个同源Actions全部success，原生API35 8/8、宿主303/303，未在用户手机验收；此head没有发布APK。
+- **当前0.19准备**：沿`ux/daily-flow-clarity`续接，版本改为0.19/code20，配套`release-notes.json`、`docs/releases/v0.19.md`及设置页说明断言；保持`dev.h516.shicang`、原证书、SQLite schema1、备份format6和媒体原件处理代码不变。新一轮精确代码测试、PR合并、main推送检查及受保护发行均尚未完成，不能把0.19候选说成已发行。
+- **安全发行路径**：更新PR后待Cloud development、Android device checks、Secret checks同源通过，使用受保护主线正常合并，再等待精确main push checks通过；`production-release.yml`只接受main完整SHA。流水线必须完成原证书签名和官方0.16→0.19模拟器真实安装/导出资料比对，发布后三资产、latest/标签/摘要回读一致才告知用户下载。不会上传私有数据、替换0.17/0.18资产或把verification包当正式包。用户手机的0.17→0.19及其私人资料最终仍只能由用户实际确认。
+- **检查进度**：发布策略Python 23/23通过，JSON解析与`git diff --check`通过；0.19源码`compileDebugKotlin -Pkotlin.incremental=false`成功，`EmbeddedReleaseNotesTest`与`ArchiveUiSnapshotTest.finalReleaseNotesOpenFromSettings`定向通过。当前机器的Kotlin增量缓存因更改BuildConfig触发重复声明假错误，关闭增量编译后通过；这不是发布阻塞理由，但最终依照干净的GitHub CI重新验证。远端检查待运行，通过后在此更新同源SHA和结果。已核实当前无v0.19 Release或Git标签。
+
+---
+
 # 当前接续：日常使用体验第一批（2026-10-28）
 
 - **用户反馈与目标**：保留「留着吧」继续开发。重点不是增加功能，而是界面、交互和操作逻辑不顺手；本批先解决能在代码和合成截图中明确复现的入口歧义与多余步骤。尚未得到实体手机上的主观体验确认。

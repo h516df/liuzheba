@@ -39,10 +39,10 @@ class ArchiveUiSnapshotTest {
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于与检查更新"))
         compose.onNodeWithText("关于与检查更新").performClick()
         compose.onNodeWithText("检查更新").assertExists()
-        compose.onNodeWithText("本版说明 0.18").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("本版说明 0.19").performScrollTo().assertIsDisplayed()
         val notes=model.updater.currentNotes()!!
-        org.junit.Assert.assertEquals("0.18",notes.version)
-        org.junit.Assert.assertEquals(19,notes.code)
+        org.junit.Assert.assertEquals("0.19",notes.version)
+        org.junit.Assert.assertEquals(20,notes.code)
         notes.sections.flatMap{it.second}.forEach {line->
             compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
         }

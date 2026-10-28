@@ -49,7 +49,7 @@ def main():
     body.write_text(Path(f"docs/releases/{tag}.md").read_text()+f"\n\n源码：`{sha}`。\n\n[云端验证与发布记录](https://github.com/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']})。\n")
     request=directory/"release-request.json"
     request.write_text(json.dumps(dict(tag_name=tag,target_commitish=sha,
-        name=f"留着吧 {tag} · 档案与沉浸浏览重构",body=body.read_text(),draft=True,prerelease=False),ensure_ascii=False))
+        name=f"留着吧 {tag} · 体验更新",body=body.read_text(),draft=True,prerelease=False),ensure_ascii=False))
     created=json.loads(gh("api",f"repos/{repo}/releases","--method","POST","--input",request).stdout)
     release_id=created.get("id")
     if not (type(release_id) is int and release_id>0 and created.get("draft") is True
