@@ -271,7 +271,15 @@ import java.io.File
             "档案" -> for(y in 0..1) for(x in 0..1) drawRoundRect(ink,Offset(w*(.10f+x*.46f),h*(.10f+y*.46f)),androidx.compose.ui.geometry.Size(w*.32f,h*.32f),androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),style=Stroke(stroke))
             "更多" -> for(x in 0..2) drawCircle(ink,1.3.dp.toPx(),Offset(w*(.2f+x*.3f),h*.5f))
             "新建" -> {drawLine(ink,Offset(w*.18f,h*.5f),Offset(w*.82f,h*.5f),stroke);drawLine(ink,Offset(w*.5f,h*.18f),Offset(w*.5f,h*.82f),stroke)}
-            "设置" -> for(i in 0..2){val y=h*(.24f+i*.26f);drawLine(ink,Offset(w*.12f,y),Offset(w*.88f,y),stroke);drawCircle(ink,w*.075f,Offset(w*(if(i==1) .67f else .33f),y),style=Stroke(stroke*1.6f))}
+            "设置" -> {
+                drawCircle(ink,w*.27f,Offset(w*.5f,h*.5f),style=Stroke(stroke))
+                drawCircle(ink,w*.08f,Offset(w*.5f,h*.5f),style=Stroke(stroke))
+                for(i in 0..7) {
+                    val angle=i*Math.PI/4
+                    val dx=kotlin.math.cos(angle).toFloat();val dy=kotlin.math.sin(angle).toFloat()
+                    line(.5f+.31f*dx,.5f+.31f*dy,.5f+.43f*dx,.5f+.43f*dy)
+                }
+            }
             "筛选" -> {line(.12f,.18f,.88f,.18f);line(.12f,.18f,.43f,.54f);line(.88f,.18f,.57f,.54f);line(.43f,.54f,.43f,.84f);line(.57f,.54f,.57f,.76f);line(.43f,.84f,.57f,.76f)}
             "搜索" -> {drawCircle(ink,w*.28f,Offset(w*.42f,h*.42f),style=Stroke(stroke));drawLine(ink,Offset(w*.63f,h*.63f),Offset(w*.87f,h*.87f),stroke)}
             "发现" -> {drawCircle(ink,w*.39f,Offset(w*.5f,h*.5f),style=Stroke(stroke));drawLine(ink,Offset(w*.63f,h*.28f),Offset(w*.37f,h*.72f),stroke);drawLine(ink,Offset(w*.37f,h*.72f),Offset(w*.31f,h*.44f),stroke);drawLine(ink,Offset(w*.31f,h*.44f),Offset(w*.63f,h*.28f),stroke)}

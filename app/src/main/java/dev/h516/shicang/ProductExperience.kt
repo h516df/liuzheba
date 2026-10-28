@@ -23,9 +23,13 @@ import kotlinx.coroutines.launch
 
 /** Two perspectives on the same archives. Neither discovery nor collection owns a second reader. */
 @Composable internal fun DiscoveryScreen(model:AppModel,s:AppState,open:(String)->Unit,view:(Archive)->Unit) {
-    var seed by rememberSaveable {mutableLongStateOf(kotlin.random.Random.nextLong())}
+    val seed=rememberSaveable {kotlin.random.Random.nextLong()}
+    var rotation by rememberSaveable {mutableIntStateOf(0)}
     val active=s.library.active
-    val order=remember(active.map{it.id},seed){discoveryOrder(active.map{it.id},seed,"")}
+    val order=remember(active.map{it.id},seed,rotation){
+        val shuffled=discoveryOrder(active.map{it.id},seed,"")
+        if(shuffled.isEmpty()) shuffled else shuffled.drop(rotation%shuffled.size)+shuffled.take(rotation%shuffled.size)
+    }
     val archives=remember(active,order){val byId=active.associateBy{it.id};order.mapNotNull(byId::get)}
     val list=rememberLazyListState()
     val scope=rememberCoroutineScope()
@@ -42,14 +46,13 @@ import kotlinx.coroutines.launch
         item(key="intro") {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("重新遇见你的收藏",style=MaterialTheme.typography.titleMedium)
+                    Text(if(archives.size==1) "你的收藏" else "重新遇见你的收藏",style=MaterialTheme.typography.titleMedium)
                     Text("${archives.size} 份档案",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                GalleryTextButton(onClick={scope.launch{list.scrollToItem(0);seed=kotlin.random.Random.nextLong()}},enabled=!s.busy){Text("换一组")}
+                if(archives.size>1) GalleryTextButton(onClick={scope.launch{list.scrollToItem(0);rotation++}},enabled=!s.busy){Text("换个顺序")}
             }
         }
         items(archives,key={it.id}){a->ArchiveStoryCard(a,s.library,model,compact=false,open={open(a.id)},view={view(a)})}
-        item(key="end"){Text("这些都是你留下的。",Modifier.fillMaxWidth().padding(vertical=12.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
 }
 

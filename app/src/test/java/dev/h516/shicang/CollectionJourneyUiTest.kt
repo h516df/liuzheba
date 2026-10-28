@@ -23,13 +23,34 @@ class CollectionJourneyUiTest:UnifiedNavigationFixture() {
     @Test fun collectingPhotosStartsPickerWithoutCreatingBlankDraft() {
         var picked:String?=null
         fixture(choose={picked=it}) {model,_->
-            compose.onNodeWithContentDescription("收录").performClick()
+            compose.onNodeWithContentDescription("添加内容").performClick()
             screenshot("refactor-collection")
-            compose.onNodeWithText("照片或视频").performClick()
+            compose.onNodeWithText("从相册添加").performClick()
             assertEquals("",picked)
             assertNull(model.state.value.editor)
             assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
         }
+    }
+
+    @Test fun savingLinkStartsAnEditorDirectlyWithoutAnotherMenu()=fixture {model,_->
+        compose.onNodeWithContentDescription("添加内容").performClick()
+        compose.onNodeWithText("保存链接").performClick()
+        idle{model.state.value.editor!=null}
+        val draft=model.state.value.editor!!
+        assertTrue(draft.fields.any{it.name=="来源" && it.type=="链接"})
+        compose.onNodeWithText("新建档案").assertExists()
+        compose.onNodeWithText("来源链接").assertExists()
+    }
+
+    @Test fun librarySortAndAdvancedSearchAreSeparateActions()=fixture {_,_->
+        compose.onNodeWithText("按最近更新").performClick()
+        compose.onNodeWithText("按名称排序").performClick()
+        compose.onNodeWithText("按名称排序").assertExists()
+        compose.onNodeWithText("高级搜索").performClick()
+        compose.onNodeWithText("定制规则").assertExists()
+        compose.onNodeWithText("收起高级搜索").performClick()
+        compose.onNodeWithText("定制规则").assertDoesNotExist()
+        compose.onNodeWithContentDescription("切换到列表视图").assertExists()
     }
 
     @Test fun detailAppendFinishesWithoutOpeningWholeArchiveEditor() {
@@ -52,8 +73,8 @@ class CollectionJourneyUiTest:UnifiedNavigationFixture() {
     }
 
     @Test fun collectionRemainsReachableAtTwoHundredPercent()=fixture(font=2f) {_,_->
-        compose.onNodeWithContentDescription("收录").assertIsDisplayed().performClick()
-        compose.onNodeWithText("文字档案").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("添加内容").assertIsDisplayed().performClick()
+        compose.onNodeWithText("新建档案").performScrollTo().assertIsDisplayed()
         screenshot("refactor-collection-font200")
         compose.onNodeWithText("取消").performScrollTo().performClick()
         compose.onNodeWithContentDescription("搜索档案").assertIsDisplayed()

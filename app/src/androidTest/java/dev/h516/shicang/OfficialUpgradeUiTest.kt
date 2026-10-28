@@ -48,7 +48,7 @@ class OfficialUpgradeUiTest {
             val current=nodes()
             current.none{it.text?.toString()?.startsWith("正在打开资料")==true} && current.any {
                 it.packageName?.toString()==production &&
-                    (it.text?.toString() in listOf("档案详情","备份与恢复","我的") || it.contentDescription?.toString()=="搜索档案")
+                    (it.text?.toString() in listOf("档案详情","备份与恢复","设置") || it.contentDescription?.toString()=="搜索档案")
             }
         }
         returnToLibrary()
@@ -113,7 +113,7 @@ class OfficialUpgradeUiTest {
         waitText("搜索档案")
     }
     private fun export(filename:String) {
-        click("我的");clickScrolling("备份与恢复");clickScrolling("导出备份文件（换机或留存）");click("确认")
+        click("设置");clickScrolling("备份与恢复");clickScrolling("导出备份文件（换机或留存）");click("确认")
         val name=waitNode("system backup filename"){it.isEditable && it.packageName?.toString()?.contains("documentsui")==true}
         setText(name,filename)
         click(waitNode("system save action"){it.isEnabled && (it.viewIdResourceName?.endsWith(":id/action_menu_save")==true || it.text?.toString().equals("Save",ignoreCase=true) || it.text?.toString()=="保存")})

@@ -118,7 +118,7 @@ class DesignV19Test {
             click("编辑");waitNode("编辑档案");screenshot("editor")
             fill(0,"未保存的改名");click("返回");waitNode("林雨（示例）")
             assertEquals("林雨（示例）",store.load().active.single().name)
-            click("返回");waitNode("搜索档案");click("收录");click("文字档案");waitNode("新建档案")
+            click("返回");waitNode("搜索档案");click("添加内容");click("新建档案");waitNode("新建档案")
             waitEditorFields(3);assertTrue(editorFields().all{it.text.isNullOrBlank()});screenshot("blank")
             click("删除");waitNode("撤销");waitEditorFields(1);click("撤销");waitEditorFields(3)
             fill(1,"居住地");fill(2,"不会复制的城市")
@@ -126,7 +126,7 @@ class DesignV19Test {
             val timeout=SystemClock.uptimeMillis()+5000
             while(store.load().templates.isEmpty() && SystemClock.uptimeMillis()<timeout) Thread.sleep(100)
             assertEquals("居住地",store.load().templates.single().fields.single().name)
-            click("返回");waitNode("搜索档案");click("收录");click("文字档案");waitNode("新建档案")
+            click("返回");waitNode("搜索档案");click("添加内容");click("新建档案");waitNode("新建档案")
             waitEditorFields(3)
             assertTrue(editorFields().all{it.text.isNullOrBlank()})
             click("选择模板");waitNode("亲友资料");click("亲友资料");waitNode("新建档案")

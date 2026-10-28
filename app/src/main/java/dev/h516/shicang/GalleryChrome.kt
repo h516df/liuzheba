@@ -123,22 +123,20 @@ import androidx.compose.ui.window.Dialog
 
 @Composable internal fun GalleryTabBar(route:String,select:(String)->Unit) {
     val c=MaterialTheme.colorScheme
-    val immersive=false
-    val foreground=if(immersive) Color.White else c.primary
-    val secondary=if(immersive) Color.White.copy(alpha=.65f) else c.onSurfaceVariant
-    val shape=RoundedCornerShape(32.dp)
-    Surface(Modifier.navigationBarsPadding().padding(horizontal=20.dp,vertical=8.dp)
-        .border(.5.dp,if(immersive) Color.White.copy(alpha=.18f) else c.outlineVariant.copy(alpha=.5f),shape),
-        shape=shape,color=if(immersive) Color(0xF2222224) else c.surface,shadowElevation=1.dp) {
-        Row(Modifier.fillMaxWidth().selectableGroup().padding(4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
-            listOf("frame" to "发现","library" to "档案").forEach{(destination,label)->
-                Column(Modifier.weight(1f).heightIn(min=54.dp).clip(RoundedCornerShape(28.dp))
-                    .background(if(route==destination) {if(immersive) Color.White.copy(alpha=.14f) else c.surfaceVariant.copy(alpha=.6f)} else Color.Transparent)
-                    .testTag("nav-$destination").semantics{contentDescription="切换到$label"}
-                    .selectable(route==destination,onClick={select(destination)},role=Role.Tab,interactionSource=remember{MutableInteractionSource()},indication=null)
-                    .padding(horizontal=8.dp,vertical=6.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)) {
-                    FrameGlyph(if(destination=="settings")"设置" else label,if(route==destination)foreground else secondary)
-                    Text(label,style=MaterialTheme.typography.labelSmall,color=if(route==destination)foreground else secondary)
+    Surface(Modifier.fillMaxWidth().navigationBarsPadding(),color=c.background) {
+        Column {
+            HorizontalDivider(color=c.outlineVariant.copy(alpha=.35f))
+            Row(Modifier.fillMaxWidth().selectableGroup().padding(horizontal=20.dp,vertical=4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
+                listOf("frame" to "发现","library" to "档案").forEach{(destination,label)->
+                    val selected=route==destination
+                    Column(Modifier.weight(1f).heightIn(min=56.dp).clip(RoundedCornerShape(14.dp))
+                        .testTag("nav-$destination").semantics{contentDescription="切换到$label"}
+                        .selectable(selected,onClick={select(destination)},role=Role.Tab,interactionSource=remember{MutableInteractionSource()},indication=null)
+                        .padding(horizontal=8.dp,vertical=6.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)) {
+                        val color=if(selected)c.primary else c.onSurfaceVariant
+                        FrameGlyph(label,color)
+                        Text(label,style=MaterialTheme.typography.labelSmall,color=color)
+                    }
                 }
             }
         }
