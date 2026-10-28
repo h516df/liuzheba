@@ -113,7 +113,15 @@ class OfficialUpgradeUiTest {
         waitText("搜索档案")
     }
     private fun export(filename:String) {
-        click("设置");clickScrolling("备份与恢复");clickScrolling("导出备份文件（换机或留存）");click("确认")
+        // The immutable 0.16 baseline has a bottom "我的" tab, while current versions
+        // expose "设置" from the library header. Exercise each published UI as shipped.
+        if (installedCode()==17L) {
+            click("切换到我的")
+            waitText("我的")
+        } else {
+            click("设置")
+        }
+        clickScrolling("备份与恢复");clickScrolling("导出备份文件（换机或留存）");click("确认")
         val name=waitNode("system backup filename"){it.isEditable && it.packageName?.toString()?.contains("documentsui")==true}
         setText(name,filename)
         click(waitNode("system save action"){it.isEnabled && (it.viewIdResourceName?.endsWith(":id/action_menu_save")==true || it.text?.toString().equals("Save",ignoreCase=true) || it.text?.toString()=="保存")})
