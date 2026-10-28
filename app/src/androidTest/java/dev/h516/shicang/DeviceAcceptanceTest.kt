@@ -166,7 +166,11 @@ class DeviceAcceptanceTest {
         await("discovery starts the portrait video") { onMain { player() != null } }
         // Exercise advanced editing/player controls in the dedicated media viewer.
         // Discover is intentionally a minimal swipe experience with fading playback chrome.
-        click("更多");click("全部媒体");click("查看第1项照片或视频");click("播放视频")
+        click("更多");click("全部媒体");click("查看第1项照片或视频")
+        val resumeOrPlay = waitNode("portrait playback button") {
+            it.text?.toString()?.let { label -> label == "播放视频" || label.startsWith("继续播放 · ") } == true
+        }
+        click(resumeOrPlay)
         await("portrait decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.height>it.videoSize.width}==true}}
         click("横屏观看")
         await("manual landscape layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE}
