@@ -5,14 +5,12 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
 import android.content.Intent
 import android.media.MediaMetadataRetriever
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.view.View
 import android.view.ViewGroup
-import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.core.content.FileProvider
@@ -166,15 +164,15 @@ class DeviceAcceptanceTest {
         prefs.edit().putBoolean("discoveryRandomMedia",false).commit()
         start();click("发现")
         await("discovery starts the portrait video") { onMain { player() != null } }
+        // Exercise advanced editing/player controls in the dedicated media viewer.
+        // Discover is intentionally a minimal swipe experience with fading playback chrome.
+        click("更多");click("全部媒体");click("查看第1项照片或视频");click("播放视频")
         await("portrait decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.height>it.videoSize.width}==true}}
-        revealVideoControls("横屏观看")
         click("横屏观看")
         await("manual landscape layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE}
         await("rotation keeps the same video"){onMain{player()?.videoSize?.height ?: 0}>0}
-        revealVideoControls("恢复方向")
         click("恢复方向")
         await("restored portrait layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT}
-        revealVideoControls("暂停")
         click("暂停");val paused=onMain{checkNotNull(player()).currentPosition}
         click("阅读文字");waitText(note.body)
         assertNull(onMain{player()})
@@ -532,24 +530,6 @@ class DeviceAcceptanceTest {
         while (node != null && !node.isClickable) node = node.parent
         check(node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) { "Control is not clickable: ${target.text}" }
         Thread.sleep(250)
-    }
-
-    private fun revealVideoControls(label: String) {
-        if (findText(label) != null) return
-        // Autoplay hides playback tools after a few seconds. Tap the actual video canvas,
-        // just as a person would; this tests discoverability instead of disabling auto-hide.
-        val target = waitText("视频手势区域：双击左右快退快进，长按倍速，下方进度条定位")
-        val bounds = Rect().also(target::getBoundsInScreen)
-        check(!bounds.isEmpty) { "Video touch area is empty" }
-        val x = bounds.centerX().toFloat()
-        val y = bounds.top + bounds.height() * .35f
-        val time = SystemClock.uptimeMillis()
-        listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP).forEachIndexed { index, action ->
-            val event = MotionEvent.obtain(time, time + index * 80L, action, x, y, 0)
-            try { check(ui.injectInputEvent(event, true)) { "Cannot tap the video canvas" } }
-            finally { event.recycle() }
-        }
-        waitText(label)
     }
 
     private fun clickScrolling(text: String) {
