@@ -70,7 +70,8 @@ import java.io.File
     a:Archive,model:AppModel,appearance:Appearance,initialPhoto:String,
     position:(String)->Unit, next:(()->Unit)?, previous:(()->Unit)?,
     library:()->Unit, details:()->Unit, allPhotos:()->Unit, settings:()->Unit, edit:()->Unit, create:()->Unit,
-    busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={}, discovery:DiscoveryActions?=null
+    busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={},
+    discovery:DiscoveryActions?=null,autoplay:Boolean=false,navigationInset:androidx.compose.ui.unit.Dp=0.dp
 ) {
     val pager=rememberPagerState(initialPage=photoIndex(a,initialPhoto),pageCount={a.photos.size.coerceAtLeast(1)})
     var playingVideo by remember {mutableStateOf<String?>(null)}
@@ -93,7 +94,7 @@ import java.io.File
     val imageScale=if(complete) ContentScale.Fit else ContentScale.Crop
     val background=if(appearance.skin!="留白") Color.Black else MaterialTheme.colorScheme.background
     // Discover draws behind the floating navigation; keep its tools above that layer.
-    val bottomInset=8.dp
+    val bottomInset=navigationInset+8.dp
     LaunchedEffect(pager.settledPage,a.photos,active) {
         a.photos.getOrNull(pager.settledPage)?.let {position(it.id)}
     }
@@ -101,8 +102,8 @@ import java.io.File
     LaunchedEffect(active,zoomed,videoPlaying,menu,information,reading,editingVideo,pager.isScrollInProgress) {
         onPagingAllowed(!zoomed && !menu && !information && !reading && editingVideo==null && !pager.isScrollInProgress)
     }
-    LaunchedEffect(controls,menu,information,reading,activity,active) {
-        if(active && controls && !menu && !information && !reading && !accessibility.isTouchExplorationEnabled) {
+    LaunchedEffect(controls,menu,information,reading,activity,active,videoPlaying,autoplay) {
+        if(active && controls && !menu && !information && !reading && (!autoplay || !videoPlaying) && !accessibility.isTouchExplorationEnabled) {
             delay(4000);controls=false
         }
     }
@@ -132,7 +133,7 @@ import java.io.File
                     val width=minOf((maxWidth-40.dp).coerceAtLeast(1.dp),(maxHeight-140.dp).coerceAtLeast(1.dp)*ratio)
                     val canvas=if(framed && !p.isVideo) Modifier.width(width).height(width/ratio).border(1.dp,MaterialTheme.colorScheme.outlineVariant).padding(8.dp) else Modifier.fillMaxSize()
                     Box(canvas) {
-                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && !reading && editingVideo==null && !busy,true,{playing->if(playing)playingVideo=p.id else if(playingVideo==p.id)playingVideo=null;touch()},controlsInset=if(discovery!=null)bottomInset else 0.dp,readText=archiveNote?.let{{touch();reading=true}}){touch();controls=!controls}
+                if(p.isVideo) VideoMedia(p,model,active && page==pager.settledPage && !pager.isScrollInProgress && !menu && !information && !reading && editingVideo==null && !busy,true,{playing->if(playing)playingVideo=p.id else if(playingVideo==p.id)playingVideo=null;touch()},controlsInset=if(discovery!=null)bottomInset else 0.dp,readText=archiveNote?.let{{touch();reading=true}},autoplay=autoplay){touch();controls=!controls}
                 else {
                     // Keep the renderer and its decoded image stable across the pager midpoint.
                     val imageState=rememberZoomableImageState()
@@ -154,7 +155,7 @@ import java.io.File
             Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
         // Navigation and actions sit on the edges; metadata never covers the media until requested.
-        AnimatedVisibility(visible=active && controls && !videoPlaying && editingVideo==null && !reading && !information,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
+        AnimatedVisibility(visible=active && controls && (!videoPlaying || autoplay) && editingVideo==null && !reading && !information,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.45f),Color.Transparent)))
                 .statusBarsPadding().padding(start=20.dp,end=12.dp,top=8.dp,bottom=24.dp)) {
                 if(close!=null) GalleryTextButton(onClick={touch();close()},modifier=Modifier.align(Alignment.CenterStart),
@@ -190,21 +191,20 @@ import java.io.File
                 }
             }
         }
-        AnimatedVisibility(visible=active && controls && !videoPlaying && editingVideo==null && !reading && !information && !hint,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
+        AnimatedVisibility(visible=active && controls && (!videoPlaying || autoplay) && editingVideo==null && !reading && !information && !hint,modifier=Modifier.align(Alignment.BottomCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
             Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.62f))))
                 .navigationBarsPadding().padding(start=24.dp,end=20.dp,top=40.dp,bottom=bottomInset),verticalAlignment=Alignment.CenterVertically) {
-                Row(Modifier.fillMaxWidth().heightIn(min=48.dp)
+                // Independent targets: the reader must not compete with a clickable parent.
+                Column(Modifier.weight(1f).heightIn(min=48.dp)
                     .clickable(interactionSource=remember{MutableInteractionSource()},indication=null,role=Role.Button,onClick={touch();if(discovery!=null) details() else information=true})
                     .semantics{contentDescription=if(discovery!=null) "打开档案：${a.name}" else "资料"}
-                    .padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                        Text(a.name,color=Color.White,fontSize=22.sp,fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(archiveState.library.archiveSummary(a).ifBlank{if(discovery!=null) "查看档案" else "查看资料"},color=Color.White.copy(alpha=.72f),fontSize=13.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    if(archiveNote!=null)TextButton(onClick={touch();reading=true}){Text("阅读文字",color=Color.White)}
-                    else FrameGlyph("展开",Color.White.copy(alpha=.8f))
+                    .padding(vertical=8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    Text(a.name,color=Color.White,fontSize=22.sp,fontWeight=FontWeight.SemiBold,maxLines=2,overflow=TextOverflow.Ellipsis)
+                    Text(archiveState.library.archiveSummary(a).ifBlank{if(discovery!=null) "查看档案" else "查看资料"},color=Color.White.copy(alpha=.72f),fontSize=13.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
                 }
+                Spacer(Modifier.width(8.dp))
+                if(archiveNote!=null)TextButton(onClick={touch();reading=true}){Text("阅读文字",color=Color.White)}
+                else FrameGlyph("展开",Color.White.copy(alpha=.8f))
             }
         }
 

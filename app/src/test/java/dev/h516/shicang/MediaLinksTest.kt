@@ -31,4 +31,20 @@ class MediaLinksTest {
     @Test fun mediaSizeLimitIsCheckedBeforeEnqueue() {
         assertThrows(IllegalArgumentException::class.java){MediaLinks.read("""{"media":[{"url":"https://example.com/large.jpg","kind":"image","bytes":1073741824}]}""")}
     }
+    @Test fun commonSocialShareTextsRetainThePostAndQueryTokens() {
+        val social=listOf(
+            "图片分享 https://xhslink.cn/o/AbCd123 复制后打开小红书" to "https://xhslink.cn/o/AbCd123",
+            "复制口令 https://xhslink.com/a/Example2?xsec_token=synthetic" to "https://xhslink.com/a/Example2?xsec_token=synthetic",
+            "抖音 https://v.douyin.com/Synthetic01/ 分享" to "https://v.douyin.com/Synthetic01/",
+            "快手 https://v.kuaishou.com/Synthetic02 分享" to "https://v.kuaishou.com/Synthetic02",
+            "微博 https://weibo.com/12345/AbCd" to "https://weibo.com/12345/AbCd",
+            "哔哩哔哩 https://www.bilibili.com/video/BVsynthetic" to "https://www.bilibili.com/video/BVsynthetic")
+        social.forEach{(input,expected)->assertEquals(expected,MediaLinks.validUrl(input))}
+    }
+    @Test fun failedRemoteDownloadExplainsRetryWithoutMarkingItComplete() {
+        assertTrue(mediaDownloadFailure(403).contains("验证"))
+        assertTrue(mediaDownloadFailure(404).contains("过期"))
+        assertTrue(mediaDownloadFailure(429).contains("稍后"))
+        assertTrue(mediaDownloadFailure(android.app.DownloadManager.ERROR_INSUFFICIENT_SPACE).contains("存储"))
+    }
 }

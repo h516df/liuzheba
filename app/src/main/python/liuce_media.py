@@ -21,6 +21,28 @@ class QuietLogger:
     def error(self, *_): pass
 
 
+def xhs_album(note, note_id):
+    """Return every image in a photo note, not the cover used by video notes."""
+    images = note.get('imageList') or note.get('image_list') or []
+    if not images or note.get('type') == 'video' or (note.get('type') != 'normal' and 'video' in note):
+        return None
+    entries = []
+    for image in images:
+        options = image.get('infoList') or image.get('info_list') or []
+        address = image.get('urlDefault') or image.get('url_default')
+        if not address:
+            address = next((item.get('url') for item in options
+                            if item.get('imageScene') in ('WB_DFT', 'WB_PRV') and item.get('url')), None)
+        if not address:
+            address = next((item.get('url') for item in options if item.get('url')), None)
+        if address:
+            entries.append({'url': address, 'kind': 'image', 'ext': 'jpg'})
+    if not entries:
+        raise ExtractorError('No album images available', expected=True)
+    return {'id': note_id, 'title': note.get('title') or note.get('desc') or '小红书图集',
+            '_type': 'liuce_album', 'media': entries}
+
+
 class LiuceXhsIE(XiaoHongShuIE):
     IE_NAME = "liuce:xiaohongshu"
 
@@ -30,17 +52,13 @@ class LiuceXhsIE(XiaoHongShuIE):
         state = self._search_json(r'window\.__INITIAL_STATE__\s*=', webpage,
                                   'initial state', note_id, transform_source=js_to_json)
         note = traverse_obj(state, ('note', 'noteDetailMap', note_id, 'note')) or {}
-        if note.get('type') == 'normal' or (note.get('imageList') and not note.get('video')):
-            entries = []
-            for image in note.get('imageList', []):
-                address = image.get('urlDefault') or next((item.get('url') for item in image.get('infoList', [])
-                                                        if item.get('imageScene') == 'WB_DFT'), None)
-                if address:
-                    entries.append({'url': address, 'kind': 'image', 'ext': 'jpg'})
-            if not entries:
-                raise ExtractorError('No album images available', expected=True)
-            return {'id': note_id, 'title': note.get('title') or note.get('desc') or '小红书图集',
-                    '_type': 'liuce_album', 'media': entries}
+        if not note:
+            details = traverse_obj(state, ('note', 'noteDetailMap')) or {}
+            note = next((item.get('note') for item in details.values()
+                         if isinstance(item, dict) and (item.get('note') or {}).get('noteId') == note_id), {})
+        album = xhs_album(note, note_id)
+        if album:
+            return album
         return super()._real_extract(url)
 
 
@@ -85,13 +103,16 @@ def flatten_info(info, limit=100):
         return media
     # Choose a single self-contained HTTP video. No transcoding or silent audio loss.
     formats = [fmt for fmt in info.get('formats', [])
-               if fmt.get('url') and fmt.get('protocol', urlparse(fmt.get('url', '')).scheme).startswith('http')
+               if fmt.get('url') and fmt.get('protocol', urlparse(fmt.get('url', '')).scheme) in ('http', 'https')
                and fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none'
                and fmt.get('ext') in ('mp4', 'webm', 'mov')]
-    selected = max(formats, key=lambda f: (f.get('height') or 0, f.get('tbr') or 0, f.get('filesize') or 0)) if formats else info
+    direct = (info if info.get('url') and info.get('ext') in ('mp4', 'webm', 'mov')
+              and info.get('protocol', urlparse(info['url']).scheme) in ('http', 'https')
+              and info.get('vcodec') != 'none' and info.get('acodec') != 'none' else None)
+    selected = max(formats, key=lambda f: (f.get('height') or 0, f.get('tbr') or 0, f.get('filesize') or 0)) if formats else direct or {}
     address = selected.get('url')
     protocol = selected.get('protocol', 'https')
-    if not address or not protocol.startswith('http'):
+    if not address or protocol not in ('http', 'https'):
         raise ExtractorError('No self-contained downloadable media format', expected=True)
     return [{'url': address, 'kind': 'video', 'ext': selected.get('ext') or 'mp4',
              'bytes': selected.get('filesize') or selected.get('filesize_approx') or 0,
@@ -105,13 +126,13 @@ def resolve(url, browser_cookies=''):
                'cachedir': False, 'playlistend': 100}
     with YoutubeDL(options) as ydl:
         host = urlparse(url).hostname or ''
-        cookie_host = 'www.douyin.com' if 'douyin.com' in host else 'www.xiaohongshu.com' if 'xhslink.com' in host else host
+        cookie_host = 'www.douyin.com' if host in ('v.douyin.com', 'www.douyin.com', 'douyin.com') else 'www.xiaohongshu.com' if host in ('xhslink.com', 'www.xhslink.com', 'xhslink.cn') else host
         for part in browser_cookies.split(';'):
             if '=' in part:
                 name, value = part.strip().split('=', 1)
                 ydl.cookiejar.set_cookie(Cookie(0, name, value, None, False, cookie_host, False,
                                                 False, '/', True, True, None, True, None, None, {}))
-        if host in ('v.douyin.com', 'xhslink.com') or host.endswith('.xhslink.com'):
+        if host in ('v.douyin.com', 'xhslink.com', 'xhslink.cn') or host.endswith('.xhslink.com'):
             with ydl.urlopen(url) as response:
                 url = response.url
         parsed = urlparse(url)

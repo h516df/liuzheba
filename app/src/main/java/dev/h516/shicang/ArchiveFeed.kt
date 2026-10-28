@@ -1,7 +1,7 @@
 package dev.h516.shicang
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.*
@@ -10,7 +10,12 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -19,7 +24,8 @@ import kotlinx.coroutines.launch
     archives:List<Archive>, initial:String, model:AppModel, appearance:Appearance,
     positions:Map<String,String>, rememberPhoto:(String,String)->Unit, selected:(String)->Unit,
     library:()->Unit, details:(String)->Unit, photos:(String)->Unit,
-    settings:()->Unit, edit:(Archive)->Unit, create:()->Unit, busy:Boolean, enabled:Boolean=true,close:(()->Unit)?=null
+    settings:()->Unit, edit:(Archive)->Unit, create:()->Unit, busy:Boolean, enabled:Boolean=true,
+    close:(()->Unit)?=null,autoplay:Boolean=false,navigationInset:Dp=0.dp
 ) {
     val ids=archives.filter { it.deleted == 0L }.map {it.id}
     val prefs=LocalContext.current.getSharedPreferences("device",0)
@@ -64,6 +70,7 @@ import kotlinx.coroutines.launch
             ?: preview?.id.orEmpty()
         // A new mode/availability must reset the horizontal pager; recomposition must not.
         key(seed,index,random,available?.map{it.id}) {
+            Box(Modifier.fillMaxSize()) {
             FullPhotoFrame(archive,model,appearance,shown,
                 {photo->
                     if(enabled && index==pager.settledPage && !pager.isScrollInProgress) {
@@ -74,7 +81,13 @@ import kotlinx.coroutines.launch
                 if(index>0) ({scope.launch{pager.animateScrollToPage(index-1)};Unit}) else null,
                 library,{details(archive.id)},{photos(archive.id)},settings,{edit(source)},create,busy,
                 close=close,active=enabled && index==pager.settledPage && !pager.isScrollInProgress,
-                onPagingAllowed={if(index==pager.settledPage) gestureEnabled=it},discovery=actions)
+                onPagingAllowed={if(index==pager.settledPage) gestureEnabled=it},discovery=actions,
+                autoplay=autoplay,navigationInset=navigationInset)
+            if(available!=null && available!!.size<source.photos.size) Text("原件不可用",
+                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top=76.dp)
+                    .background(Color.Black.copy(alpha=.67f)).padding(horizontal=12.dp,vertical=7.dp),
+                color=Color.White,fontWeight=FontWeight.Medium)
+            }
         }
     }
 }

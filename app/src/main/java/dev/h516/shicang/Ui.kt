@@ -125,7 +125,8 @@ private val Muted: Color
             HashMap<String,String>().apply{saved.keys().asSequence().take(200).forEach{key->val value=saved.optString(key);if(Codec.validId(key) && Codec.validId(value))put(key,value)}}
         }.getOrDefault(hashMapOf()))}
         val mediaActive=!collectMenu && !appearanceOpen && !s.authorsOpen && noteEditing==null && !s.downloadsOpen && s.exportRequest==null && s.shares.isEmpty() && s.protectionSelection==null && confirm==null
-        val immersive=unlocked && s.ready && !editing && zoomPhoto.isNotEmpty()
+        val discovering=unlocked && s.ready && !editing && route=="frame" && zoomPhoto.isEmpty()
+        val immersive=unlocked && s.ready && !editing && (zoomPhoto.isNotEmpty() || discovering)
         DisposableEffect(immersive,dark) {
             val window=(context as? android.app.Activity)?.window
             val bars=window?.let {androidx.core.view.WindowCompat.getInsetsController(it,it.decorView)}
@@ -181,7 +182,7 @@ private val Muted: Color
             }
         }
         BackHandler(enabled=editing || route!="library" || zoomPhoto.isNotEmpty()) {backPage()}
-        Scaffold(containerColor=scheme.background,contentWindowInsets=if(immersive) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets,snackbarHost={if(unlocked) Box(Modifier.padding(bottom=if(immersive) 96.dp else 0.dp)){SnackbarHost(snackbar)}},
+        Scaffold(containerColor=scheme.background,contentWindowInsets=if(immersive) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets,snackbarHost={if(unlocked && !immersive) SnackbarHost(snackbar)},
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
@@ -213,7 +214,7 @@ private val Muted: Color
                     }
                 }
                 if(s.busy){LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(horizontal=24.dp,vertical=4.dp),fontSize=12.sp);if(s.progress.contains("备份")||s.progress.contains("恢复")||s.progress.contains("导入")||s.progress.contains("打包")||s.progress.contains("写入")) GalleryTextButton(onClick=model::cancelOperation){Text("取消")}}}
-             }},bottomBar={if(!editing && zoomPhoto.isEmpty() && route in listOf("frame","library") && unlocked && s.ready) {
+            }},bottomBar={if(!editing && !discovering && zoomPhoto.isEmpty() && route=="library" && unlocked && s.ready) {
                 GalleryTabBar(route){destination->route=destination;settingsReturn="library";settingsPhoto=""}
             }}) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
@@ -225,7 +226,8 @@ private val Muted: Color
 
                     route=="frame" && !editing && zoomPhoto.isEmpty()->{
                         libraryState.SaveableStateProvider("discovery") {
-                            DiscoveryScreen(model,s,::openDetails){a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()}
+                            DiscoveryScreen(model,s,positions,::rememberPhoto,::openDetails,::openPhotos,
+                                {appearanceOpen=true},{route="library"},enabled=mediaActive)
                         }
                     }
                     route=="photos"->libraryState.SaveableStateProvider("photos:$selected") {val a=s.library.active.firstOrNull{it.id==selected}
@@ -258,6 +260,13 @@ private val Muted: Color
                     }
                     else LaunchedEffect(Unit){zoomPhoto=""}
 
+                }
+                if(discovering) Box(Modifier.align(Alignment.BottomCenter)) {
+                    GalleryTabBar("frame",immersive=true){destination->route=destination;settingsReturn="library";settingsPhoto=""}
+                }
+                // In a full-screen viewer, feedback must not obscure the title, reader or player controls.
+                if(immersive) Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).statusBarsPadding().padding(top=84.dp)) {
+                    SnackbarHost(snackbar)
                 }
             }
         }

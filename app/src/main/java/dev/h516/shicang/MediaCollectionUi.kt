@@ -1,6 +1,7 @@
 package dev.h516.shicang
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -56,6 +57,16 @@ import coil3.compose.AsyncImage
 
 @Composable private fun DownloadSheet(model:AppModel,s:AppState) {
     val context=LocalContext.current
+    val browser=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if(result.resultCode==Activity.RESULT_OK) {
+            result.data?.dataString?.let {url->
+                if(runCatching{MediaLinks.validUrl(url)}.getOrNull()==url) {
+                    model.downloadInput(url)
+                    model.resolveMedia()
+                }
+            }
+        }
+    }
     var target by remember {mutableStateOf<List<MediaDownload>?>(null)}
     val plan=s.mediaPlan
     var selection by remember(plan) {mutableStateOf(plan?.items?.indices?.toSet() ?: emptySet())}
@@ -71,8 +82,8 @@ import coil3.compose.AsyncImage
                             GalleryButton(onClick=model::resolveMedia,enabled=!s.resolving && s.downloadInput.isNotBlank()) {Text(if(s.resolving) "正在解析…" else "解析链接")}
                             if(s.downloadInput.isNotBlank()) GalleryTextButton(onClick={
                                 val url=runCatching{MediaLinks.validUrl(s.downloadInput)}.getOrNull()
-                                if(url!=null)context.startActivity(Intent(context,MediaBrowserActivity::class.java).putExtra("url",url))
-                            }){Text("打开网页")}
+                                if(url!=null)browser.launch(Intent(context,MediaBrowserActivity::class.java).putExtra("url",url))
+                            }){Text("打开网页验证")}
                         }
                         if(s.resolving) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top=8.dp))
                         if(s.downloadError.isNotBlank()) Text(s.downloadError,Modifier.padding(top=8.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
@@ -108,6 +119,7 @@ import coil3.compose.AsyncImage
                             val draft=s.library.drafts.firstOrNull{it.id==job.archiveId && s.library.active.none{a->a.id==job.archiveId}}
                             val status=if(job.state=="已收录" && draft!=null) "已存为草稿" else job.state
                             Text("${if(job.kind=="video")"视频" else "图片"} · $status${if(job.state=="下载中") " ${job.percent}%" else ""}",Modifier.padding(top=4.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
+                            if(job.failure.isNotBlank()) Text(job.failure,Modifier.padding(top=4.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                             if(job.state in listOf("下载中","等待网络","等待下载")) LinearProgressIndicator(progress={job.percent/100f},modifier=Modifier.fillMaxWidth().padding(top=8.dp))
                             Row {
                                 if(draft!=null)GalleryTextButton(onClick={model.closeDownloads();model.edit(draft)},enabled=!s.busy){Text("继续完成收录")}
@@ -118,7 +130,7 @@ import coil3.compose.AsyncImage
                         }
                     }
                     if(s.busy)item{LinearProgressIndicator(Modifier.fillMaxWidth());Text(s.progress,style=MaterialTheme.typography.bodySmall)}
-                    item {Text("部分平台需在网页中完成登录或验证。也可从其他 App 直接分享图片、视频到留着吧。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
+                    item {Text("小红书图文请使用作品分享链接。若解析失败，点「打开网页验证」，在网页完成验证后点「返回并解析当前网页」。平台可能限制部分作品的下载；也可从其他 App 直接分享图片、视频到留着吧。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
                 }
             }
         }

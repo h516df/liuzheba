@@ -125,8 +125,8 @@ class DeviceAcceptanceTest {
         store.save(archive)
         start()
         click("发现")
-        click("浏览合成设备视频的照片与视频")
-        click("播放视频")
+        // Discover now opens the full-screen swipe feed directly and auto-plays its video.
+        await("discovery starts the visible video") { onMain { player() != null } }
         await("video decoder ready", 20000) {
             onMain { player()?.let { it.playbackState == Player.STATE_READY && it.playerError == null } == true }
         }
@@ -162,7 +162,15 @@ class DeviceAcceptanceTest {
         val note=LongNote("archive",archive.id,body="这份档案同时包含横屏、竖屏视频和文字。")
         store.saveNote(note,null,store.generationToken)
         prefs.edit().putBoolean("discoveryRandomMedia",false).commit()
-        start();click("发现");click("浏览合成横竖视频档案的照片与视频");click("播放视频")
+        start();click("发现")
+        await("discovery starts the portrait video") { onMain { player() != null } }
+        // Exercise advanced editing/player controls in the dedicated media viewer.
+        // Discover is intentionally a minimal swipe experience with fading playback chrome.
+        click("更多");click("全部媒体");click("查看第1项照片或视频")
+        val resumeOrPlay = waitNode("portrait playback button") {
+            it.text?.toString()?.let { label -> label == "播放视频" || label.startsWith("继续播放 · ") } == true
+        }
+        click(resumeOrPlay)
         await("portrait decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.height>it.videoSize.width}==true}}
         click("横屏观看")
         await("manual landscape layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE}
