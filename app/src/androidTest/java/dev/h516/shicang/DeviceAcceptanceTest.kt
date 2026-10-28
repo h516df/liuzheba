@@ -171,8 +171,10 @@ class DeviceAcceptanceTest {
         click("横屏观看")
         await("manual landscape layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE}
         await("rotation keeps the same video"){onMain{player()?.videoSize?.height ?: 0}>0}
+        revealVideoControls("恢复方向")
         click("恢复方向")
         await("restored portrait layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT}
+        revealVideoControls("暂停")
         click("暂停");val paused=onMain{checkNotNull(player()).currentPosition}
         click("阅读文字");waitText(note.body)
         assertNull(onMain{player()})
