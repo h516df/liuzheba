@@ -307,7 +307,7 @@ class AppModel(app: Application): AndroidViewModel(app) {
         draftJob?.cancel()
         // Keep the editor available on failure; leaving must not discard the debounce window.
         val text=editorTextFor(a)
-        work("保存编辑草稿") {store.draft(a,text);mutable.value=mutable.value.copy(editor=null,archiveText=null,draftStatus="草稿已保存")}
+        work("保存编辑草稿") {store.draft(a,text);mutable.value=mutable.value.copy(editor=null,archiveText=null,draftStatus="草稿已保存");message("编辑已存为草稿，档案尚未更新")}
     }
     fun discardEditor() {invalidateTagSuggestions();val a=mutable.value.editor ?: return;draftJob?.cancel();val text=editorTextFor(a);work("放弃编辑") {store.discard(a.id,text);mutable.value=mutable.value.copy(editor=null,archiveText=null)} }
     fun saveEditor() {invalidateTagSuggestions();val a=mutable.value.editor ?: return;draftJob?.cancel();val text=editorTextFor(a);work("保存资料") {store.save(a,text);mutable.value=mutable.value.copy(editor=null,archiveText=null);message("已保存「${a.name.trim()}」")} }

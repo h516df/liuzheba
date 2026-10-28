@@ -1,3 +1,23 @@
+# 当前接续：0.19 正式覆盖更新（2026-10-28，发布前）
+
+- **用户目标与设备起点**：用户指出仅保留Draft PR不能在真实手机试用；其当前手机仍安装0.17。要求将已完成的界面/交互改动公开发布到GitHub，使其使用原签名同包名APK直接覆盖升级，而不是安装debug、卸载或清除资料。
+- **已核实基线**：仓库当前latest为正式v0.18/code19，main源`50287d5743a287c23153a4ed4b82be5d36447319`，其原证书和0.16→0.18模拟器升级验收见下方。PR [#41](https://github.com/h516df/liuzheba/pull/41)的0.18交互代码head`6341011c5600ecac42a498cc5935473507edf8a9`，四个同源Actions全部success，原生API35 8/8、宿主303/303，未在用户手机验收；此head没有发布APK。
+- **当前0.19准备**：沿`ux/daily-flow-clarity`续接，版本改为0.19/code20，配套`release-notes.json`、`docs/releases/v0.19.md`及设置页说明断言；保持`dev.h516.shicang`、原证书、SQLite schema1、备份format6和媒体原件处理代码不变。新一轮精确代码测试、PR合并、main推送检查及受保护发行均尚未完成，不能把0.19候选说成已发行。
+- **安全发行路径**：更新PR后待Cloud development、Android device checks、Secret checks同源通过，使用受保护主线正常合并，再等待精确main push checks通过；`production-release.yml`只接受main完整SHA。流水线必须完成原证书签名和官方0.16→0.19模拟器真实安装/导出资料比对，发布后三资产、latest/标签/摘要回读一致才告知用户下载。不会上传私有数据、替换0.17/0.18资产或把verification包当正式包。用户手机的0.17→0.19及其私人资料最终仍只能由用户实际确认。
+- **检查进度**：发布策略Python 23/23通过，JSON解析与`git diff --check`通过；0.19源码`compileDebugKotlin -Pkotlin.incremental=false`成功，`EmbeddedReleaseNotesTest`与`ArchiveUiSnapshotTest.finalReleaseNotesOpenFromSettings`定向通过。当前机器的Kotlin增量缓存因更改BuildConfig触发重复声明假错误，关闭增量编译后通过；这不是发布阻塞理由，但最终依照干净的GitHub CI重新验证。远端检查待运行，通过后在此更新同源SHA和结果。已核实当前无v0.19 Release或Git标签。
+
+---
+
+# 当前接续：日常使用体验第一批（2026-10-28）
+
+- **用户反馈与目标**：保留「留着吧」继续开发。重点不是增加功能，而是界面、交互和操作逻辑不顺手；本批先解决能在代码和合成截图中明确复现的入口歧义与多余步骤。尚未得到实体手机上的主观体验确认。
+- **基线与分支**：基于`main`的`50287d5`，独立分支`ux/daily-flow-clarity`、[Draft PR #41](https://github.com/h516df/liuzheba/pull/41)，远端源码提交`4c849ea2c3b549565ddae78f1a8aee7ca8d1eb94`，树`092895769c78a1ded347a195c679e3505f2b0803`。保持原`applicationId`、正式签名、SQLite schema1、备份format6以及媒体原件处理机制，未修改正式版本号；本批不合并、不签名、不发布。
+- **改动**：顶栏「收录」改「添加」，添加面板直接列出新建档案、相册、拍照、保存链接、下载链接媒体五种动作，取消链接二级面板；档案页排序与高级搜索分开，列表切换补充明确无障碍标签；仅一份档案时取消无效的刷新，多份时「换个顺序」必然改变排序；设置入口使用齿轮和「设置」名称；常规底部导航去掉大型悬浮胶囊；编辑页移除常驻草稿提示，但保留自动草稿保存、失败警示与返回后的“尚未更新档案”反馈。
+- **检查**：已用项目隔离JDK21、SDK36和Gradle9.1编译`compileDebugKotlin`、`compileDebugAndroidTestKotlin`成功。定向Compose宿主回归32项通过；全量首次303项中302项通过、唯一旧常驻草稿提示断言不匹配，修正测试后最终全量重新运行，**303/303，59 suites，零失败/错误/跳过**。本地截图已检查常规底栏和添加面板。PR初次云端`Android checks`的`Existing feature validation`失败原因是Runner缺少Chaquopy需要的Python 3.12（尚未进入业务测试）；已为其与原生设备工作流都加固定Python3.12准备步骤，需检查新提交。API35设备与真实手机仍待验证，不能称作正式覆盖升级验收。
+- **交付待办**：已推送并开Draft PR，等待同源 GitHub Actions 检查及 Android 原生验证；请以最新远端PR/提交为准，不用本地临时路径或历史0.18回执冒充本批结果。用户体验复核后再挑下一批编辑器和阅读流程，避免一次性大改导致难以定位回归。
+
+---
+
 # 0.18已发布与最终交接（2026-10-23）
 
 - **正式0.18/code19已公开发布为latest**：[Release](https://github.com/h516df/liuzheba/releases/tag/v0.18)，源码/标签固定在`fcd10904f9e169753c116773788fe22f79e14bd0`，APK、更新说明、校验文件均匿名下载并核对大小/摘要。原包名`dev.h516.shicang`、原证书`67127caf5a760d51f11dc5a2fadcf44ddc30ce836fa14ffb9efd96c4b7e95a26`、arm64-v8a/x86_64、内外更新说明一致。APK SHA256`31b3c046fabd61933c5fbe1b8fa3f0bd6c7da680be3f6a3735d9279c6489910f`，105700012字节；此安装包与已发布0.17资产均不覆盖。

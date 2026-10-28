@@ -382,7 +382,7 @@ class DeviceAcceptanceTest {
         store.save(archive)
         val before = store.load()
         start()
-        click("我的")
+        click("设置")
         clickScrolling("备份与恢复")
         clickScrolling("导出备份文件（换机或留存）")
         click("确认")

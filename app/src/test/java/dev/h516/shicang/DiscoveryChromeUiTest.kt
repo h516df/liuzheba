@@ -65,6 +65,12 @@ class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
         assertTrue(model.state.value.library.drafts.isEmpty())
         assertTrue(model.state.value.library.noteDrafts.isEmpty())
     }
+
+    @Test fun aSingleArchiveDoesNotOfferARefreshThatCannotChangeAnything()=fixture {_,_->
+        compose.onNodeWithTag("nav-frame").performClick()
+        compose.onNodeWithText("你的收藏").assertExists()
+        compose.onNodeWithText("换个顺序").assertDoesNotExist()
+    }
 }
 
 /** A fake player verifies control geometry only, without claiming codec playback. */

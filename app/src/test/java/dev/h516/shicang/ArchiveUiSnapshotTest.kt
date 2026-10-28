@@ -39,10 +39,10 @@ class ArchiveUiSnapshotTest {
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于与检查更新"))
         compose.onNodeWithText("关于与检查更新").performClick()
         compose.onNodeWithText("检查更新").assertExists()
-        compose.onNodeWithText("本版说明 0.18").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("本版说明 0.19").performScrollTo().assertIsDisplayed()
         val notes=model.updater.currentNotes()!!
-        org.junit.Assert.assertEquals("0.18",notes.version)
-        org.junit.Assert.assertEquals(19,notes.code)
+        org.junit.Assert.assertEquals("0.19",notes.version)
+        org.junit.Assert.assertEquals(20,notes.code)
         notes.sections.flatMap{it.second}.forEach {line->
             compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
         }
@@ -95,8 +95,7 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun localAiOptInCanCancelWithoutDownloading()=render("local-ai-opt-in",verify={model->
         compose.onNodeWithText("按意思找 · AI").assertDoesNotExist()
-        compose.onNodeWithText("显示").performClick()
-        compose.onNodeWithText("搜索选项").performClick()
+        compose.onNodeWithText("高级搜索").performClick()
         compose.onNodeWithText("按意思找 · AI").performClick()
         compose.onNodeWithText("下载 / 校验本机 AI 模型").performClick()
         compose.onNodeWithText("下载本机中文语义模型？").assertExists()
@@ -108,8 +107,7 @@ class ArchiveUiSnapshotTest {
     @Test fun cancelledRuleDraftDoesNotRewriteLibrary()=render("search-rules-cancel",verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
-        compose.onNodeWithText("显示").performClick()
-        compose.onNodeWithText("搜索选项").performClick()
+        compose.onNodeWithText("高级搜索").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("旧回忆")
         compose.onNodeWithText("对应的原名称或关键词").performTextInput("一封旧信")
@@ -122,8 +120,7 @@ class ArchiveUiSnapshotTest {
     @Test fun rulesBackDiscardsDraft()=render("search-rules-back",verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
-        compose.onNodeWithText("显示").performClick()
-        compose.onNodeWithText("搜索选项").performClick()
+        compose.onNodeWithText("高级搜索").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performTextInput("不保存")
         compose.onNodeWithContentDescription("返回").performClick()
@@ -143,8 +140,7 @@ class ArchiveUiSnapshotTest {
     fun narrowRulesSaveOnlyOnExplicitAction()=render("rules-320-font200",fontScale=2f,verify={model->
         val before=model.state.value.library
         compose.onNodeWithText("定制规则").assertDoesNotExist()
-        compose.onNodeWithText("显示").performClick()
-        compose.onNodeWithText("搜索选项").performClick()
+        compose.onNodeWithText("高级搜索").performClick()
         compose.onNodeWithText("定制规则").performClick()
         compose.onNodeWithText("我习惯搜的词").performScrollTo().performTextInput("旧回忆")
         compose.onNodeWithText("对应的原名称或关键词").performScrollTo().performTextInput("一封旧信")

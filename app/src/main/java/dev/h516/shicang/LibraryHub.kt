@@ -27,22 +27,16 @@ import kotlinx.coroutines.withContext
 }
 
 @Composable internal fun CollectionSheet(close:()->Unit,photos:()->Unit,camera:()->Unit,archive:()->Unit,link:()->Unit,download:()->Unit) {
-    var links by rememberSaveable{mutableStateOf(false)}
     ModalBottomSheet(onDismissRequest=close,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),
         containerColor=MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text(if(links) "收录链接" else "收录",style=MaterialTheme.typography.headlineMedium)
+            Text("添加内容",style=MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
-            if(links) {
-                CollectionAction("保存链接到档案","保留来源，保存前可以编辑",link)
-                CollectionAction("从链接下载媒体","下载完成后选择收录位置",download)
-                GalleryTextButton(onClick={links=false},modifier=Modifier.fillMaxWidth()){Text("返回收录方式")}
-            } else {
-                CollectionAction("照片或视频","从系统相册选择",photos)
-                CollectionAction("拍照","记录眼前这一刻",camera)
-                CollectionAction("链接","保存来源或下载媒体",{links=true})
-                CollectionAction("文字档案","一个名字也可以开始",archive)
-            }
+            CollectionAction("新建档案","先写名称或文字，照片可以以后再加",archive)
+            CollectionAction("从相册添加","选择照片或视频，再决定放进哪份档案",photos)
+            CollectionAction("拍照添加","拍照后选择保存到哪份档案",camera)
+            CollectionAction("保存链接","把网址或分享文字保存到档案",link)
+            CollectionAction("下载链接媒体","下载完成后选择档案",download)
             GalleryTextButton(onClick=close,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("取消")}
             Spacer(Modifier.height(16.dp))
         }

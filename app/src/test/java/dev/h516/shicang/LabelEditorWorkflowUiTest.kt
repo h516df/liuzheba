@@ -69,7 +69,7 @@ class LabelEditorWorkflowUiTest:UnifiedNavigationFixture() {
         model.edit(a);idle{model.state.value.editor!=null}
         compose.onNodeWithContentDescription("编辑选项").assertIsDisplayed()
         compose.onNodeWithText("保存").assertIsDisplayed()
-        compose.onNodeWithText("返回保留草稿",substring=true).assertIsDisplayed()
+        compose.onNodeWithText("返回保留草稿",substring=true).assertDoesNotExist()
         screenshot("editor-large-text")
         compose.onNodeWithText("收起可选资料").performScrollTo().performClick()
         compose.onNodeWithText("旧备注").assertDoesNotExist()

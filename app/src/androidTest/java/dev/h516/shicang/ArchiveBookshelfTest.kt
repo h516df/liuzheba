@@ -37,9 +37,9 @@ class ArchiveBookshelfTest {
         fun shot(name:String){if(name!="failure"){i.waitForIdleSync();ui.waitForIdle(300,5000)};val bitmap=ui.takeScreenshot()!!;File(out,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
         fun back(){val at=SystemClock.uptimeMillis();check(ui.injectInputEvent(KeyEvent(at,at,KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_BACK,0),true));check(ui.injectInputEvent(KeyEvent(at,SystemClock.uptimeMillis(),KeyEvent.ACTION_UP,KeyEvent.KEYCODE_BACK,0),true));Thread.sleep(500)}
         try {
-            wait("4 份档案");wait("我的");shot("wall")
-            search("不存在");wait("没有匹配的档案");wait("我的");shot("no-results");click("清除搜索与筛选");wait("4 份档案")
-            click("筛选");wait("筛选档案");click("日常收藏");click("完成");wait("2 份档案");wait("我的");shot("filtered")
+            wait("4 份档案");wait("设置");shot("wall")
+            search("不存在");wait("没有匹配的档案");wait("设置");shot("no-results");click("清除搜索与筛选");wait("4 份档案")
+            click("筛选");wait("筛选档案");click("日常收藏");click("完成");wait("2 份档案");wait("设置");shot("filtered")
             click("移除分类筛选");wait("4 份档案")
             click("筛选");wait("筛选档案");click("日常收藏");back();wait("4 份档案")
             click("列表");wait("封面");shot("list")

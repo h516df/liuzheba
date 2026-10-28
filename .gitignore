@@ -1,5 +1,6 @@
 # Build and local SDK configuration
 .gradle/
+.gradle-home/
 .kotlin/
 local.properties
 **/build/

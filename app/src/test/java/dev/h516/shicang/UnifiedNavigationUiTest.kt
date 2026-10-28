@@ -101,7 +101,7 @@ class UnifiedLibraryReturnUiTest:UnifiedNavigationFixture() {
 
 class UnifiedBackupLargeTextUiTest:UnifiedNavigationFixture() {
     @Test fun singleBackupDestinationAtTwoHundredPercent()=fixture(font=2f) {_,_->
-        compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithText("我的").assertExists()
+        compose.onNodeWithTag("nav-settings").performClick();compose.onNodeWithText("设置").assertExists()
         screenshot("mine-font200")
         compose.onNodeWithText("资料与备份").assertDoesNotExist()
         compose.onNodeWithText("自动保护 · 未开启").assertDoesNotExist()
@@ -120,7 +120,7 @@ class UnifiedBackupLargeTextUiTest:UnifiedNavigationFixture() {
         compose.onNodeWithText("撤销最近一次恢复").performScrollTo().assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText("暂无可撤销的恢复").assertIsDisplayed()
         screenshot("backup-font200")
-        compose.onNodeWithContentDescription("返回").performClick();compose.onNodeWithText("我的").assertExists()
+        compose.onNodeWithContentDescription("返回").performClick();compose.onNodeWithText("设置").assertExists()
     }
 }
 
@@ -162,8 +162,8 @@ class UnifiedKeyboardUiTest:UnifiedNavigationFixture() {
 
 class UnifiedCreateUiTest:UnifiedNavigationFixture() {
     @Test fun newArchiveShowsDistinctCreationAndOpensOnlyAfterSave()=fixture {model,_->
-        compose.onNodeWithContentDescription("收录").performClick()
-        compose.onNodeWithText("文字档案").performClick()
+        compose.onNodeWithContentDescription("添加内容").performClick()
+        compose.onNodeWithText("新建档案").performClick()
         compose.onNodeWithText("新建档案").assertExists()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("新建合成档案")
         compose.onNodeWithText("保存").performClick()

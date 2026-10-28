@@ -74,7 +74,7 @@ import androidx.compose.ui.semantics.semantics
     var recent by rememberSaveable{mutableStateOf(0L)}
     var semantic by rememberSaveable{mutableStateOf(false)}
     var filters by rememberSaveable{mutableStateOf(false)}
-    var displayMenu by remember{mutableStateOf(false)}
+    var sortMenu by remember{mutableStateOf(false)}
     val prefs=LocalContext.current.getSharedPreferences("device",0)
     val focus=androidx.compose.ui.platform.LocalFocusManager.current
     var covers by rememberSaveable{mutableStateOf(prefs.getBoolean("libraryCovers",true))}
@@ -116,13 +116,14 @@ import androidx.compose.ui.semantics.semantics
         FlowRow(Modifier.fillMaxWidth().padding(top=8.dp,bottom=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalArrangement=Arrangement.Center,itemVerticalAlignment=Alignment.CenterVertically) {
             Text(if(searching) "正在查找" else "${results.orEmpty().size} 份档案",(if(LocalDensity.current.fontScale>1.4f) Modifier.fillMaxWidth() else Modifier.weight(1f)).padding(end=8.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
             Box {
-                GalleryTextButton(onClick={displayMenu=true}){Text("显示")}
-                DropdownMenu(displayMenu,{displayMenu=false}) {
-                    DropdownMenuItem(text={Text(if(byName) "排序：按名称" else "排序：最近更新")},onClick={byName=!byName;displayMenu=false})
-                    DropdownMenuItem(text={Text(if(searchOptions) "收起选项" else "搜索选项")},onClick={searchOptions=!searchOptions;displayMenu=false})
+                GalleryTextButton(onClick={sortMenu=true}){Text(if(byName) "按名称排序" else "按最近更新")}
+                DropdownMenu(sortMenu,{sortMenu=false}) {
+                    DropdownMenuItem(text={Text("最近更新优先")},onClick={byName=false;sortMenu=false})
+                    DropdownMenuItem(text={Text("按名称排序")},onClick={byName=true;sortMenu=false})
                 }
             }
-            GalleryTextButton(onClick={covers=!covers;prefs.edit().putBoolean("libraryCovers",covers).apply()},contentPadding=PaddingValues(horizontal=8.dp)){
+            GalleryTextButton(onClick={searchOptions=!searchOptions}){Text(if(searchOptions) "收起高级搜索" else "高级搜索")}
+            GalleryTextButton(onClick={covers=!covers;prefs.edit().putBoolean("libraryCovers",covers).apply()},modifier=Modifier.semantics{contentDescription=if(covers) "切换到列表视图" else "切换到封面视图"},contentPadding=PaddingValues(horizontal=8.dp)){
                 Text(if(covers) "列表" else "封面",style=MaterialTheme.typography.labelMedium)
             }
         }
@@ -218,7 +219,7 @@ private fun openLink(context:Context,url:String,model:AppModel) {
                 }
                 GalleryButton(onClick=model::saveEditor,enabled=!s.busy,shape=RoundedCornerShape(20.dp),contentPadding=PaddingValues(horizontal=18.dp,vertical=8.dp)){Text(if(s.busy) "处理中" else "保存")}
             }
-            Text("${s.draftStatus.ifBlank{"正在保留草稿"}} · 返回保留草稿",Modifier.padding(horizontal=20.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
+            if(s.draftStatus=="草稿保存失败") Text("草稿未能自动保存，请检查存储空间；不要直接退出应用。",Modifier.padding(horizontal=20.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=c.error)
             if(s.message.isNotEmpty()) Row(Modifier.fillMaxWidth().background(c.surfaceVariant).padding(start=24.dp),verticalAlignment=Alignment.CenterVertically){Text(s.message,Modifier.weight(1f),fontSize=12.sp);GalleryTextButton(onClick=model::dismissMessage){Text("知道了",fontSize=12.sp)}}
             if(s.busy) {LinearProgressIndicator(Modifier.fillMaxWidth());Row(verticalAlignment=Alignment.CenterVertically){Text(s.progress,Modifier.weight(1f).padding(start=24.dp),fontSize=12.sp);GalleryTextButton(onClick=model::cancelOperation){Text("取消")}}}
             LazyColumn(Modifier.testTag("archive-editor-fields"),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=16.dp,bottom=24.dp)) {
