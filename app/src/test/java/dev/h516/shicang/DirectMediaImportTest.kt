@@ -214,6 +214,29 @@ class DirectMediaImportTest {
         assertTrue(downloads.list().all{it.state=="已收录"})
         assertNull(model.state.value.editor)
     }
+    @Test fun completedHistoryCleanupWaitsForFormalSaveAndPreservesPendingDownloads() {
+        val (downloads,jobs)=downloadedBatch()
+        val originalSource=sha(source)
+        // New collection is only a draft: its download record is the way back to finish it.
+        model.importDownloads(listOf(jobs.first()));await{!model.state.value.busy}
+        val draft=runBlocking{model.store.load()}.drafts.single()
+        assertEquals("已收录",downloads.list().first{it.id==jobs.first().id}.state)
+        assertEquals(emptyList<MediaDownload>(),completedDownloadRecords(downloads.list(),setOf(formal.id)))
+        model.clearCompletedDownloads();await{!model.state.value.busy}
+        assertEquals(2,downloads.list().size)
+        assertEquals(draft.id,model.state.value.editor?.id)
+        // After saving, only its completed history is disposable, not the other source.
+        model.saveEditor();await{!model.state.value.busy}
+        val saved=runBlocking{model.store.load()}.active.first{it.id==draft.id}
+        val savedMedia=saved.photos.single()
+        assertEquals(listOf(jobs.first().id),completedDownloadRecords(downloads.list(),setOf(formal.id,draft.id)).map{it.id})
+        model.clearCompletedDownloads();await{!model.state.value.busy}
+        assertEquals(listOf(jobs.last().id),downloads.list().map{it.id})
+        assertEquals("待收录",downloads.list().single().state)
+        assertEquals(originalSource,sha(source))
+        assertEquals(originalSource,sha(File(model.store.photoDir,savedMedia.file)))
+        assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
+    }
     @Test fun failedDownloadInBatchRemainsAvailableWhileSuccessfulItemIsLinked() {
         val (downloads,jobs)=downloadedBatch()
         org.robolectric.Shadows.shadowOf(app.contentResolver).registerInputStream(Uri.fromFile(downloads.file(jobs.first())),object:java.io.InputStream(){

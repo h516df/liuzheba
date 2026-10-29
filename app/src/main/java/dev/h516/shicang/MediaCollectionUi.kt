@@ -68,6 +68,8 @@ import coil3.compose.AsyncImage
         }
     }
     var target by remember {mutableStateOf<List<MediaDownload>?>(null)}
+    var confirmCleanup by remember {mutableStateOf(false)}
+    val completedCount=completedDownloadRecords(s.downloads,s.library.active.map{it.id}.toSet()).size
     val plan=s.mediaPlan
     var selection by remember(plan) {mutableStateOf(plan?.items?.indices?.toSet() ?: emptySet())}
     Dialog(onDismissRequest=model::closeDownloads,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {
@@ -107,6 +109,11 @@ import coil3.compose.AsyncImage
                         }
                     }
                     item {Text("下载记录",style=MaterialTheme.typography.titleMedium)}
+                    if(completedCount>0) item {
+                        GalleryTextButton(onClick={confirmCleanup=true},enabled=!s.busy) {
+                            Text("清理已收录记录（$completedCount）")
+                        }
+                    }
                     items(s.downloads.filter{it.state=="待收录"}.groupBy{it.source}.values.filter{it.size>1}.toList(),key={"batch-"+it.first().id}) {batch->
                         GalleryTonalButton(onClick={target=batch},enabled=!s.busy,modifier=Modifier.fillMaxWidth()) {
                             Text("收录同一来源的 ${batch.size} 项",style=MaterialTheme.typography.labelLarge)
@@ -136,4 +143,8 @@ import coil3.compose.AsyncImage
         }
     }
     target?.let{jobs->ArchiveTargetDialog("收录 ${jobs.size} 项到档案",s.library.active,s.busy,{target=null}){id->target=null;model.importDownloads(jobs,id)}}
+    if(confirmCleanup) GalleryAlertDialog(onDismissRequest={confirmCleanup=false},title={Text("清理下载记录？")},text={
+        Text("仅清理已保存到正式档案的 $completedCount 条记录，不删除档案内的原件。尚未完成的草稿、待收录媒体和下载任务都会保留。")
+    },confirmButton={GalleryButton(onClick={confirmCleanup=false;model.clearCompletedDownloads()},enabled=!s.busy && completedCount>0){Text("确认清理")}},
+        dismissButton={GalleryTextButton(onClick={confirmCleanup=false}){Text("取消")}})
 }

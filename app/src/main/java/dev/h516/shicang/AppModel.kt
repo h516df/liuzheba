@@ -221,6 +221,14 @@ class AppModel(app: Application): AndroidViewModel(app) {
             .onFailure{mutable.value=mutable.value.copy(downloadError=it.message.orEmpty())}
     }
     fun removeDownload(id:String){mediaDownloads.remove(id)}
+    fun clearCompletedDownloads() = work("正在清理已收录记录") {
+        // Re-read committed archives: an editor draft is not yet a safe completed target.
+        val formalIds=store.load().active.map{it.id}.toSet()
+        val count=withContext(Dispatchers.IO){mediaDownloads.clearCompleted(formalIds)}
+        val jobs=withContext(Dispatchers.IO){mediaDownloads.list()}
+        mutable.update{it.copy(downloads=jobs)}
+        message(if(count==0) "没有可清理的正式收录记录" else "已清理 $count 条下载记录，正式档案和草稿均已保留")
+    }
     fun retryDownload(job:MediaDownload) {downloadInput(job.source);resolveMedia()}
     fun importDownload(job:MediaDownload,targetId:String?=null)=importDownloads(listOf(job),targetId)
     fun importDownloads(jobs:List<MediaDownload>,targetId:String?=null) {
