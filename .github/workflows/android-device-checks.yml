@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'app/**'
+      # PR-only: host tests and isolated social extractors do not touch these
+      # native media/backup flows. Main pushes still exercise every device test.
+      - '!app/src/test/**'
+      - '!app/src/main/python/**'
       - 'gradle/**'
       - '*.gradle.kts'
       - 'gradle.properties'
