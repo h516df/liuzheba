@@ -69,7 +69,7 @@ import coil3.compose.AsyncImage
     }
     var target by remember {mutableStateOf<List<MediaDownload>?>(null)}
     var confirmCleanup by remember {mutableStateOf(false)}
-    val completedCount=completedDownloadRecords(s.downloads,s.library.active.map{it.id}.toSet()).size
+    val completedCount=completedDownloadRecords(s.downloads,s.library.active.map{it.id}.toSet()-s.library.drafts.map{it.id}.toSet()).size
     val plan=s.mediaPlan
     var selection by remember(plan) {mutableStateOf(plan?.items?.indices?.toSet() ?: emptySet())}
     Dialog(onDismissRequest=model::closeDownloads,properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) {

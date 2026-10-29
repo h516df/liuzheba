@@ -214,6 +214,16 @@ class DirectMediaImportTest {
         assertTrue(downloads.list().all{it.state=="已收录"})
         assertNull(model.state.value.editor)
     }
+    @Test fun clearingHistoryKeepsFormalArchiveWithUnsubmittedDraft() {
+        runBlocking{model.store.draft(formal.copy(name="还没保存的标题"))}
+        val (downloads,jobs)=downloadedBatch()
+        model.importDownloads(jobs,formal.id);await{!model.state.value.busy}
+        model.clearCompletedDownloads();await{!model.state.value.busy}
+        assertEquals(jobs.map{it.id},downloads.list().map{it.id})
+        val stored=runBlocking{model.store.load()}
+        assertEquals("还没保存的标题",stored.drafts.single().name)
+        assertEquals(2,stored.active.single().photos.size)
+    }
     @Test fun completedHistoryCleanupWaitsForFormalSaveAndPreservesPendingDownloads() {
         val (downloads,jobs)=downloadedBatch()
         val originalSource=sha(source)

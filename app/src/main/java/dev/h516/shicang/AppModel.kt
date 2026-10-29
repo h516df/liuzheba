@@ -223,7 +223,8 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun removeDownload(id:String){mediaDownloads.remove(id)}
     fun clearCompletedDownloads() = work("正在清理已收录记录") {
         // Re-read committed archives: an editor draft is not yet a safe completed target.
-        val formalIds=store.load().active.map{it.id}.toSet()
+        val library=store.load()
+        val formalIds=library.active.map{it.id}.toSet()-library.drafts.map{it.id}.toSet()
         val count=withContext(Dispatchers.IO){mediaDownloads.clearCompleted(formalIds)}
         val jobs=withContext(Dispatchers.IO){mediaDownloads.list()}
         mutable.update{it.copy(downloads=jobs)}
