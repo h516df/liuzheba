@@ -3,6 +3,7 @@
 import copy
 import contextlib
 import io
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -28,6 +29,44 @@ def fixture():
 
 
 class FinishGuardTest(unittest.TestCase):
+    def test_snapshot_fetches_independent_evidence_concurrently(self):
+        pr, files, checks, sha = fixture()
+        rendezvous = threading.Barrier(3)
+
+        def api(endpoint, *, method="GET", fields=()):
+            self.assertEqual(method, "GET")
+            rendezvous.wait(timeout=3)
+            if endpoint.endswith("/files?per_page=100"):
+                return files
+            if endpoint.endswith("/check-runs?per_page=100"):
+                return {"total_count": len(checks), "check_runs": checks}
+            return pr
+
+        with patch.object(helper, "gh_api", side_effect=api):
+            self.assertEqual(
+                helper.read_snapshot("repos/h516df/liuzheba/pulls/46",
+                                     "repos/h516df/liuzheba/pulls/46/files?per_page=100", sha),
+                (pr, files, checks),
+            )
+
+    def test_snapshot_failure_is_not_retried_or_merged(self):
+        pr, files, checks, sha = fixture()
+        mutations = []
+
+        def api(endpoint, *, method="GET", fields=()):
+            if method != "GET":
+                mutations.append(endpoint)
+            if endpoint.endswith("/files?per_page=100"):
+                raise OSError("read failed")
+            if endpoint.endswith("/check-runs?per_page=100"):
+                return {"total_count": len(checks), "check_runs": checks}
+            return pr
+
+        with patch.object(helper, "gh_api", side_effect=api):
+            with self.assertRaisesRegex(OSError, "read failed"):
+                helper.finish_pr(46, sha, merge=True)
+        self.assertEqual(mutations, [])
+
     def test_complete_app_pr_is_ready(self):
         self.assertEqual(helper.guard(*fixture()), (True, "all required checks passed"))
 
@@ -98,9 +137,10 @@ class FinishGuardTest(unittest.TestCase):
                 return {"total_count": len(checks), "check_runs": next(polls)}
             return pr
 
+        output = io.StringIO()
         with patch.object(helper, "gh_api", side_effect=api), \
                 patch.object(helper.time, "sleep") as sleep, \
-                contextlib.redirect_stdout(io.StringIO()):
+                contextlib.redirect_stdout(output):
             result = helper.finish_pr(46, sha, wait_seconds=1800, merge=True)
         self.assertEqual(result, 0)
         self.assertEqual(sum("/files?" in path for path, _ in calls), 2)
@@ -108,6 +148,8 @@ class FinishGuardTest(unittest.TestCase):
         self.assertEqual(sum(path.endswith("/pulls/46") for path, _ in calls), 2)
         self.assertEqual(sum(method == "PUT" for _, method in calls), 1)
         self.assertEqual(sleep.call_count, 2)
+        self.assertEqual(output.getvalue().count("waiting for "), 1)
+        self.assertEqual(output.getvalue().count("all required checks passed"), 1)
 
     def test_changed_pr_after_green_cannot_merge(self):
         pr, files, checks, sha = copy.deepcopy(fixture())
