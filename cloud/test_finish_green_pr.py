@@ -1,7 +1,10 @@
 """Offline tests of safe PR merging criteria; no network or mutation."""
 
 import copy
+import contextlib
+import io
 import unittest
+from unittest.mock import patch
 
 import finish_green_pr as helper
 
@@ -76,6 +79,58 @@ class FinishGuardTest(unittest.TestCase):
         pr, files, checks, sha = copy.deepcopy(fixture())
         self.assertFalse(helper.guard(pr, [], checks, sha)[0])
         self.assertFalse(helper.guard(pr, files * 100, checks, sha)[0])
+
+    def test_waiting_polls_only_checks_and_revalidates_before_merge(self):
+        pr, files, checks, sha = copy.deepcopy(fixture())
+        waiting = copy.deepcopy(checks)
+        waiting[0].update(status="in_progress", conclusion=None)
+        calls = []
+        polls = iter((waiting, waiting, checks, checks))
+
+        def api(endpoint, *, method="GET", fields=()):
+            calls.append((endpoint, method))
+            if method == "PUT":
+                self.assertIn(f"sha={sha}", fields)
+                return {"merged": True, "sha": "b" * 40}
+            if endpoint.endswith("/files?per_page=100"):
+                return files
+            if endpoint.endswith("/check-runs?per_page=100"):
+                return {"total_count": len(checks), "check_runs": next(polls)}
+            return pr
+
+        with patch.object(helper, "gh_api", side_effect=api), \
+                patch.object(helper.time, "sleep") as sleep, \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = helper.finish_pr(46, sha, wait_seconds=1800, merge=True)
+        self.assertEqual(result, 0)
+        self.assertEqual(sum("/files?" in path for path, _ in calls), 2)
+        self.assertEqual(sum(path.endswith("/check-runs?per_page=100") for path, _ in calls), 4)
+        self.assertEqual(sum(path.endswith("/pulls/46") for path, _ in calls), 2)
+        self.assertEqual(sum(method == "PUT" for _, method in calls), 1)
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_changed_pr_after_green_cannot_merge(self):
+        pr, files, checks, sha = copy.deepcopy(fixture())
+        changed = copy.deepcopy(pr)
+        changed["head"]["sha"] = "b" * 40
+        reads = iter((pr, changed))
+        mutations = []
+
+        def api(endpoint, *, method="GET", fields=()):
+            if method != "GET":
+                mutations.append(endpoint)
+                return {"merged": True}
+            if endpoint.endswith("/files?per_page=100"):
+                return files
+            if endpoint.endswith("/check-runs?per_page=100"):
+                return {"total_count": len(checks), "check_runs": checks}
+            return next(reads)
+
+        with patch.object(helper, "gh_api", side_effect=api), \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = helper.finish_pr(46, sha, merge=True)
+        self.assertEqual(result, 2)
+        self.assertEqual(mutations, [])
 
 
 if __name__ == "__main__":
