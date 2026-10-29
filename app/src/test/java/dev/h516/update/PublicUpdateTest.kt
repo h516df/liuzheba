@@ -61,4 +61,57 @@ class PublicUpdateTest {
         assertFalse(UpdateConfig.apiUrl("https://api.github.com/repos/attacker/liuzheba/releases"))
         assertFalse(UpdateConfig.apiUrl("https://api.github.com/repos/h516df/liuzheba/%2e%2e/releases"))
     }
+    @Test fun officialWebFallbackOnlyTrustsExactReleaseAndAssetPaths() {
+        assertEquals("v0.20",UpdateConfig.latestTagFromLocation("https://github.com/h516df/liuzheba/releases/tag/v0.20"))
+        listOf("https://github.com/attacker/liuzheba/releases/tag/v0.20",
+            "https://github.com/h516df/liuzheba/releases/tag/v0.20?from=other",
+            "https://github.com/h516df/liuzheba/releases/tag/v0.20/extra",
+            "http://github.com/h516df/liuzheba/releases/tag/v0.20",
+            "https://github.com@evil.test/h516df/liuzheba/releases/tag/v0.20").forEach {
+            assertNull(it,UpdateConfig.latestTagFromLocation(it))
+        }
+        val asset=UpdateCatalog.fromOfficialLatestTag("v0.20").assets.single{it.name.endsWith("universal.apk")}
+        assertEquals(0L,asset.size)
+        assertTrue(UpdateConfig.publicAssetUrl(asset.publicUrl!!,asset.name))
+        assertFalse(UpdateConfig.publicAssetUrl(asset.publicUrl+"?token=foreign",asset.name))
+        assertFalse(UpdateConfig.publicAssetUrl(asset.publicUrl.replace("github.com","example.org"),asset.name))
+        assertFalse(UpdateConfig.publicAssetUrl(asset.publicUrl.replace("/v0.20/","/v0.19/"),asset.name))
+    }
+
+    @Test fun officialLatestWebRequestDoesNotRequireCredentialsOrApiHeaders() {
+        val redirect=Response(302,location="https://github.com/h516df/liuzheba/releases/tag/v0.20")
+        val requests=mutableListOf<String>()
+        assertEquals("v0.20",UpdateHttp { url -> requests+=url;redirect }.officialLatestTag())
+        assertEquals(listOf("${UpdateConfig.PUBLIC_RELEASES}/latest"),requests)
+        assertEquals("text/html",redirect.getRequestProperty("Accept"))
+        assertNull(redirect.getRequestProperty("Authorization"))
+        assertNull(redirect.getRequestProperty("X-GitHub-Api-Version"))
+    }
+
+    @Test fun retryableApiFailuresAreExplicitAndBadMetadataNeverFallsBack() {
+        listOf(401,403,429,500,503).forEach { code ->
+            assertTrue(canUsePublicReleaseFallback(UpdateHttpStatusFailure(code,"synthetic")))
+        }
+        assertFalse(canUsePublicReleaseFallback(UpdateHttpStatusFailure(404,"synthetic")))
+        assertFalse(canUsePublicReleaseFallback(UpdateFailure("malformed metadata")))
+        assertFalse(canUsePublicReleaseFallback(javax.net.ssl.SSLHandshakeException("untrusted certificate")))
+        assertTrue(canUsePublicReleaseFallback(java.net.SocketTimeoutException("synthetic timeout")))
+    }
+
+    @Test fun officialFallbackChecksRedirectAndBoundsUnspecifiedApkSize() {
+        val url=UpdateConfig.releaseAssetUrl("0.20","shicang-v0.20-universal.apk")
+        val asset=UpdateCatalog.fromOfficialLatestTag("v0.20").assets.single{it.publicUrl==url}
+        val requests=mutableListOf<String>()
+        val http=UpdateHttp { input ->
+            requests+=input
+            if(input==url)Response(302,location="https://release-assets.githubusercontent.com/public-test")
+            else Response(200,"synthetic-apk")
+        }
+        val file=File.createTempFile("official-fallback-",".apk")
+        try {
+            http.downloadApk(asset,asset.size,file){}
+            assertEquals("synthetic-apk",file.readText())
+            assertEquals(listOf(url,"https://release-assets.githubusercontent.com/public-test"),requests)
+        }finally{file.delete()}
+    }
 }

@@ -168,4 +168,103 @@ class UpdaterSessionTest {
         assertEquals(listOf(2,3),connections.map{it.first});assertTrue(connections.all{it.second.endsWith("/releases?per_page=20")})
     }
 
+    private fun fallbackSession(env:Environment,requests:MutableList<String>,apiCode:Int=429,
+                                latestLocation:String="https://github.com/h516df/liuzheba/releases/tag/v0.14",
+                                shaText:String="$sha  ${record.name}",shaAvailable:Boolean=true,webOffline:Boolean=false):Updater {
+        val notes="""{"versionName":"0.14","versionCode":15,"改进":["合成回归"]}"""
+        val official="${UpdateConfig.PUBLIC_RELEASES}/download/v0.14/"
+        return Updater(context,env){UpdateHttp { url ->
+            requests+=url
+            val resource=url.substringAfterLast('/')
+            val (code,body,location)=when {
+                url.endsWith("/releases?per_page=20") -> Triple(apiCode,ByteArray(0),null)
+                url=="${UpdateConfig.PUBLIC_RELEASES}/latest" -> Triple(302,ByteArray(0),latestLocation)
+                url.startsWith(official) -> Triple(302,ByteArray(0),"https://release-assets.githubusercontent.com/synthetic/$resource")
+                url.contains("/synthetic/shicang-v0.14-release-notes.json") -> Triple(200,notes.toByteArray(),null)
+                url.contains("/synthetic/shicang-v0.14-SHA256.txt") -> if(shaAvailable)Triple(200,shaText.toByteArray(),null) else Triple(404,ByteArray(0),null)
+                url.contains("/synthetic/${record.name}") -> Triple(200,bytes,null)
+                else -> Triple(404,ByteArray(0),null)
+            }
+            object:HttpURLConnection(URL(url)) {
+                override fun connect(){};override fun disconnect(){};override fun usingProxy()=false
+                override fun getResponseCode():Int {
+                    if(apiCode==-1 && url.endsWith("/releases?per_page=20"))throw java.net.SocketTimeoutException("synthetic offline API")
+                    if(webOffline && url=="${UpdateConfig.PUBLIC_RELEASES}/latest")throw java.net.SocketTimeoutException("synthetic offline web")
+                    return code
+                }
+                override fun getHeaderField(name:String)=if(name=="Location")location else null
+                override fun getInputStream()=ByteArrayInputStream(body)
+            }
+        }}.also{sessions+=it}
+    }
+
+    @Test fun apiRateLimitUsesOfficialReleaseAndStillVerifiesBeforeInstall() {
+        val calls=java.util.concurrent.CopyOnWriteArrayList<String>()
+        val env=Environment().apply{allowed=true}
+        val u=fallbackSession(env,calls)
+        u.onForeground();until{u.state is UpdateState.Available}
+        val candidate=(u.state as UpdateState.Available).candidate
+        assertEquals(0L,candidate.apk.id)
+        assertNull(candidate.apk.apiDigest)
+        u.download();until{env.installs==1 && u.state is UpdateState.ReadyToInstall}
+        assertTrue(env.verifications>=3)
+        assertTrue(calls.any{it=="${UpdateConfig.PUBLIC_RELEASES}/latest"})
+        assertTrue(calls.any{it=="${UpdateConfig.PUBLIC_RELEASES}/download/v0.14/${record.name}"})
+        assertTrue(calls.all{it.startsWith(UpdateConfig.API) || it.startsWith(UpdateConfig.PUBLIC_RELEASES) || it.startsWith("https://release-assets.githubusercontent.com/synthetic/")})
+    }
+
+    @Test fun apiForbiddenServerErrorAndTimeoutUseTheSameOfficialFallback() {
+        listOf(403,503,-1).forEach { code ->
+            val calls=java.util.concurrent.CopyOnWriteArrayList<String>()
+            val u=fallbackSession(Environment(),calls,apiCode=code)
+            u.check();until{u.state is UpdateState.Available}
+            assertEquals(1,calls.count{it=="${UpdateConfig.PUBLIC_RELEASES}/latest"})
+            assertTrue(calls.any{it.endsWith("shicang-v0.14-SHA256.txt")})
+            u.close()
+        }
+    }
+
+    @Test fun missingChecksumStopsBeforeOfferingAnApk() {
+        val calls=java.util.concurrent.CopyOnWriteArrayList<String>()
+        val u=fallbackSession(Environment(),calls,shaAvailable=false)
+        u.check();until{u.state is UpdateState.Failed}
+        assertTrue(calls.any{it.endsWith("shicang-v0.14-SHA256.txt")})
+        assertTrue(calls.none{it.endsWith(record.name)})
+    }
+
+    @Test fun fallbackChecksumMismatchNeverReachesInstaller() {
+        val calls=java.util.concurrent.CopyOnWriteArrayList<String>()
+        val env=Environment().apply{allowed=true}
+        val u=fallbackSession(env,calls,shaText="${"0".repeat(64)}  ${record.name}")
+        u.check();until{u.state is UpdateState.Available};u.download()
+        until{u.state is UpdateState.Failed}
+        assertEquals(0,env.installs)
+        assertFalse(context.getSharedPreferences("public_update_session",0).contains("verified"))
+    }
+
+    @Test fun foreignLatestRedirectStopsWithoutRequestingAssets() {
+        val calls=java.util.concurrent.CopyOnWriteArrayList<String>()
+        val u=fallbackSession(Environment(),calls,latestLocation="https://attacker.test/h516df/liuzheba/releases/tag/v0.14")
+        u.check();until{u.state is UpdateState.Failed}
+        assertEquals(2,calls.size)
+        assertTrue(calls.none{it.contains("/download/")})
+    }
+
+    @Test fun missingReleaseApiResponseDoesNotDowngradeToWebFallback() {
+        val calls=java.util.concurrent.CopyOnWriteArrayList<String>()
+        val u=fallbackSession(Environment(),calls,apiCode=404)
+        u.check();until{u.state is UpdateState.Failed}
+        assertEquals(1,calls.size)
+    }
+
+    @Test fun fullOfflineFailureKeepsCurrentAppAndNeverInstalls() {
+        val calls=java.util.concurrent.CopyOnWriteArrayList<String>()
+        val env=Environment().apply{allowed=true}
+        val u=fallbackSession(env,calls,apiCode=-1,webOffline=true)
+        u.check();until{u.state is UpdateState.Failed}
+        assertEquals(2,calls.size)
+        assertEquals(0,env.installs)
+        assertFalse(context.getSharedPreferences("public_update_session",0).contains("verified"))
+    }
+
 }

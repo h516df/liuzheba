@@ -75,7 +75,7 @@ class Updater internal constructor(context:Context,private val environment:Updat
     fun installedVersionCode():Int=runCatching{environment.code()}.getOrDefault(0)
     fun hint():String?=when(val s=state) {
         is UpdateState.Available->"发现新版本 ${s.candidate.notes.version}"
-        is UpdateState.Downloading->"更新下载中 ${s.percent}%"
+        is UpdateState.Downloading->if(s.percent<0)"更新下载中" else "更新下载中 ${s.percent}%"
         is UpdateState.ReadyToInstall,UpdateState.NeedsInstallPermission->"更新已准备好，继续安装"
         else->null
     }
@@ -105,12 +105,23 @@ class Updater internal constructor(context:Context,private val environment:Updat
             try {
                 ensureCurrent(token)
                 clearLegacyUpdateAuthorization(context)
-                val newest=UpdateCatalog.newest(UpdateCatalog.parse(client.json("/releases?per_page=20")))
+                val newest=try {
+                    UpdateCatalog.newest(UpdateCatalog.parse(client.json("/releases?per_page=20")))
+                } catch(e:Exception) {
+                    if(!canUsePublicReleaseFallback(e))throw e
+                    UpdateCatalog.fromOfficialLatestTag(client.officialLatestTag())
+                }
                     ?: throw UpdateFailure("还没发布过带更新说明的版本，请稍后再试")
                 ensureCurrent(token)
-                val notes=ReleaseNotes.decode(client.assetText(newest.notesAsset.id))
+                val notes=ReleaseNotes.decode(client.assetText(newest.notesAsset))
                 requireUpdate(notes.version==newest.version,"新版说明与发行版本不一致，已停止更新")
                 val result=UpdateCatalog.decide(notes,newest.assets,environment.code(),UpdateVerify.deviceAbis())
+                // The web fallback has no API asset inventory. Validate the small checksum
+                // manifest before offering a potentially large APK download.
+                if(result is UpdateCatalog.Result.Available && result.candidate.apk.publicUrl!=null) {
+                    val shaAsset=result.candidate.shaFile ?: throw UpdateFailure("官方发布缺少校验文件，已停止更新")
+                    UpdateVerify.parseShaFile(client.assetText(shaAsset),result.candidate.apk.name)
+                }
                 emit(token){quietChecking=false;when(result){
                     is UpdateCatalog.Result.Latest->state=UpdateState.Latest(result.notes)
                     is UpdateCatalog.Result.Available->{candidate=result.candidate;promptDismissed=false;state=UpdateState.Available(result.candidate)}
@@ -122,17 +133,19 @@ class Updater internal constructor(context:Context,private val environment:Updat
         val target=candidate ?: return
         if(closed || busy() || !environment.official())return
         installAfterDownload=foreground
-        val token=++generation;val client=httpFactory();http=client;state=UpdateState.Downloading(0)
+        val token=++generation;val client=httpFactory();http=client
+        state=UpdateState.Downloading(if(target.apk.size>0)0 else -1)
         io.execute {
             directory.mkdirs()
             val partial=File(directory,"download-$token.part")
             try {
                 ensureCurrent(token)
-                client.downloadApk(target.apk.id,target.apk.size,partial){percent->emit(token){state=UpdateState.Downloading(percent)}}
+                client.downloadApk(target.apk,target.apk.size,partial){percent->emit(token){state=UpdateState.Downloading(percent)}}
                 ensureCurrent(token)
-                val sha=target.shaFile?.let{UpdateVerify.parseShaFile(client.assetText(it.id),target.apk.name)}
+                val sha=target.shaFile?.let{UpdateVerify.parseShaFile(client.assetText(it),target.apk.name)}
                     ?:target.apk.apiDigest ?:throw UpdateFailure("发布资料里缺校验值，请稍后再试")
-                val record=VerifiedUpdate.decode(VerifiedUpdate(target.apk.name,target.apk.size,sha,target.apk.apiDigest,target.notes.code,target.notes.version).encode())
+                val size=target.apk.size.takeIf{it>0} ?: partial.length()
+                val record=VerifiedUpdate.decode(VerifiedUpdate(target.apk.name,size,sha,target.apk.apiDigest,target.notes.code,target.notes.version).encode())
                 environment.verify(partial,record)
                 if(token!=generation || closed)return@execute
                 val dest=file(record)
@@ -196,4 +209,11 @@ class Updater internal constructor(context:Context,private val environment:Updat
     }
     private fun emit(token:Long,change:()->Unit){main.post{if(!closed && token==generation)change()}}
     private fun message(e:Exception,fallback:String)=(e as? UpdateFailure)?.userMessage ?: fallback
+}
+
+/** Do not bypass invalid metadata, untrusted redirects, TLS failures or a missing release. */
+internal fun canUsePublicReleaseFallback(e:Exception):Boolean = when(e) {
+    is UpdateHttpStatusFailure -> e.statusCode in setOf(401,403,429) || e.statusCode in 500..599
+    is java.net.SocketTimeoutException,is java.net.ConnectException,is java.net.UnknownHostException -> true
+    else -> false
 }
