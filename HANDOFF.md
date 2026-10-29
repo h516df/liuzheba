@@ -3,6 +3,7 @@
 - **用户提供的最小复现**：抖音 `https://v.douyin.com/PWiwqM6y5tE/`（作者关闭平台保存），小红书 `https://xhslink.cn/o/4FcHkEc51BR`（作者关闭平台保存），Instagram `https://www.instagram.com/reel/De6y3nBMmnZ/`（作者允许保存）。样本可公开记录但不保存会话令牌/用户 Cookies。云端无登录 HTTP 验证：抖音短链 302 到视频页，但详情响应无媒体；小红书短链转登录页，原解析器错误地把登录页交给提取器；Instagram 网页 HTTP 200，最新版 yt-dlp 无会话读取时返回空媒体。**三条均未实测成功下载，不能宣称完成用户需求。**
 - **本轮实际修复**：将 Chaquopy 与离线社媒回归的 yt-dlp 同步更新为官方 2026.10.26（Python3.12 兼容）；小红书短链即使被导向登录页也仅从可信同站 `redirectPath` 恢复原笔记地址（无权限时继续拒绝）；补齐 Instagram Reel 的网页验证回传、登录页拦截和会话解析提示；对抖音作者关闭下载入口但仍提供公开 `play_addr` 的情形加回归，仍不绕过私密访问或 DRM。新版独立 Python 离线 12/12 通过；Android/云端/隔离设备验证待本任务远端同源提交。
 - **边界**：不动已有正式0.20 APK、签名、包名、数据库schema1/备份format6、原件。必须继续验证 Android 编译和真实链接，尤其网页会话是否能读取这些作品；不把最新依赖或合成播放样例通过当作真实作品可下载。
+- **新增发布授权与准备**：用户 2026-10-29 明确要求本轮开发完成后发布新版并自行从 GitHub 下载。候选版本定为 v0.21 / versionCode 22，已准备 `app/src/main/assets/release-notes.json` 及 `docs/releases/v0.21.md`，包含下载记录清理、更新 API 备用路径与本轮社媒兼容改动。只有精确 PR/main 的 Cloud、Android/隔离设备、安全检查满足发布门禁后，才可对 main 的精确 SHA 手动 dispatch 既有 `production-release.yml`；必须由原签名环境签名、v0.16→新正式 APK 在隔离模拟器真实覆盖升级并核对资料、发布后三资产和最新版本回读。v0.20 已发布资产不可覆盖，任何发布失败或草稿状态都不得宣称用户可下载。真实三条社媒作品尚未下载成功，发布说明必须保留限制。
 
 ---
 
