@@ -41,6 +41,12 @@ class BuildGateTest(unittest.TestCase):
             self.assertEqual(helper.build(self.state), 9)
         self.assertEqual(json.loads((self.state / 'result.json').read_text())['code'], 9)
 
+    def test_identity_process_cannot_start_is_a_failed_receipt(self):
+        with patch.object(helper.subprocess, 'run', side_effect=[Mock(returncode=0), OSError('synthetic launch failure')]):
+            with self.assertRaises(OSError):
+                helper.build(self.state)
+        self.assertNotEqual(json.loads((self.state / 'result.json').read_text())['code'], 0)
+
     def test_wrong_commit_and_missing_receipt_fail_closed(self):
         with self.assertRaisesRegex(RuntimeError, 'no device tests'):
             helper.wait(self.state, timeout=0)

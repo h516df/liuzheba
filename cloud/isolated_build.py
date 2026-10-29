@@ -21,6 +21,9 @@ def build(state):
                 sys.executable, 'cloud/check_apk_identity.py',
                 'app/build/outputs/apk/debug/app-debug.apk', 'dev.h516.shicang.verification',
             ], check=False).returncode
+    except Exception:
+        code = 1
+        raise
     finally:
         receipt = state / 'result.tmp'
         receipt.write_text(json.dumps({'sha': os.environ['GITHUB_SHA'], 'code': code}), encoding='utf-8')
