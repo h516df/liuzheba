@@ -87,6 +87,51 @@ def gh_api(endpoint, *, method="GET", fields=()):
     return json.loads(result.stdout)
 
 
+def read_checks(expected_head):
+    result = gh_api(f"repos/{REPO}/commits/{expected_head}/check-runs?per_page=100")
+    checks = result.get("check_runs") or []
+    if result.get("total_count", len(checks)) > len(checks):
+        raise RuntimeError("incomplete check evidence; review manually")
+    return checks
+
+
+def finish_pr(pr_number, expected_head, wait_seconds=0, merge=False):
+    """Poll only mutable check results; revalidate the full PR before a finish."""
+    pr_endpoint = f"repos/{REPO}/pulls/{pr_number}"
+    files_endpoint = f"{pr_endpoint}/files?per_page=100"
+    deadline = time.monotonic() + wait_seconds
+    pr = gh_api(pr_endpoint)
+    files = gh_api(files_endpoint)
+    waited = False
+    while True:
+        checks = read_checks(expected_head)
+        ready, reason = guard(pr, files, checks, expected_head)
+        if ready and (waited or merge):
+            # The PR can change while checks run. Never merge using cached
+            # ownership, branch, file scope or check-run evidence.
+            pr = gh_api(pr_endpoint)
+            files = gh_api(files_endpoint)
+            checks = read_checks(expected_head)
+            ready, reason = guard(pr, files, checks, expected_head)
+        print(f"PR #{pr_number} {expected_head[:12]}: {reason}", flush=True)
+        if ready:
+            if not merge:
+                print("Read-only: use --merge after authorization and review")
+                return 0
+            merged = gh_api(
+                f"{pr_endpoint}/merge", method="PUT",
+                fields=(f"sha={expected_head}", "merge_method=squash"),
+            )
+            if not merged.get("merged"):
+                raise RuntimeError("GitHub did not confirm merge")
+            print(f"Merged at {merged['sha']}; now verify main push checks", flush=True)
+            return 0
+        if not reason.startswith("waiting for ") or time.monotonic() >= deadline:
+            return 2
+        waited = True
+        time.sleep(min(30, max(0, deadline - time.monotonic())))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pr", type=int, required=True)
@@ -99,32 +144,7 @@ def main():
     if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
         parser.error("run outside Actions with the existing user GitHub identity")
 
-    deadline = time.monotonic() + args.wait_seconds
-    while True:
-        pr = gh_api(f"repos/{REPO}/pulls/{args.pr}")
-        files = gh_api(f"repos/{REPO}/pulls/{args.pr}/files?per_page=100")
-        result = gh_api(f"repos/{REPO}/commits/{args.expected_head}/check-runs?per_page=100")
-        checks = result.get("check_runs") or []
-        if result.get("total_count", len(checks)) > len(checks):
-            raise RuntimeError("incomplete check evidence; review manually")
-        ready, reason = guard(pr, files, checks, args.expected_head)
-        print(f"PR #{args.pr} {args.expected_head[:12]}: {reason}", flush=True)
-        if ready:
-            if not args.merge:
-                print("Read-only: use --merge after authorization and review")
-                return 0
-            merged = gh_api(
-                f"repos/{REPO}/pulls/{args.pr}/merge",
-                method="PUT",
-                fields=(f"sha={args.expected_head}", "merge_method=squash"),
-            )
-            if not merged.get("merged"):
-                raise RuntimeError("GitHub did not confirm merge")
-            print(f"Merged at {merged['sha']}; now verify main push checks", flush=True)
-            return 0
-        if not reason.startswith("waiting for ") or time.monotonic() >= deadline:
-            return 2
-        time.sleep(min(30, max(0, deadline - time.monotonic())))
+    return finish_pr(args.pr, args.expected_head, args.wait_seconds, args.merge)
 
 
 if __name__ == "__main__":
