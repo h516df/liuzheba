@@ -12,8 +12,8 @@ android {
         applicationId = "dev.h516.shicang"
         minSdk = 24
         targetSdk = 36
-        versionCode = 21
-        versionName = "0.20"
+        versionCode = 22
+        versionName = "0.21"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,7 +34,7 @@ chaquopy {
     defaultConfig {
         version = "3.12"
         System.getenv("SHICANG_BUILD_PYTHON")?.let { buildPython(it) }
-        pip { install("yt-dlp==2026.8.19"); install("certifi==2026.10.18") }
+        pip { install("yt-dlp==2026.10.26"); install("certifi==2026.10.18") }
     }
 }
 dependencies {

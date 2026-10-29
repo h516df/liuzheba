@@ -32,9 +32,7 @@ class MediaBrowserActivity:ComponentActivity() {
             CookieManager.getInstance().flush()
             val current=web?.url.orEmpty()
             val target=runCatching{MediaLinks.validUrl(current)}.getOrNull()
-            val path=target?.let{Uri.parse(it).path.orEmpty()}.orEmpty()
-            if(target!=null && path!="/" && !path.startsWith("/404") && !path.startsWith("/login") &&
-                Links.title(target) in listOf("小红书","抖音","快手","微博","哔哩哔哩")) {
+            if(target!=null && Links.canResolveFromBrowser(target)) {
                 setResult(Activity.RESULT_OK,Intent().setData(Uri.parse(target)))
             }
             finish()

@@ -1,10 +1,19 @@
-# 当前接续（2026-10-29）：匿名更新的官方 Release 备用路径（Issue #5）
+# 当前接续（2026-10-29）：用户实测链接下载失败（抖音、小红书、Instagram）
+
+- **用户提供的最小复现**：抖音 `https://v.douyin.com/PWiwqM6y5tE/`（作者关闭平台保存），小红书 `https://xhslink.cn/o/4FcHkEc51BR`（作者关闭平台保存），Instagram `https://www.instagram.com/reel/De6y3nBMmnZ/`（作者允许保存）。样本可公开记录但不保存会话令牌/用户 Cookies。云端无登录 HTTP 验证：抖音短链 302 到视频页，但详情响应无媒体；小红书短链转登录页，原解析器错误地把登录页交给提取器；Instagram 网页 HTTP 200，最新版 yt-dlp 无会话读取时返回空媒体。**三条均未实测成功下载，不能宣称完成用户需求。**
+- **本轮实际修复**：将 Chaquopy 与离线社媒回归的 yt-dlp 同步更新为官方 2026.10.26（Python3.12 兼容）；小红书短链即使被导向登录页也仅从可信同站 `redirectPath` 恢复原笔记地址（无权限时继续拒绝）；补齐 Instagram Reel 的网页验证回传、登录页拦截和会话解析提示；对抖音作者关闭下载入口但仍提供公开 `play_addr` 的情形加回归，仍不绕过私密访问或 DRM。新版独立 Python 离线 12/12 通过；Android/云端/隔离设备验证待本任务远端同源提交。
+- **边界**：不动已有正式0.20 APK、签名、包名、数据库schema1/备份format6、原件。必须继续验证 Android 编译和真实链接，尤其网页会话是否能读取这些作品；不把最新依赖或合成播放样例通过当作真实作品可下载。
+- **新增发布授权与准备**：用户 2026-10-29 明确要求本轮开发完成后发布新版并自行从 GitHub 下载。候选版本定为 v0.21 / versionCode 22，已准备 `app/src/main/assets/release-notes.json` 及 `docs/releases/v0.21.md`，包含下载记录清理、更新 API 备用路径与本轮社媒兼容改动。只有精确 PR/main 的 Cloud、Android/隔离设备、安全检查满足发布门禁后，才可对 main 的精确 SHA 手动 dispatch 既有 `production-release.yml`；必须由原签名环境签名、v0.16→新正式 APK 在隔离模拟器真实覆盖升级并核对资料、发布后三资产和最新版本回读。v0.20 已发布资产不可覆盖，任何发布失败或草稿状态都不得宣称用户可下载。真实三条社媒作品尚未下载成功，发布说明必须保留限制。
+
+---
+
+# 已完成源码（2026-10-29）：匿名更新的官方 Release 备用路径（Issue #5）
 
 - **目标**：当匿名 GitHub REST API 返回 403/429/5xx 或连接/超时时，仍可从同仓库官方 `/releases/latest` 跳转识别稳定正式版，再经官方 Release 文件地址读取中文说明、SHA256 清单和 universal APK；不加账号、私有代理或镜像。
 - **基线与任务分支**：基于 `main` 的 `af183f1fd1691a2c2c34d1aed4ab19711a3d73f1`，分支 `fix/public-release-fallback-20261029`。仅影响公开更新模块及对应测试/说明；不触碰正式签名、应用包名、SQLite schema1、备份 format6、私人档案及 v0.20 已发布资产。
 - **保护与体验**：只接受 `github.com/h516df/liuzheba` 的精确最新版跳转和严格同版本文件名；继续限制 Release 资产重定向域名。备用路径没有 API 提供的文件长度，下载采用未知进度，完成后核对安全大小上限、官方 SHA256 清单、APK 实际大小、正式包名、版本、架构和证书。说明/清单缺失或跳转异常一律拒绝，旧版不变；非正式验证包仍不能检查或安装官方更新。
-- **验收**：增加模拟 403/429/503/超时、错误跳转、404、完全断网、SHA 不匹配和草稿/安装保护回归。GitHub 公开 latest 在 2026-10-29 通过只读 HTTP HEAD 实测返回同仓库 `/releases/tag/v0.20`，APK 官方下载链接返回到 GitHub `release-assets` 域的 302。此记录只是公开网页行为证据，不是用户手机成功升级。源码 CI、模拟器与正式签名覆盖升级仍以精确任务提交的实际结果为准。
-- **下一步**：完成定向测试与静态安全检查，远端 PR→同源 CI→合并与 main 检查；正式发行依既有版本/签名/保资料门禁单独执行，不能把主线源码当作已安装到手机。
+- **验收与合并**：[PR #54](https://github.com/h516df/liuzheba/pull/54) head `b02e9510424c6a672ba0062900efe36963142042` 四组 PR CI completed/success，包含 403/429/503/超时、错误跳转、404、全断网、SHA 不匹配等回归；squash 合入 main `3b339e9ffa6010c947f02dc847098baea00dd294`，树 `d427681d1616e374fda08e0b07eece1159b88898` 与 PR 受测树一致。2026-10-29 只读实测官方 latest→v0.20 和 APK 官方链接302。主线合并后的 CI 运行中，结果必须继续读回。
+- **发布边界**：已有 v0.20 签名资产未替换，目标手机未验；正式发行依原版本/签名/保资料门禁另行执行，不能把主线源码当作已安装到手机。
 
 ---
 
@@ -13,7 +22,7 @@
 - **目标**：链接媒体下载记录上限为200项，成功收录到正式档案后仍占记录名额，用户只能逐项移除。新增「清理已收录记录」和确认说明，减少长期使用时的重复操作。
 - **基线与范围**：main `d0c7576a9adda79b2f56c719e628e6e3b4c82a55`，任务分支 `feat/download-history-cleanup-20261029`。仅改下载记录管理、对应 UI 与回归测试，不修改 SQLite schema1、备份 format6、原件、签名、包名、发行流程和0.20已发布资产。
 - **安全行为**：只清理当前资料代次中、目标档案已经正式保存且无未提交草稿的下载记录；尚未保存的草稿（包括已有正式档案上的草稿）继续显示「继续完成收录」，待收录、下载中和其他代次任务均不清理。先提交下载记录索引，再撤销系统下载及清理其临时文件，不能因索引写入失败误删仍列出的文件。正式档案中的原件副本不会触碰。
-- **验收与合并**：[PR #53](https://github.com/h516df/liuzheba/pull/53) head `6c201996357f66211c449785efb23b8324def297` 的四项 PR Checks 全绿后 squash 合入 main `af183f1fd1691a2c2c34d1aed4ab19711a3d73f1`，合并树 `aeb22e0df63b92125bed23aaccf58c46e6463bdd` 与受测树相同。main push [Cloud 40830799312](https://github.com/h516df/liuzheba/actions/runs/40830799312)、[Android 40830799309](https://github.com/h516df/liuzheba/actions/runs/40830799309)、[隔离设备 40830799336](https://github.com/h516df/liuzheba/actions/runs/40830799336)、[Secret 40830799316](https://github.com/h516df/liuzheba/actions/runs/40830799316) 全部 success。Cloud 97 项任务中 36 项 from-cache，8m44s；结果登记到 [#50](https://github.com/h516df/liuzheba/issues/50)，缓存生效但提速未证实。实际目标手机未验。
+- **验收与合并**：[PR #53](https://github.com/h516df/liuzheba/pull/53) head `6c201996357f66211c449785efb23b8324def297` 四组 PR Checks 全绿后 squash 合入 main `af183f1fd1691a2c2c34d1aed4ab19711a3d73f1`，合并树 `aeb22e0df63b92125bed23aaccf58c46e6463bdd` 与受测树相同。main Cloud 40830799312、Android 40830799309、隔离设备 40830799336、Secret 40830799316 均 success。Cloud 97 项任务中 36 项 from-cache，8m44s；缓存生效但提速未证实，见 [#50](https://github.com/h516df/liuzheba/issues/50)。目标手机未验。
 - **发布边界**：本分支不预占0.21版本、不改已有正式 APK；合并与未来新版正式发行按已授权的同源校验、原签名覆盖升级和下载回读流程推进。
 
 ---

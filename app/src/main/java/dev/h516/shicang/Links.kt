@@ -25,9 +25,24 @@ object Links {
             belongs("douyin.com")->"抖音"
             belongs("kuaishou.com") || belongs("gifshow.com")->"快手"
             belongs("bilibili.com") || belongs("b23.tv")->"哔哩哔哩"
+            belongs("instagram.com")->"Instagram"
             belongs("xiaohongshu.com") || belongs("xhslink.com") || belongs("xhslink.cn")->"小红书"
             belongs("weibo.com") || belongs("weibo.cn")->"微博"
             else->"打开网站"
         }
     }
+
+    /** A verification browser must return a media page, never a login or unrelated landing page. */
+    fun canResolveFromBrowser(url:String):Boolean = runCatching {
+        val uri=URI(url)
+        if(uri.scheme!="https" || uri.userInfo!=null || uri.host==null || uri.port !in listOf(-1,443))return@runCatching false
+        val path=uri.path.orEmpty()
+        if(path.isBlank() || path=="/" || path.startsWith("/404") || path.startsWith("/login") ||
+            path.startsWith("/accounts/login"))return@runCatching false
+        when(title(url)) {
+            "Instagram" -> Regex("^/(reel|p|tv)/[A-Za-z0-9_-]{5,32}/?$").matches(path)
+            "小红书","抖音","快手","微博","哔哩哔哩" -> true
+            else -> false
+        }
+    }.getOrDefault(false)
 }

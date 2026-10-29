@@ -64,7 +64,7 @@ jobs:
       - name: Offline social media extraction checks
         if: steps.scope.outputs.tool_only != 'true'
         run: |
-          python3 -m pip install --disable-pip-version-check 'yt-dlp==2026.8.19'
+          python3 -m pip install --disable-pip-version-check 'yt-dlp==2026.10.26'
           python3 tools/tests/test_media_bridge.py
       - name: Prepare cloud toolchain
         if: steps.scope.outputs.tool_only != 'true'

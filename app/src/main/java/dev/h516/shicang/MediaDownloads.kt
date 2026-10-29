@@ -51,9 +51,11 @@ object MediaLinks {
         }
         try {read(Python.getInstance().getModule("liuce_media").callAttr("resolve",url,cookies).toString())}
         catch(e:Exception) {
-            val platform=SharedLinks.platform(url)
+            val platform=SharedLinks.platform(url) ?: Links.title(url).takeIf{it=="Instagram"}
             val hint=if(platform=="小红书" || platform=="抖音")
                 "$platform 没有返回可下载的原图或视频。请点「打开网页验证」，完成验证后返回重新解析；部分作品可能禁止下载。"
+            else if(platform=="Instagram")
+                "Instagram 没有返回可保存的视频或图片。请点「打开网页验证」，在网页内确认能正常查看作品，再返回重新解析；有些作品需要登录后才能读取媒体。"
             else "此作品没有返回可直接下载的媒体。可先打开网页验证后重试；部分平台只提供在线播放或限制下载。"
             throw IllegalStateException(hint,e)
         }
