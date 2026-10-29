@@ -76,6 +76,36 @@ class FinishGuardTest(unittest.TestCase):
         checks = [x for x in checks if x["name"] != helper.DEVICE_CHECK]
         self.assertTrue(helper.guard(pr, files, checks, sha)[0])
 
+    def test_pr_paths_excluded_by_device_workflow_do_not_wait_for_absent_check(self):
+        for filename in ('app/src/test/java/dev/h516/shicang/ProductJourneyUiTest.kt',
+                         'app/src/main/python/media_bridge.py', 'tools/tests/test_media_bridge.py'):
+            pr, files, checks, sha = copy.deepcopy(fixture())
+            files[0]['filename'] = filename
+            checks = [x for x in checks if x['name'] != helper.DEVICE_CHECK]
+            self.assertEqual(helper.guard(pr, files, checks, sha),
+                             (True, 'all required checks passed'), filename)
+
+    def test_mixed_native_changes_still_require_device_check(self):
+        pr, files, checks, sha = copy.deepcopy(fixture())
+        files.append({'filename': 'app/src/test/java/ExampleTest.kt'})
+        checks = [x for x in checks if x['name'] != helper.DEVICE_CHECK]
+        self.assertEqual(helper.guard(pr, files, checks, sha),
+                         (False, 'waiting for required checks'))
+
+    def test_background_build_helpers_require_their_device_check(self):
+        for filename in ('cloud/isolated_build.py', 'cloud/test_isolated_build.py'):
+            pr, files, checks, sha = copy.deepcopy(fixture())
+            files[0]['filename'] = filename
+            checks = [x for x in checks if x['name'] != helper.DEVICE_CHECK]
+            self.assertEqual(helper.guard(pr, files, checks, sha),
+                             (False, 'waiting for required checks'), filename)
+
+    def test_device_exemption_does_not_ignore_an_existing_failed_device_run(self):
+        pr, files, checks, sha = copy.deepcopy(fixture())
+        files[0]['filename'] = 'app/src/test/java/ExampleTest.kt'
+        next(x for x in checks if x['name'] == helper.DEVICE_CHECK)['conclusion'] = 'failure'
+        self.assertFalse(helper.guard(pr, files, checks, sha)[0])
+
     def test_rejects_untrusted_pr_and_changed_sha(self):
         for kind in ("fork", "author", "base", "draft", "sha"):
             pr, files, checks, sha = copy.deepcopy(fixture())

@@ -10,7 +10,9 @@ import org.robolectric.annotation.Config
 @Config(qualifiers="zh-rCN-w412dp-h915dp-xhdpi")
 class ProductJourneyUiTest:UnifiedNavigationFixture() {
     @Test fun undoRemovingAllMediaRestoresOrderCoverAndPreservesText()=fixture {model,a->
-        compose.onNodeWithText(a.name).performClick()
+        // Card semantics may merge/replace the title; keep targeting its visible
+        // bounds and injecting a real touch rather than bypassing the UI action.
+        compose.onNodeWithText(a.name,useUnmergedTree=true).assertIsDisplayed().performClick()
         compose.onNodeWithText("编辑").performClick()
         compose.onNodeWithTag("archive-body").performTextInput("撤销移除期间写下的文字")
         compose.onNodeWithTag("editor-media-grid").performScrollTo()

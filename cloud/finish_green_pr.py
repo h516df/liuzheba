@@ -30,7 +30,10 @@ DEVICE_PATHS = (
     "cloud/prepare_upgrade_reference.py", "cloud/run_official_upgrade.py",
     "cloud/verify_upgrade.py", "tools/verification.init.gradle",
     "tools/release/verify_apk.py", "gradle.properties",
+    "cloud/isolated_build.py", "cloud/test_isolated_build.py",
 )
+# Match PR exclusions in android-device-checks.yml; main pushes still run fully.
+DEVICE_EXEMPT_PATHS = ("app/src/test/", "app/src/main/python/")
 
 
 def guard(pr, changed_files, checks, expected_head):
@@ -56,7 +59,8 @@ def guard(pr, changed_files, checks, expected_head):
         if any(name.startswith(prefix) for prefix in BLOCKED_PATHS):
             return False, f"sensitive change requires manual review: {name}"
     needs_device = any(
-        name.startswith(DEVICE_PATHS) or name.endswith(".gradle.kts") for name in names
+        not name.startswith(DEVICE_EXEMPT_PATHS)
+        and (name.startswith(DEVICE_PATHS) or name.endswith(".gradle.kts")) for name in names
     )
     required = CORE_CHECKS | ({DEVICE_CHECK} if needs_device else set())
 
