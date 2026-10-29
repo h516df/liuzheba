@@ -21,7 +21,7 @@ gradle_started="$SECONDS"
 gradle_status=0
 bash ./gradlew "${gradle_args[@]}" -I tools/verification.init.gradle testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug 2>&1 | tee "$gradle_log" || gradle_status=$?
 task_summary="$(grep -E '^[[:space:]]*[0-9]+ actionable tasks?:' "$gradle_log" | tail -n 1 || true)"
-{
+if ! {
   printf '### Cloud Gradle checks\n\n'
   printf '| Metric | Result |\n|---|---|\n'
   printf '| Exit status | `%s` |\n' "$gradle_status"
@@ -32,5 +32,7 @@ task_summary="$(grep -E '^[[:space:]]*[0-9]+ actionable tasks?:' "$gradle_log" |
   else
     printf '| Gradle tasks | `summary unavailable` |\n'
   fi
-} >> "$GITHUB_STEP_SUMMARY"
+} >> "$GITHUB_STEP_SUMMARY"; then
+  printf 'warning: could not write GitHub Actions summary\n' >&2
+fi
 exit "$gradle_status"
