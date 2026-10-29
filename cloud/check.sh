@@ -6,8 +6,16 @@ python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
 git diff --check
 export SHICANG_BUILD_PYTHON="$(command -v python3.12)"
 gradle_workers=1
-# Only GitHub-hosted CI has two workers; local checks retain their current limit.
-if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then gradle_workers=2; fi
+# Hosted CI uses a resource-checked limit; local checks retain their current limit.
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  gradle_workers=2
+  # Four isolated 2 GiB forks fit the larger hosted runners, not small machines.
+  if [[ "$(getconf _NPROCESSORS_ONLN)" -ge 4 ]] &&
+     [[ "$(awk '/MemTotal:/ {print $2}' /proc/meminfo)" -ge 12582912 ]]; then
+    gradle_workers=4
+  fi
+  export SHICANG_TEST_FORKS="$gradle_workers"
+fi
 gradle_args=(--no-daemon "--max-workers=${gradle_workers}")
 # GitHub Actions preserves Gradle's task cache between runs; keep local builds unchanged.
 if [[ "${CI:-}" == "true" ]]; then gradle_args+=(--build-cache); fi
@@ -30,6 +38,7 @@ if ! {
   printf '| Exit status | `%s` |\n' "$gradle_status"
   printf '| Elapsed | `%s s` |\n' "$((SECONDS - gradle_started))"
   printf '| Build cache | `%s` |\n' "$([[ "${CI:-}" == "true" ]] && printf enabled || printf disabled)"
+  printf '| Worker limit | `%s` |\n' "$gradle_workers"
   if [[ -n "$task_summary" ]]; then
     printf '| Gradle tasks | `%s` |\n' "$task_summary"
   else

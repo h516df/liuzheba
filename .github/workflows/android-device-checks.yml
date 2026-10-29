@@ -13,6 +13,8 @@ on:
       - 'gradle.properties'
       - 'tools/verification.init.gradle'
       - 'cloud/device_acceptance.sh'
+      - 'cloud/isolated_build.py'
+      - 'cloud/test_isolated_build.py'
       - 'cloud/prepare_upgrade_reference.py'
       - 'cloud/run_official_upgrade.py'
       - 'cloud/verify_upgrade.py'
@@ -62,13 +64,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           cache-read-only: true
-      - name: Build only the isolated debug application and tests
+      - name: Start isolated build alongside emulator cold boot
         run: |
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
           chmod +x gradlew
-          ./gradlew --no-daemon --max-workers=1 -I tools/verification.init.gradle assembleDebug assembleDebugAndroidTest
-      - name: Verify the actual isolated APK before any device test
-        run: python3 cloud/check_apk_identity.py app/build/outputs/apk/debug/app-debug.apk dev.h516.shicang.verification
+          python3 cloud/isolated_build.py start
       - name: Validate optional signed reference origin
         if: inputs.signed_reference_run != '' || inputs.signed_reference_sha != ''
         env:
@@ -130,7 +130,10 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: bash cloud/device_acceptance.sh
+          script: python3 cloud/isolated_build.py wait && bash cloud/device_acceptance.sh
+      - name: Show isolated build log on failure
+        if: failure()
+        run: tail -n 120 "$RUNNER_TEMP/shicang-isolated-build/build.log" || true
       - name: Preserve optional reference harness receipt
         if: success() && inputs.signed_reference_run != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
