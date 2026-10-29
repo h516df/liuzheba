@@ -5,7 +5,10 @@ if [[ -f .cloud/env.sh ]]; then source .cloud/env.sh; fi
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
 git diff --check
 export SHICANG_BUILD_PYTHON="$(command -v python3.12)"
-gradle_args=(--no-daemon --max-workers=1)
+gradle_workers=1
+# Only GitHub-hosted CI has two workers; local checks retain their current limit.
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then gradle_workers=2; fi
+gradle_args=(--no-daemon "--max-workers=${gradle_workers}")
 # GitHub Actions preserves Gradle's task cache between runs; keep local builds unchanged.
 if [[ "${CI:-}" == "true" ]]; then gradle_args+=(--build-cache); fi
 
