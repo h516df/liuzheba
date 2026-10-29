@@ -34,7 +34,7 @@ chaquopy {
     defaultConfig {
         version = "3.12"
         System.getenv("SHICANG_BUILD_PYTHON")?.let { buildPython(it) }
-        pip { install("yt-dlp==2026.8.19"); install("certifi==2026.10.18") }
+        pip { install("yt-dlp==2026.10.26"); install("certifi==2026.10.18") }
     }
 }
 dependencies {

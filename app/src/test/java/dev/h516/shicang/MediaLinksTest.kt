@@ -38,8 +38,15 @@ class MediaLinksTest {
             "抖音 https://v.douyin.com/Synthetic01/ 分享" to "https://v.douyin.com/Synthetic01/",
             "快手 https://v.kuaishou.com/Synthetic02 分享" to "https://v.kuaishou.com/Synthetic02",
             "微博 https://weibo.com/12345/AbCd" to "https://weibo.com/12345/AbCd",
-            "哔哩哔哩 https://www.bilibili.com/video/BVsynthetic" to "https://www.bilibili.com/video/BVsynthetic")
+            "哔哩哔哩 https://www.bilibili.com/video/BVsynthetic" to "https://www.bilibili.com/video/BVsynthetic",
+            "Instagram https://www.instagram.com/reel/De6y3nBMmnZ/?dlrf=synthetic" to "https://www.instagram.com/reel/De6y3nBMmnZ/?dlrf=synthetic")
         social.forEach{(input,expected)->assertEquals(expected,MediaLinks.validUrl(input))}
+        assertEquals("Instagram",Links.title("https://www.instagram.com/reel/De6y3nBMmnZ/"))
+        assertEquals("打开网站",Links.title("https://malicious-instagram.com/reel/De6y3nBMmnZ/"))
+        assertTrue(Links.canResolveFromBrowser("https://www.instagram.com/reel/De6y3nBMmnZ/?dlrf=synthetic"))
+        assertFalse(Links.canResolveFromBrowser("https://www.instagram.com/accounts/login/?next=/reel/De6y3nBMmnZ/"))
+        assertFalse(Links.canResolveFromBrowser("https://www.instagram.com/"))
+        assertFalse(Links.canResolveFromBrowser("https://malicious-instagram.com/reel/De6y3nBMmnZ/"))
     }
     @Test fun failedRemoteDownloadExplainsRetryWithoutMarkingItComplete() {
         assertTrue(mediaDownloadFailure(403).contains("验证"))

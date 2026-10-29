@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'app/src/main/python'))
-from liuce_media import LiuceXhsIE, LiuceDouyinIE, flatten_info, safe_headers, QuietLogger, xhs_album, resolve
+from liuce_media import LiuceXhsIE, LiuceDouyinIE, flatten_info, safe_headers, QuietLogger, xhs_album, xhs_login_redirect_target, resolve
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import ExtractorError
 
@@ -51,6 +51,33 @@ class MediaBridgeTest(unittest.TestCase):
         self.assertEqual(len(result['media']), 2)
         self.assertTrue(all(item['headers']['Referer']==target for item in result['media']))
 
+    def test_xhs_login_redirect_retains_same_site_note_without_following_arbitrary_url(self):
+        from urllib.parse import quote
+        note = 'http://www.xiaohongshu.com/discovery/item/6ae2c6a2000000002b03912d?xsec_token=synthetic'
+        login = 'https://www.xiaohongshu.com/login?redirectPath=' + quote(note, safe='')
+        canonical = note.replace('http://', 'https://', 1)
+        self.assertEqual(canonical, xhs_login_redirect_target(login))
+        for foreign in (
+            'https://attacker.example/discovery/item/6ae2c6a2000000002b03912d',
+            'https://www.xiaohongshu.com.attacker.example/discovery/item/6ae2c6a2000000002b03912d',
+            'https://www.xiaohongshu.com/login',
+            'https://www.xiaohongshu.com/discovery/item/not-a-valid-id',
+        ):
+            self.assertIsNone(xhs_login_redirect_target('https://www.xiaohongshu.com/login?redirectPath=' + quote(foreign, safe='')))
+
+        class Redirect:
+            url = login
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+
+        album = {'title': '图文', '_type': 'liuce_album',
+                 'media': [{'url': 'https://example.com/picture.jpg', 'kind': 'image', 'ext': 'jpg'}]}
+        with patch.object(YoutubeDL, 'urlopen', return_value=Redirect()), \
+                patch.object(LiuceXhsIE, 'extract', return_value=album) as extractor:
+            result = json.loads(resolve('https://xhslink.cn/o/SyntheticShort'))
+        extractor.assert_called_once_with(canonical)
+        self.assertEqual(result['media'][0]['url'], 'https://example.com/picture.jpg')
+
     def test_douyin_album_uses_images_not_video_cover(self):
         extractor = LiuceDouyinIE(self.engine())
         extractor._download_json = lambda *_, **__: {'aweme_detail':{'desc':'合成作品','images':[
@@ -60,6 +87,68 @@ class MediaBridgeTest(unittest.TestCase):
         result = extractor._real_extract('https://www.douyin.com/note/123456789')
         self.assertEqual(len(flatten_info(result)), 2)
         self.assertNotIn('cover.jpg', json.dumps(result))
+
+    def test_douyin_public_playback_remains_usable_when_creator_disables_download(self):
+        """No download_addr is needed when the publisher still exposes a public playable MP4."""
+        detail = {
+            'aweme_id': '7698417431442743418', 'desc': '合成公开播放作品',
+            'video': {
+                'width': 1080, 'height': 1920,
+                'play_addr': {'url_list': ['https://example.com/playback.mp4']},
+                'download_addr': None,
+            },
+            'author': {},
+        }
+        extractor = LiuceDouyinIE(self.engine())
+        extractor._download_json = lambda *_, **__: {'aweme_detail': detail}
+        result = extractor._real_extract('https://www.douyin.com/video/7698417431442743418')
+        self.assertEqual(
+            [item['url'] for item in flatten_info(result)],
+            ['https://example.com/playback.mp4'],
+        )
+
+    def test_douyin_short_share_keeps_public_playback_and_browser_session(self):
+        target = 'https://www.iesdouyin.com/share/video/1234567890123456789/?region=CN&from=share'
+        canonical = 'https://www.douyin.com/video/1234567890123456789'
+
+        class Redirect:
+            url = target
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+
+        def extraction(extractor, url):
+            self.assertEqual(canonical, url)
+            self.assertEqual('synthetic-browser-session', extractor._get_cookies('https://www.douyin.com/')['s_v_web_id'].value)
+            return {'title': '只公开播放', 'formats': [
+                {'url': 'https://example.com/public-playback.mp4', 'ext': 'mp4', 'acodec': 'aac', 'vcodec': 'h264'}]}
+
+        with patch.object(YoutubeDL, 'urlopen', return_value=Redirect()), \
+                patch.object(LiuceDouyinIE, 'extract', extraction):
+            result = json.loads(resolve('https://v.douyin.com/SyntheticShare/',
+                                        's_v_web_id=synthetic-browser-session'))
+        self.assertEqual(result['source'], canonical)
+        self.assertEqual(result['media'][0]['url'], 'https://example.com/public-playback.mp4')
+
+    def test_douyin_missing_playback_metadata_fails_closed(self):
+        extractor = LiuceDouyinIE(self.engine())
+        extractor._download_json = lambda *_, **__: {}
+        with self.assertRaisesRegex(ExtractorError, 'fresh browser session'):
+            extractor._real_extract('https://www.douyin.com/video/7698417431442743418')
+
+    def test_instagram_reel_uses_its_normal_extractor_with_browser_cookies(self):
+        url = 'https://www.instagram.com/reel/De6y3nBMmnZ/?dlrf=synthetic'
+
+        def extraction(ydl, requested_url, download=False):
+            self.assertEqual(url, requested_url)
+            self.assertFalse(download)
+            self.assertEqual('synthetic-session', ydl.cookiejar._cookies['www.instagram.com']['/']['sessionid'].value)
+            return {'title': '公开 Reel', 'formats': [
+                {'url': 'https://example.com/instagram.mp4', 'ext': 'mp4', 'acodec': 'aac', 'vcodec': 'h264'}]}
+
+        with patch.object(YoutubeDL, 'extract_info', extraction):
+            result = json.loads(resolve(url, 'sessionid=synthetic-session'))
+        self.assertEqual(result['source'], url)
+        self.assertEqual(result['media'][0]['url'], 'https://example.com/instagram.mp4')
 
     def test_raw_upstream_video_formats_keep_sound(self):
         result={'formats':[

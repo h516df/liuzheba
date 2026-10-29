@@ -4,7 +4,8 @@ The two album adapters use the same upstream page/API metadata as yt-dlp.
 They return actual album images, never the video thumbnail collection.
 """
 import json
-from urllib.parse import urlparse, urlunparse
+import re
+from urllib.parse import urlparse, urlunparse, parse_qs
 from http.cookiejar import Cookie
 
 from yt_dlp import YoutubeDL
@@ -90,6 +91,32 @@ def safe_headers(headers):
             if key.lower() in ('user-agent', 'referer', 'origin')}
 
 
+def xhs_login_redirect_target(url):
+    """Recover the same-site note URL when a share link lands on the login page.
+
+    The redirect parameter is untrusted. Only a literal Xiaohongshu note URL is
+    accepted; never use this as a general-purpose redirect resolver.
+    """
+    parsed = urlparse(url)
+    if parsed.hostname not in ('www.xiaohongshu.com', 'xiaohongshu.com') or parsed.path != '/login':
+        return None
+    values = parse_qs(parsed.query).get('redirectPath') or []
+    if len(values) != 1:
+        return None
+    try:
+        note = urlparse(values[0])
+        trusted = (note.scheme in ('http', 'https')
+                   and note.hostname in ('www.xiaohongshu.com', 'xiaohongshu.com')
+                   and note.port is None and note.username is None and note.password is None)
+    except ValueError:
+        return None
+    if not trusted:
+        return None
+    if not re.fullmatch(r'/(?:discovery/item|explore)/[0-9a-fA-F]{24}/?', note.path):
+        return None
+    return urlunparse(('https', note.netloc, note.path, '', note.query, ''))
+
+
 def flatten_info(info, limit=100):
     if info.get('_type') == 'liuce_album':
         return info['media'][:limit]
@@ -135,6 +162,9 @@ def resolve(url, browser_cookies=''):
         if host in ('v.douyin.com', 'xhslink.com', 'xhslink.cn') or host.endswith('.xhslink.com'):
             with ydl.urlopen(url) as response:
                 url = response.url
+            recovered = xhs_login_redirect_target(url)
+            if recovered:
+                url = recovered
         parsed = urlparse(url)
         if 'iesdouyin.com' in (parsed.hostname or '') and '/share/video/' in parsed.path:
             url = 'https://www.douyin.com/video/' + parsed.path.split('/share/video/')[1].strip('/')

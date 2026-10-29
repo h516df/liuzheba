@@ -137,7 +137,7 @@ import coil3.compose.AsyncImage
                         }
                     }
                     if(s.busy)item{LinearProgressIndicator(Modifier.fillMaxWidth());Text(s.progress,style=MaterialTheme.typography.bodySmall)}
-                    item {Text("小红书图文请使用作品分享链接。若解析失败，点「打开网页验证」，在网页完成验证后点「返回并解析当前网页」。平台可能限制部分作品的下载；也可从其他 App 直接分享图片、视频到留着吧。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
+                    item {Text("支持小红书、抖音、快手、微博、哔哩哔哩及 Instagram 公开作品链接。若解析失败，点「打开网页验证」，在网页确认作品可查看后点「返回并解析当前网页」。只保存可直接读取的原图或视频，需额外授权或受保护的媒体可能无法下载；也可从其他 App 直接分享图片、视频到留着吧。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)}
                 }
             }
         }
