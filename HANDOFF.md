@@ -1,8 +1,9 @@
-# 当前接续（2026-10-29）：v0.20 已正式发行，开发流程防空转
+# 当前接续（2026-10-29）：v0.20 已正式发行，绿灯收尾流程已改进
 
-- **正式应用事实**：最新 Release 是 [v0.20](https://github.com/h516df/liuzheba/releases/tag/v0.20)，于 2026-10-28 15:55 UTC 公开，发行源码为 `5510326b14446a40189b9114e4e386f196eb47ea`；三资产含正式 universal APK、release-notes.json 和 SHA256.txt。尚无用户手机实体安装/使用验收，不将自动化替代它。正式包、签名、备份结构不因本轮流程优化而修改。
-- **流程优化证据**：[PR #44](https://github.com/h516df/liuzheba/pull/44) 已合并为 `135c82e2afd1b4f2491c6e86718bd6f905cdc4e5`，消除了版本断言硬编码和重复全量 CI。0.20 [PR #43](https://github.com/h516df/liuzheba/pull/43) 的 PR 检查 2026-10-28 12:08 UTC 全绿、15:17 UTC 才合并；后续针对这一约 3 小时 10 分钟间隔引入**逐 PR 显式授权**的绿灯自动合并观察器。该观察器不负责生产发布；自动合并是否工作须由后续带标记的真实 PR 证明，不能用单元测试代替。
-- **接续**：每次先读 GitHub 当前 main、PR 检查、最新 Release，再按 AGENTS 的授权与安全要求接续；本条为 2026-10-29 快照，下方历史“当前”“待发布”文字属于旧时点，不能当实时任务状态。
+- **实际发行**：最新公开 [v0.20](https://github.com/h516df/liuzheba/releases/tag/v0.20) 于 2026-10-28 15:55 UTC 发布，应用源码 `5510326b14446a40189b9114e4e386f196eb47ea`；三资产为正式 universal APK、release-notes.json、SHA256.txt。原签名/包名/SQLite/备份及用户私有资料不受本轮流程改动影响；目标手机的实际安装及使用尚未验。
+- **本轮已完成**：[PR #44](https://github.com/h516df/liuzheba/pull/44) 合并为 `135c82e2afd1b4f2491c6e86718bd6f905cdc4e5`，移除版本升级后硬编码断言和重复全量 CI。0.20 [PR #43](https://github.com/h516df/liuzheba/pull/43) 于 2026-10-28 12:08 UTC 四条检查全绿，15:17 UTC 合并，中间约 3 小时 10 分钟；无法从日志证明等待原因。
+- **进一步改进**：用现有授权开发执行端负责 PR 全绿后的有界检查与合并；配备 `cloud/finish_green_pr.py` 作为可选用户身份终结脚本。GitHub Actions 自带 `GITHUB_TOKEN` 的自动合并会抑制新 main push 触发，可能破坏正式发布的精确主线门禁，因此**未启用**此类高权限 Actions 自动合并。新辅助脚本尚须后续自然产品 PR 的真实授权环境验证；单元测试不能等同于端到端验收。
+- **接续**：先只读核对当前 GitHub main、PR、Actions 和最新 Release；本条是 2026-10-29 快照，下面历史中“当前”“待发布”仅代表当时状态，不能当实时事实。
 
 ---
 
