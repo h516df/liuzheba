@@ -17,23 +17,56 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
+          fetch-depth: 2
+      # A pure finisher-tool PR still receives the required "build" status.
+      # Unknown paths, release branches and every push always build normally.
+      - name: Detect isolated PR maintenance changes
+        id: scope
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && !startsWith(github.head_ref, 'release/') && !startsWith(github.head_ref, 'codex/release/') }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import subprocess
+
+          allowed = {'cloud/finish_green_pr.py', 'cloud/test_finish_green_pr.py'}
+          changed = set()
+          try:
+              parents = subprocess.check_output(
+                  ['git', 'rev-list', '--parents', '-n', '1', 'HEAD'], text=True
+              ).split()
+              if len(parents) == 3:
+                  raw = subprocess.check_output(
+                      ['git', 'diff', '--name-only', '--no-renames', '-z', 'HEAD^1', 'HEAD']
+                  )
+                  changed = set(filter(None, raw.decode('utf-8', 'surrogateescape').split('\0')))
+          except (OSError, subprocess.CalledProcessError, UnicodeError):
+              pass
+          tool_only = bool(changed) and changed <= allowed
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"tool_only={'true' if tool_only else 'false'}\n")
+          print(f'Isolated maintenance PR: {tool_only}; changed files: {len(changed)}')
+          PY
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        if: steps.scope.outputs.tool_only != 'true'
         with:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        if: steps.scope.outputs.tool_only != 'true'
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        if: steps.scope.outputs.tool_only != 'true'
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+        if: steps.scope.outputs.tool_only != 'true'
       # Cloud development already runs full unit, AndroidTest compilation and lint on PR/main.
       # This independent job checks the ordinary .dev APK packaging, without doing the same full suite twice.
       - name: Independent debug APK packaging
-        if: ${{ !startsWith(github.head_ref || github.ref_name, 'release/') && !startsWith(github.head_ref || github.ref_name, 'codex/release/') }}
+        if: ${{ steps.scope.outputs.tool_only != 'true' && !startsWith(github.head_ref || github.ref_name, 'release/') && !startsWith(github.head_ref || github.ref_name, 'codex/release/') }}
         run: chmod +x gradlew && ./gradlew --no-daemon --max-workers=1 assembleDebug
       - name: Final release inputs and unsigned package
         if: startsWith(github.head_ref || github.ref_name, 'release/') || startsWith(github.head_ref || github.ref_name, 'codex/release/')
