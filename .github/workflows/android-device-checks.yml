@@ -110,6 +110,31 @@ jobs:
           fi
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
+      # Cache only a pristine AVD boot snapshot, created before installing test APKs.
+      # PR runs can restore the trusted main-branch cache; each job still runs all tests.
+      - name: Restore clean API 35 emulator snapshot
+        id: avd-cache
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-v1-${{ runner.os }}-api35-googleapis-x86_64-pixel2-2048m
+      - name: Generate clean emulator snapshot on cache miss
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          cores: 2
+          ram-size: 2048M
+          force-avd-creation: false
+          disable-animations: false
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: echo 'Clean emulator snapshot prepared before application tests.'
       - name: Exercise offline synthetic device flows
         env:
           REFERENCE_SHA: ${{ inputs.signed_reference_sha }}
@@ -123,9 +148,10 @@ jobs:
           profile: pixel_2
           cores: 2
           ram-size: 2048M
+          force-avd-creation: false
           disable-animations: true
           emulator-boot-timeout: 600
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot-save -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash cloud/device_acceptance.sh
       - name: Preserve optional reference harness receipt
         if: success() && inputs.signed_reference_run != ''
