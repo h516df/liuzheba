@@ -35,14 +35,14 @@ class ArchiveUiSnapshotTest {
     @Test fun libraryDark()=render("library-dark",dark=true)
     @Test fun detailLight()=render("detail-light",detail=true)
     @Test fun settingsLight()=render("settings-light",settings=true)
-    @Test fun finalReleaseNotesOpenFromSettings()=render("v020-update-notes",settings=true,verify={model->
+    @Test fun finalReleaseNotesOpenFromSettings()=render("current-release-notes",settings=true,verify={model->
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("关于与检查更新"))
         compose.onNodeWithText("关于与检查更新").performClick()
         compose.onNodeWithText("检查更新").assertExists()
-        compose.onNodeWithText("本版说明 0.20").performScrollTo().assertIsDisplayed()
         val notes=model.updater.currentNotes()!!
-        org.junit.Assert.assertEquals("0.20",notes.version)
-        org.junit.Assert.assertEquals(21,notes.code)
+        org.junit.Assert.assertEquals(BuildConfig.VERSION_NAME,notes.version)
+        org.junit.Assert.assertEquals(BuildConfig.VERSION_CODE,notes.code)
+        compose.onNodeWithText("本版说明 ${notes.version}").performScrollTo().assertIsDisplayed()
         notes.sections.flatMap{it.second}.forEach {line->
             compose.onNodeWithText(line).performScrollTo().assertIsDisplayed()
         }

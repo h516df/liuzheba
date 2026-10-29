@@ -1,6 +1,7 @@
 name: Android checks
 on:
   push:
+    branches: [main, 'release/**', 'codex/release/**']
   pull_request:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -29,9 +30,11 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Existing feature validation
+      # Cloud development already runs full unit, AndroidTest compilation and lint on PR/main.
+      # This independent job checks the ordinary .dev APK packaging, without doing the same full suite twice.
+      - name: Independent debug APK packaging
         if: ${{ !startsWith(github.head_ref || github.ref_name, 'release/') && !startsWith(github.head_ref || github.ref_name, 'codex/release/') }}
-        run: chmod +x gradlew && ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
+        run: chmod +x gradlew && ./gradlew --no-daemon --max-workers=1 assembleDebug
       - name: Final release inputs and unsigned package
         if: startsWith(github.head_ref || github.ref_name, 'release/') || startsWith(github.head_ref || github.ref_name, 'codex/release/')
         run: chmod +x gradlew && ./gradlew --no-daemon --max-workers=1 testDebugUnitTest --tests dev.h516.update.EmbeddedReleaseNotesTest --tests dev.h516.shicang.ArchiveUiSnapshotTest.finalReleaseNotesOpenFromSettings assembleRelease -PunsignedRelease=true
@@ -43,8 +46,8 @@ jobs:
           path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Preserve test and lint reports
-        if: always()
+      - name: Preserve release-specific test reports
+        if: ${{ always() && (startsWith(github.head_ref || github.ref_name, 'release/') || startsWith(github.head_ref || github.ref_name, 'codex/release/')) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: archive-ui-checks-${{ github.sha }}
