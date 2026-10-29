@@ -132,6 +132,29 @@ class FinishGuardTest(unittest.TestCase):
         self.assertEqual(result, 2)
         self.assertEqual(mutations, [])
 
+    def test_sensitive_file_appearing_on_refresh_cannot_merge(self):
+        pr, files, checks, sha = copy.deepcopy(fixture())
+        files[0]["filename"] = "README.md"
+        refreshed = [{"filename": ".github/workflows/android.yml"}]
+        reads = iter((files, refreshed))
+        mutations = []
+
+        def api(endpoint, *, method="GET", fields=()):
+            if method != "GET":
+                mutations.append(endpoint)
+                return {"merged": True}
+            if endpoint.endswith("/files?per_page=100"):
+                return next(reads)
+            if endpoint.endswith("/check-runs?per_page=100"):
+                return {"total_count": len(checks), "check_runs": checks}
+            return pr
+
+        with patch.object(helper, "gh_api", side_effect=api), \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = helper.finish_pr(46, sha, merge=True)
+        self.assertEqual(result, 2)
+        self.assertEqual(mutations, [])
+
 
 if __name__ == "__main__":
     unittest.main()
