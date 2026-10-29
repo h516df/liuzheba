@@ -6,6 +6,7 @@ main push workflows required by the official release gate.
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import re
@@ -95,25 +96,36 @@ def read_checks(expected_head):
     return checks
 
 
+def read_snapshot(pr_endpoint, files_endpoint, expected_head):
+    """Fetch independent read-only PR evidence concurrently, once per snapshot."""
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        pr_future = pool.submit(gh_api, pr_endpoint)
+        files_future = pool.submit(gh_api, files_endpoint)
+        checks_future = pool.submit(read_checks, expected_head)
+        return pr_future.result(), files_future.result(), checks_future.result()
+
+
 def finish_pr(pr_number, expected_head, wait_seconds=0, merge=False):
     """Poll only mutable check results; revalidate the full PR before a finish."""
     pr_endpoint = f"repos/{REPO}/pulls/{pr_number}"
     files_endpoint = f"{pr_endpoint}/files?per_page=100"
     deadline = time.monotonic() + wait_seconds
-    pr = gh_api(pr_endpoint)
-    files = gh_api(files_endpoint)
+    pr, files, checks = read_snapshot(pr_endpoint, files_endpoint, expected_head)
     waited = False
+    last_reason = None
+    last_report_at = None
     while True:
-        checks = read_checks(expected_head)
         ready, reason = guard(pr, files, checks, expected_head)
         if ready and (waited or merge):
             # The PR can change while checks run. Never merge using cached
             # ownership, branch, file scope or check-run evidence.
-            pr = gh_api(pr_endpoint)
-            files = gh_api(files_endpoint)
-            checks = read_checks(expected_head)
+            pr, files, checks = read_snapshot(pr_endpoint, files_endpoint, expected_head)
             ready, reason = guard(pr, files, checks, expected_head)
-        print(f"PR #{pr_number} {expected_head[:12]}: {reason}", flush=True)
+        now = time.monotonic()
+        if reason != last_reason or last_report_at is None or now - last_report_at >= 180:
+            print(f"PR #{pr_number} {expected_head[:12]}: {reason}", flush=True)
+            last_reason = reason
+            last_report_at = now
         if ready:
             if not merge:
                 print("Read-only: use --merge after authorization and review")
@@ -127,9 +139,12 @@ def finish_pr(pr_number, expected_head, wait_seconds=0, merge=False):
             print(f"Merged at {merged['sha']}; now verify main push checks", flush=True)
             return 0
         if not reason.startswith("waiting for ") or time.monotonic() >= deadline:
+            if reason.startswith("waiting for "):
+                print(f"PR #{pr_number}: wait deadline reached", flush=True)
             return 2
         waited = True
         time.sleep(min(30, max(0, deadline - time.monotonic())))
+        checks = read_checks(expected_head)
 
 
 def main():
