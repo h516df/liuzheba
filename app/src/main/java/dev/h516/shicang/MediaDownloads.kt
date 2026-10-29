@@ -63,6 +63,10 @@ object MediaLinks {
 data class MediaDownload(val id:String,val title:String,val source:String,val kind:String,val ext:String,val managerId:Long,
     val generation:String,val state:String="等待下载",val percent:Int=0,val bytes:Long=0,val archiveId:String="",val failure:String="")
 
+/** Only formal archives are safe to hide from the download queue. Drafts need their resume entry. */
+internal fun completedDownloadRecords(jobs:List<MediaDownload>,formalArchiveIds:Set<String>):List<MediaDownload> =
+    jobs.filter{it.archiveId.isNotBlank() && it.archiveId in formalArchiveIds}
+
 /** DownloadManager separates HTTP rejections from transient transport and storage failures. */
 internal fun mediaDownloadFailure(reason:Int):String = when(reason) {
     401,403->"平台拒绝访问：请打开网页验证，再重新解析"
@@ -130,5 +134,21 @@ class MediaDownloads(private val context:Context) {
         }
     }
     @Synchronized fun imported(id:String,archive:String) {val jobs=read();write(jobs.map{if(it.id==id)it.copy(archiveId=archive) else it});jobs.firstOrNull{it.id==id}?.let{manager.remove(it.managerId)}}
-    @Synchronized fun remove(id:String) {val jobs=read();jobs.firstOrNull{it.id==id}?.let{manager.remove(it.managerId);file(it).delete()};write(jobs.filter{it.id!=id})}
+    @Synchronized fun remove(id:String) {
+        val jobs=read();val target=jobs.firstOrNull{it.id==id} ?: return
+        // Commit the journal first. A failed write must not destroy a still-listed download.
+        write(jobs.filter{it.id!=id})
+        runCatching{manager.remove(target.managerId)}
+        file(target).delete()
+    }
+    /** One journal transaction frees the history cap without discarding downloads or draft recovery. */
+    @Synchronized fun clearCompleted(formalArchiveIds:Set<String>):Int {
+        val jobs=read();val current=generation()
+        val completed=completedDownloadRecords(jobs.filter{it.generation==current},formalArchiveIds)
+        if(completed.isEmpty())return 0
+        val ids=completed.map{it.id}.toSet()
+        write(jobs.filterNot{it.id in ids})
+        completed.forEach{job->runCatching{manager.remove(job.managerId)};file(job).delete()}
+        return completed.size
+    }
 }
