@@ -3,7 +3,7 @@ package dev.h516.update
 import org.json.JSONArray
 
 /** 发布里挂的一个文件。 */
-data class UpdateAsset(val id: Long, val size: Long, val name: String, val apiDigest: String?)
+data class UpdateAsset(val id: Long, val size: Long, val name: String, val apiDigest: String?,val publicUrl:String?=null)
 
 /** 一个已经发布、并且带中文说明文件的版本。 */
 internal data class PublishedUpdate(
@@ -21,6 +21,16 @@ data class UpdateCandidate(
 )
 
 internal object UpdateCatalog {
+
+    /** An API-free fallback can only offer the official universal APK and SHA256 manifest. */
+    fun fromOfficialLatestTag(tag:String):PublishedUpdate {
+        val version=versionOf(tag) ?: throw UpdateFailure("官方发布版本号不正确，已停止更新")
+        val names=listOf(UpdateConfig.notesName(version),"${UpdateConfig.APK_PREFIX}-v$version-universal.apk",UpdateConfig.shaName(version))
+        val assets=names.map { name ->
+            UpdateAsset(0,0,name,null,UpdateConfig.releaseAssetUrl(version,name))
+        }
+        return PublishedUpdate(tag,version,assets.first(),assets)
+    }
 
     sealed class Result {
         class Latest(val notes: ReleaseNotes?) : Result()

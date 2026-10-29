@@ -92,7 +92,8 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
             is UpdateState.Available -> {
                 Text("发现新版本 ${state.candidate.notes.version}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    text = "安装包约 ${state.candidate.apk.size / 1024 / 1024 + 1} MB，校验通过后将打开系统安装确认",
+                    text = if(state.candidate.apk.size>0) "安装包约 ${state.candidate.apk.size / 1024 / 1024 + 1} MB，校验通过后将打开系统安装确认"
+                        else "从官方发布页获取安装包，下载后会核对完整性与签名",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -103,12 +104,10 @@ fun UpdateScreen(updater: Updater, contentPadding: PaddingValues) {
             }
 
             is UpdateState.Downloading -> {
-                Text("正在下载 ${state.percent}%", fontSize = 15.sp)
+                Text(if(state.percent<0) "正在下载官方安装包…" else "正在下载 ${state.percent}%", fontSize = 15.sp)
                 TextButton(onClick=updater::cancel){Text("取消下载")}
-                LinearProgressIndicator(
-                    progress = { state.percent / 100f },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if(state.percent<0)LinearProgressIndicator(modifier=Modifier.fillMaxWidth())
+                else LinearProgressIndicator(progress={state.percent / 100f},modifier=Modifier.fillMaxWidth())
             }
 
             is UpdateState.ReadyToInstall -> {

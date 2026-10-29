@@ -23,7 +23,7 @@ internal class UpdateHttp(
         if (cancelled || Thread.currentThread().isInterrupted) throw InterruptedException()
     }
 
-    private fun open(url: String, binary: Boolean): HttpURLConnection {
+    private fun open(url: String, binary: Boolean, web: Boolean = false): HttpURLConnection {
         ensureAlive()
         val c = connect(url)
         connection = c
@@ -33,9 +33,9 @@ internal class UpdateHttp(
         c.setRequestProperty("User-Agent", UpdateConfig.APK_PREFIX + "-updater")
         c.setRequestProperty(
             "Accept",
-            if (binary) "application/octet-stream" else "application/vnd.github+json",
+            if (web) "text/html" else if (binary) "application/octet-stream" else "application/vnd.github+json",
         )
-        c.setRequestProperty("X-GitHub-Api-Version", "2026-03-10")
+        if (!web) c.setRequestProperty("X-GitHub-Api-Version", "2026-03-10")
         return c
     }
 
@@ -52,10 +52,33 @@ internal class UpdateHttp(
         }
     }
 
+    /** Independent public web redirect when the anonymous REST API is rate-limited. */
+    fun officialLatestTag():String {
+        val c=open("${UpdateConfig.PUBLIC_RELEASES}/latest",binary=false,web=true)
+        try {
+            val code=c.responseCode
+            if(code !in setOf(301,302,303,307,308)) {
+                status(code)
+                throw UpdateFailure("官方发布入口暂时无法确认，请稍后重试")
+            }
+            return UpdateConfig.latestTagFromLocation(c.getHeaderField("Location").orEmpty())
+                ?: throw UpdateFailure("官方发布地址不可信，已停止更新")
+        } finally {c.disconnect();connection=null}
+    }
+
     /** 下载资产（安装包或校验文件）。全程匿名，且只认 GitHub 的资产域名。 */
     fun <T> asset(id: Long, read: (InputStream) -> T): T {
         requireUpdate(id > 0, "更新资料不完整，请稍后重试")
-        var url = "${UpdateConfig.API}/releases/assets/$id"
+        return fetchAsset("${UpdateConfig.API}/releases/assets/$id",read)
+    }
+
+    fun <T> asset(resource:UpdateAsset,read:(InputStream)->T):T = if(resource.publicUrl!=null) {
+        requireUpdate(UpdateConfig.publicAssetUrl(resource.publicUrl,resource.name),"更新下载地址不可信，已停止")
+        fetchAsset(resource.publicUrl,read)
+    } else asset(resource.id,read)
+
+    private fun <T> fetchAsset(initialUrl:String,read:(InputStream)->T):T {
+        var url=initialUrl
         repeat(4) {
             val c = open(url, binary = true)
             try {
@@ -80,10 +103,17 @@ internal class UpdateHttp(
     fun assetText(id: Long): String = asset(id) { input ->
         String(readBounded(input, 512 * 1024), Charsets.UTF_8)
     }
+    fun assetText(resource:UpdateAsset):String = asset(resource) { input ->
+        String(readBounded(input,512 * 1024),Charsets.UTF_8)
+    }
 
     /** 下载安装包到指定文件，边下边报进度（0-100）。大小必须和发布资料一致。 */
-    fun downloadApk(id: Long, expectedSize: Long, dest: File, onProgress: (Int) -> Unit) {
-        asset(id) { input ->
+    fun downloadApk(id: Long, expectedSize: Long, dest: File, onProgress: (Int) -> Unit) =
+        downloadApk(UpdateAsset(id,expectedSize,"",null),expectedSize,dest,onProgress)
+
+    fun downloadApk(resource:UpdateAsset,expectedSize:Long,dest:File,onProgress:(Int)->Unit) {
+        requireUpdate(expectedSize in 1..UpdateConfig.MAX_APK || (expectedSize==0L && resource.publicUrl!=null),"安装包大小信息无效，已停止下载")
+        asset(resource) { input ->
             dest.outputStream().use { out ->
                 val buffer = ByteArray(64 * 1024)
                 var written = 0L
@@ -103,14 +133,14 @@ internal class UpdateHttp(
                         }
                     }
                 }
-                requireUpdate(written == expectedSize, "安装包下载不完整，请重试")
+                requireUpdate(written in 1..UpdateConfig.MAX_APK && (expectedSize==0L || written==expectedSize), "安装包下载不完整，请重试")
             }
         }
     }
 
     private fun status(code: Int) {
         if (code in 200..299) return
-        throw UpdateFailure(
+        throw UpdateHttpStatusFailure(code,
             when (code) {
                 401, 403, 429 -> "公开更新暂时不可用或请求过多，请稍后重试"
                 404 -> "没找到更新资料，可能这个版本还没发布"
