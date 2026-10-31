@@ -134,7 +134,8 @@ class DispatchTests(unittest.TestCase):
                 release.tag_is_free(TAG)
 
     def test_read_only_default_does_not_call_gh_workflow(self):
-        with patch.object(release, "preflight", return_value={"sourceSha": SHA, "tag": TAG}), \
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), \
+             patch.object(release, "preflight", return_value={"sourceSha": SHA, "tag": TAG}), \
              patch.object(release, "command") as command, contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(release.main(["--expected-sha", SHA, "--tag", TAG]), 0)
         command.assert_not_called()
@@ -142,7 +143,8 @@ class DispatchTests(unittest.TestCase):
 
     def test_dispatch_requires_explicit_flag(self):
         result = type("Result", (), {"returncode": 0, "stdout": "https://github.com/h516df/liuzheba/actions/runs/123"})()
-        with patch.object(release, "preflight", return_value={"sourceSha": SHA, "tag": TAG}), \
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), \
+             patch.object(release, "preflight", return_value={"sourceSha": SHA, "tag": TAG}), \
              patch.object(release, "command", return_value=result) as command, \
              contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(release.main(["--expected-sha", SHA, "--tag", TAG, "--dispatch"]), 0)
