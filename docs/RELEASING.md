@@ -67,3 +67,18 @@ gh workflow run production-release.yml --ref main -f expected_sha=<已核实的m
 2026-10-23草稿API修复：未公开草稿可能尚无Git标签，`GET /releases/tags/{tag}`会返回404。发行脚本分页检查含草稿的版本占用，并检查Git标签；通过创建Release的POST响应取得ID，之后按`/releases/{id}`核对身份/资产、公开与回读。既有草稿或标签均阻止重复创建；不覆盖资产。正文从当前版本的`docs/releases/{tag}.md`读取。
 
 0.17发行中首次遇到该404：构建、原签名和真实覆盖升级已通过，三资产也已上传，随后经Release ID421590291逐项核对后公开原草稿，未重传或替换资产。原工作流publish失败记录保留；Release的源码/标签为6826b378061acb117eb08a2515d9070e792f1e3b，后续脚本修复不改变已发布安装包。遇到部分发布失败应先检查现存Release ID、target源码及签名/升级/资产摘要，再接续；不要盲目重跑创建步骤或删除已公开发行。
+
+## 2026-10-31 发布接力与本机 CLI 入口
+
+v0.22 的实际路径：PR [#61](https://github.com/h516df/liuzheba/pull/61) 同源检查全部成功后合入 main `3b4123c4890e7108d884b5f1c64b23b88b3d045b`；该 SHA 的四组 main push 检查全部成功。原有 GitHub 连接器不能直接启动 `workflow_dispatch`，云端浏览器也没有已登录会话；**最后在一台已授权的本机 Windows 设备上复用现有 Desktop Commander 终端及 `gh` 登录，启动既有受保护工作流**。没有复制/输出实际令牌，没有更换签名、GitHub 权限、工作流触发条件或创建另一条发布链。
+
+新加入的 `tools/release/dispatch_verified.py` 是可选的**用户会话预检**。它要求完整且等于当前 main 的 SHA、官方公开仓库、`h516df` 已登录身份、与 tag 一致的发布说明、无占用 Release/草稿/标签及相同源码上未完成的正式发布任务，以及当前 main 精确 SHA 的 Cloud、Android、隔离设备和 Secret 四组 push 成功结果；查询不完整或网络失败则停止。默认只读，19 项合成回归已接入现有 Cloud development Python 检查；**仅在当前任务已有正式发行授权后**才可显式加 `--dispatch`：
+
+```sh
+python tools/release/dispatch_verified.py --expected-sha <当前main完整SHA> --tag v0.23
+python tools/release/dispatch_verified.py --expected-sha <当前main完整SHA> --tag v0.23 --dispatch
+```
+
+Windows 使用同一条 `python` 命令；须在具备 `gh` 且已获授权登录的工作环境运行。脚本不替代受保护 `production-release.yml`、`release_gate.py`、原签名隔离和旧版真实升级验证；不允许在 GitHub Actions 中以自带 `GITHUB_TOKEN` 运行。已经发布的版本会因标签占用而拒绝，不能拿以上示例修改或重发 v0.22。用户明确使用本机/DSH时，先发现现有可用终端和身份，不预设浏览器已登录，也不因某个连接器缺少 dispatch 就提前交还用户；没有可用权限时明确停下。
+
+发布后仍由负责人读回完整 Actions 结论、公开正式 Release 的准确源码、非草稿/非预发行、三个原生附件的大小和 GitHub 摘要及 latest；最后才给 APK 下载链接。**v0.22 已发布**：[Run #41178310812](https://github.com/h516df/liuzheba/actions/runs/41178310812) 的 build、sign、upgrade、publish 均 success；[正式 Release](https://github.com/h516df/liuzheba/releases/tag/v0.22) 为非草稿稳定版，APK `shicang-v0.22-universal.apk` 大小 105720492 字节、SHA256 `9a6342ba36d944b5c31e4f1bc4bbd02bf17282aa47c985933aa62d3730d0c327`。模拟器原签名旧版覆盖升级通过，不代表用户 v0.20 手机实际安装与私人资料检查已完成。
