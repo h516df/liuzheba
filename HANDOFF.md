@@ -1,9 +1,9 @@
-# 当前接续（2026-10-31）：开发反馈提速、设备稳定性与发布观察
+# 当前接续（2026-10-31）：开发反馈提速已并入 main，验证轻量维护 PR
 
-- **基线**：v0.22 已正式发布且公开，最新已核实 main `960e917c84f0176067c3ee0deea1947332647f15`，保留原包名/正式签名/资料格式及已有 Release。当前主分支文档工具 PR #62 合并后的 [设备验收 41181386589](https://github.com/h516df/liuzheba/actions/runs/41181386589) 首次和重跑都因 Pixel Launcher 系统 ANR 遮挡 UI 失败；其余 Cloud、Android、Secret push checks 通过。原因调查 [Issue #63](https://github.com/h516df/liuzheba/issues/63)。
-- **实施任务**：分支 `chore/ci-fast-device-stability`，只改 GitHub PR 轻量验收的保守变更分类、API35 模拟器资源与失败诊断、发布后安全观察/断线续查及说明，不修改 Android 产品代码、签名或发布工作流。`cloud/ci_scope.py` 与 tests 限制文档/用户态工具变更走 Python 回归，版本元数据/发行工具链/任何不明改动仍完整编译；main push 与正式发行门禁不减。
-- **本地检查**：`python3 -m unittest discover -s cloud -p 'test_*.py'` 95/95、`python3 -m unittest discover -s tools/release -p 'test_*.py'` 21/21；`bash -n cloud/device_acceptance.sh`、三个 Actions YAML 解析、`git diff --check` 均通过。这些只是离线验证，不是 GitHub PR/原生设备通过。正式 GitHub PR、main push 和设备重跑结果必须以精确 SHA 实际记录为准。
-- **发布续查**：在已有授权本机 `gh` 会话，新版可 `dispatch_verified.py --dispatch --wait-seconds 1200` 观察完成，超时后仅以 `observe_verified.py` 只读核对同源现有 run；不得重复派发。脚本不执行生产签名、重打已发布 v0.22、手机覆盖升级或三条真实平台作品下载。后续优先完成 GitHub 上的全量 CI、确认 Issue #63 是否真正可关闭，并以真实维护类 PR 测量快速通道耗时。
+- **成果**：v0.22 公开 Release 完全保留，包名/签名/数据格式未变。保守 PR 变更分类、模拟器资源/失败诊断与正式发布安全观察已通过 [PR #64](https://github.com/h516df/liuzheba/pull/64) 合入 main `7e8326b0c5ea5c69f039ac2abb9ec2fe1e9d689f`，其源码树 `f7fe89a8e84f6f38b21641404ff894e9380159c9` 与 PR 受测源码树一致。
+- **GitHub 验收 passed**：PR head `304b9a97f9b2905b1135f7d9760860e570d5f2bb` 的 [Cloud](https://github.com/h516df/liuzheba/actions/runs/41188994570)、[Android](https://github.com/h516df/liuzheba/actions/runs/41188994571)、[device](https://github.com/h516df/liuzheba/actions/runs/41188994568)、[Secret](https://github.com/h516df/liuzheba/actions/runs/41188994586) 均 success；该精确 main SHA 的 [Cloud](https://github.com/h516df/liuzheba/actions/runs/41189449208)、[Android](https://github.com/h516df/liuzheba/actions/runs/41189449215)、[device](https://github.com/h516df/liuzheba/actions/runs/41189449216)、[Secret](https://github.com/h516df/liuzheba/actions/runs/41189449210) 也均 success。API35 未再出现 Pixel Launcher ANR，但只能称两次 CI 未复现，不能认定永久消除；跟踪 [Issue #63](https://github.com/h516df/liuzheba/issues/63)。
+- **本地检查 passed**：`python3 -m unittest discover -s cloud -p 'test_*.py'` 95/95、`python3 -m unittest discover -s tools/release -p 'test_*.py'` 21/21、三个 Actions YAML 解析、`bash -n cloud/device_acceptance.sh`、`git diff --check`。当前分支 `chore/ci-fastlane-handoff-proof` 仅维护本交接及 `docs/CI_OPTIMIZATION.md`，用于以真实 GitHub PR 验证新增文档/工具快速通道是否缩短等待；本项结果以 PR 现场为准，不把预期当验收。
+- **发布续查**：在已有授权本机 `gh` 会话，新版可 `dispatch_verified.py --dispatch --wait-seconds 1200` 观察完成，超时后仅以 `observe_verified.py` 只读核对同源现有 run；不得重复派发。脚本不执行生产签名、重打已发布 v0.22、手机覆盖升级或三条真实平台作品下载。真实维护类 PR 的速度仍需用其自身流水线测量；今后遇到模拟器 ANR 再按 Issue #63 的诊断证据调查，不靠无限重试。
 
 ---
 
