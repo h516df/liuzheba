@@ -49,3 +49,10 @@ main push、正式发布、签名隔离、原包名/证书、v0.16→新 APK 数
 | 新 main `34c2365` · [41203704055](https://github.com/h516df/liuzheba/actions/runs/41203704055) | 396 s | 340 s | 53 executed / 44 cached |
 
 **解释边界**：PR 的24%端到端改善没有在第一次main上等幅复现，main仅约6%。原基线从 `testDebugUnitTest` 至 `lintDebug` 的日志间隔约273秒，PR约228秒，新main约283秒，不能在只有一次A/B和一次main样本时推断JIT参数已经稳定减少测试时间。保留完整回归与隔离；未来正常业务 main push 继续积累可比样本，若反复变慢再决定撤销。仅发布用户态 CI 改动，不重发 v0.22、签名或迁移数据。
+
+
+## 预热实验的第二次 main 证据与保守回退（2026-10-31）
+
+[PR #71](https://github.com/h516df/liuzheba/pull/71) 只有 `HANDOFF.md` 与本文件，维护快车道 Cloud [41204400365](https://github.com/h516df/liuzheba/actions/runs/41204400365) 23秒 success、未执行 Android Gradle；该 PR 的 Android、Secret 也 success。合并后 main `40c91cc9f70098dd5d794f3c31cbdbeb7ec15ada` 四组 push 中 [Cloud 41204487496](https://github.com/h516df/liuzheba/actions/runs/41204487496) **failure**，另外三组 success。
+
+Cloud 日志明确是 **330 个 JVM/Compose 测试中一个 `ProductJourneyUiTest.discoveryFeedReturnsToSameMediaAfterReadingAndEditing` 在 `ProductJourneyUiTest.kt:52` 抛 `ComposeTimeoutException`**，并非编译/JVM 参数非法。此前此测试及同夹具测试曾有时序性故障，不能把这一次归因于新JIT参数，亦不能忽略失败或继续声称稳定提速24%。为最小化变量，`fix/revert-jit-warmup-after-flake-20261031` 候选撤回仅CI使用的 `-XX:TieredStopAtLevel=1`，恢复原2个测试fork/每类新JVM，保留330项完整回归和所有其它检查。需在新 PR/main 精确提交复验；如故障仍存在，则独立定位 Compose 异步回流/可见计数，不用减少测试覆盖来换绿灯。
