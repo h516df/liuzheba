@@ -21,3 +21,10 @@ main push、正式发布、签名隔离、原包名/证书、v0.16→新 APK 数
 - GitHub main：合并精确受测源码后，四组 main push 必须 success，特别核对设备 ANR 是否真的消失。
 - 效率对比：用相同基线的一次真实 docs/maintenance-only PR 记录最快和最慢检查耗时；不要把单机本地单测 0.05 秒冒充 CI 端到端耗时。
 - 未进行正式新版本发布；也未进行目标手机安装、真实小红书/抖音/Instagram 作品下载验证。
+
+## 第一次端到端 CI 结果（2026-10-31）
+
+- [PR #64](https://github.com/h516df/liuzheba/pull/64) `304b9a97f9b2905b1135f7d9760860e570d5f2bb` 的四组 PR 检查全部 success（Cloud 41188994570、Android 41188994571、device 41188994568、Secret 41188994586）。实际 Cloud 日志确认 `ci_scope=full`、`changed_files=14`，符合本 PR 修改 CI 分类器必须完整验收的预期。
+- squash 后 main `7e8326b0c5ea5c69f039ac2abb9ec2fe1e9d689f` 的 Cloud [41189449208](https://github.com/h516df/liuzheba/actions/runs/41189449208)、Android [41189449215](https://github.com/h516df/liuzheba/actions/runs/41189449215)、device [41189449216](https://github.com/h516df/liuzheba/actions/runs/41189449216) 和 Secret [41189449210](https://github.com/h516df/liuzheba/actions/runs/41189449210) 均 success。
+- PR 与 main 各完成一次 API35 原生设备验收且没有再出现 Pixel Launcher ANR，说明扩大资源配置后的两次观测有效。两次绿灯不证明系统级 ANR 已永远消失；故障再次出现时以收集的系统事件调查。没有修改/忽略原生验收用例。
+- 新快车道尚未由独立纯维护 PR 证明实际耗时。本次后续的交接文档改动只触及 `HANDOFF.md` 与本文件，恰属于保守允许名单；其真实 PR 工作流需要展示 `ci_scope=maintenance` 且没有 Android Gradle 构建，才能记为端到端提效通过。
