@@ -34,3 +34,18 @@ main push、正式发布、签名隔离、原包名/证书、v0.16→新 APK 数
 - [PR #65](https://github.com/h516df/liuzheba/pull/65) 仅修改 `HANDOFF.md` 与本文件，GitHub Cloud/Android 日志均为 `ci_scope=maintenance`、`changed_files=2`；Cloud 41189973646、Android 41189973624、Secret 41189973603 全 success，最慢 Cloud 从 09:45:21 UTC 创建到 09:45:34 UTC 完成，**约13秒**，且没有运行 Android Gradle。此提速只适用于严格的维护允许名单。
 - 该维护 PR 合入后的 main `161664d` 首次发现一项已有的 Compose 测试入口偶发失败（Cloud 41190024539 330项中1失败），已在 [PR #66](https://github.com/h516df/liuzheba/pull/66) 第二版改为 `useUnmergedTree=true` 与等待真实卡片标题，修正版 PR Cloud 41191105217 success，main `0899341` Cloud 41191628016 success。测试没有被删除/跳过。
 - main `0899341` 的 API35 device [41191628221](https://github.com/h516df/liuzheba/actions/runs/41191628221) 又暴露另一种独立环境失败：emulator 启动时报 `Not enough space to create userdata partition`，实际可用约6169 MB、需要约7373 MB，设备根本未连接，未执行一项 App 原生用例；不能归类为 Launcher ANR 或产品回归。下一次修正保留4GiB RAM，明确通过 pinned Android emulator runner 的 `disk-size: 3072M` 限制虚拟数据分区，待 GitHub PR/main 真实设备结果判定有效性。
+
+
+## JVM 短生命周期测试调优实测（2026-10-31）
+
+- 根因候选：`app/build.gradle.kts` 为避免 Robolectric 原生 SQLite/graphics 跨测试类残留而固定 `forkEvery=1`；本仓库约49个 Kotlin 测试源文件，启动多个短期 JVM 成为真实开销。不能为速度直接移除进程隔离。
+- 三路并发 [PR #69](https://github.com/h516df/liuzheba/pull/69) 保留测试但 Cloud 从421秒至422秒、Gradle步骤从363秒至387秒，四组检查虽全成功仍**不合并**。
+- 两路并发保留，[PR #70](https://github.com/h516df/liuzheba/pull/70) 仅给 GitHub CI 的测试 JVM 加 `-XX:TieredStopAtLevel=1`。PR 的四组检查 success，main `34c236554551c67e400a3308ae8a2a0e45606aa6` 的四组 push 也全部 success。本地弱电脑仍1 worker，生产 APK 不使用此标志。
+
+| 同类完整检查 | Cloud 端到端 | `Check this revision` | Gradle任务 |
+| --- | ---: | ---: | --- |
+| 旧 main `d83b680` · [41194031404](https://github.com/h516df/liuzheba/actions/runs/41194031404) | 421 s | 363 s | 53 executed / 44 cached |
+| PR #70 `c289cbd` · [41203216673](https://github.com/h516df/liuzheba/actions/runs/41203216673) | 322 s | 283 s | 53 executed / 44 cached |
+| 新 main `34c2365` · [41203704055](https://github.com/h516df/liuzheba/actions/runs/41203704055) | 396 s | 340 s | 53 executed / 44 cached |
+
+**解释边界**：PR 的24%端到端改善没有在第一次main上等幅复现，main仅约6%。原基线从 `testDebugUnitTest` 至 `lintDebug` 的日志间隔约273秒，PR约228秒，新main约283秒，不能在只有一次A/B和一次main样本时推断JIT参数已经稳定减少测试时间。保留完整回归与隔离；未来正常业务 main push 继续积累可比样本，若反复变慢再决定撤销。仅发布用户态 CI 改动，不重发 v0.22、签名或迁移数据。

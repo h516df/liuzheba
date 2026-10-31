@@ -1,3 +1,13 @@
+# 当前接续（2026-10-31）：Cloud JVM 测试预热调优的精确证据
+
+- **已合入安全范围内的 CI 参数**：[PR #70](https://github.com/h516df/liuzheba/pull/70) head `c289cbdf2eff5151e328888b4bb69ac374ce23e1`，squash main `34c236554551c67e400a3308ae8a2a0e45606aa6`。仅在 `GITHUB_ACTIONS=true` 的隔离测试 JVM 上增加 `-XX:TieredStopAtLevel=1`；`forkEvery=1`、最多2个 CI 测试 fork、全部测试/lint任务不变，本地仍为1 worker。
+- **精确回执**：该 PR 的 [Cloud 41203216673](https://github.com/h516df/liuzheba/actions/runs/41203216673)、[Android 41203216708](https://github.com/h516df/liuzheba/actions/runs/41203216708)、[API35 device 41203216703](https://github.com/h516df/liuzheba/actions/runs/41203216703)、[Secret 41203216737](https://github.com/h516df/liuzheba/actions/runs/41203216737) 全 success；main 同源 [Cloud 41203704055](https://github.com/h516df/liuzheba/actions/runs/41203704055)、[Android 41203704097](https://github.com/h516df/liuzheba/actions/runs/41203704097)、[API35 device 41203704090](https://github.com/h516df/liuzheba/actions/runs/41203704090)、[Secret 41203704046](https://github.com/h516df/liuzheba/actions/runs/41203704046) 均 completed/success。
+- **速度实测/不要过度承诺**：同一原基线 main `d83b680` Cloud 421秒、Gradle步骤363秒；PR #70 为322秒/283秒（分别减约24%/22%）；首次合并 main 为396秒/340秒（分别减约6%/6%）。三次均 97 个Gradle任务、53个执行、44个缓存。由于 runner/缓存波动，**当前只证明这两次改动运行通过且首次main比基线短25秒，不保证稳定24%**。main 测试段近似283秒，甚至略长于原基线273秒，后续仍需多次观察。
+- **已排除反例**：[PR #69](https://github.com/h516df/liuzheba/pull/69) 三路并发实测 Cloud 422秒、核心Gradle 387秒，未提速已关闭、未合并；不要重复无证据地增加fork数、放宽Robolectric native SQLite隔离、删测试或跳正式发布门禁。
+- **待后续**：观察正常业务变更的独立 main push 耗时与测试稳定性；只有多次证实 JVM 预热策略持续有益才称长期收益。现有 v0.22 正式资产、签名与私人资料不变；本轮未触发正式发布或手机安装。详见 `docs/CI_OPTIMIZATION.md`。
+
+---
+
 # 当前接续（2026-10-31）：Compose 共享测试夹具等待首屏数据
 
 - **新的失败证据**：[PR #67](https://github.com/h516df/liuzheba/pull/67) head `374c3dc4cd35b6a51fa20846416085dcc78d8d1c` 四组检查 success，设备实际执行8/8项，随后 squash 合入 main `23d1dc66b18c24e00cfbae090e97f5d0d6a97dfb`，源树 `beaa33986759e92b2e2dd5d75bdb649f9a0d972d` 精确一致。该 main 的 Secret 41193011776、Android 41193011666、device 41193011663 success，**Cloud [41193011635](https://github.com/h516df/liuzheba/actions/runs/41193011635) failed**：330 个 JVM/Compose 用例中 `ProductJourneyUiTest.undoRemovingAllMediaRestoresOrderCoverAndPreservesText` 在第15行初次点击档案标题抛 AssertionError；App 源码未变。
