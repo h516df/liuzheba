@@ -1,3 +1,11 @@
+# 当前接续（2026-10-31）：第二次 main 回归失败，撤回 JVM 预热实验
+
+- **新证据（不可忽略）**：纯交接文档 [PR #71](https://github.com/h516df/liuzheba/pull/71) 的维护快车道三组检查 success、Cloud约23秒；squash main `40c91cc9f70098dd5d794f3c31cbdbeb7ec15ada` 的 [Cloud 41204487496](https://github.com/h516df/liuzheba/actions/runs/41204487496) **failure**：330项 JVM/Compose 用例中 `ProductJourneyUiTest.discoveryFeedReturnsToSameMediaAfterReadingAndEditing` 在源码第52行 `mediaNumber(3)` 等待超时；[Android 41204487612](https://github.com/h516df/liuzheba/actions/runs/41204487612)、[API35 device 41204487503](https://github.com/h516df/liuzheba/actions/runs/41204487503)、[Secret 41204487451](https://github.com/h516df/liuzheba/actions/runs/41204487451) 均 success。文档改动不涉及 App。
+- **保守处理**：PR #70 的 JVM `-XX:TieredStopAtLevel=1` 曾在 PR 与第一次 main 全绿，但第二次 main 的 1/330 测试超时暴露不稳定。**尚无证据证明超时由 JIT 参数引起**，此前无参数时 Compose 也出现过类似入口时序失败；但增加性能调优变量不利定位，先通过独立 `fix/revert-jit-warmup-after-flake-20261031` 撤回这一**仅用于CI**的试验设置，保留原有 `forkEvery=1`、CI两个fork和全部断言。
+- **未完成与门禁**：回退候选需在新 PR 全量跑 Cloud/Android/API35/Secret，若 Cloud 仍在相同测试失败应调查实际 UI 状态/异步回流，不添加任意 sleep、关闭测试或降低发布门禁；main 精确 SHA 继续全绿后才能称稳定。原签名、正式 v0.22 资产、手机数据、生产发布不变。原测量及失败实验保留在下方历史和 `docs/CI_OPTIMIZATION.md`。
+
+---
+
 # 当前接续（2026-10-31）：Cloud JVM 测试预热调优的精确证据
 
 - **已合入安全范围内的 CI 参数**：[PR #70](https://github.com/h516df/liuzheba/pull/70) head `c289cbdf2eff5151e328888b4bb69ac374ce23e1`，squash main `34c236554551c67e400a3308ae8a2a0e45606aa6`。仅在 `GITHUB_ACTIONS=true` 的隔离测试 JVM 上增加 `-XX:TieredStopAtLevel=1`；`forkEvery=1`、最多2个 CI 测试 fork、全部测试/lint任务不变，本地仍为1 worker。

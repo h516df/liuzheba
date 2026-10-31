@@ -71,12 +71,8 @@ android.testOptions.unitTests.apply {
         // Robolectric native SQLite finalizers can outlive a sandbox. Do not reuse
         // one JVM across classes which select different SQLite/graphics modes.
         it.forkEvery = 1
-        // Preserve one JVM per class; limit concurrent forks to two in GitHub CI.
-        if (System.getenv("GITHUB_ACTIONS") == "true") {
-            it.maxParallelForks = 2
-            // Each fork is short lived; trial quicker warmup without changing test isolation.
-            it.jvmArgs("-XX:TieredStopAtLevel=1")
-        }
+        // Keep a fresh JVM per test class, but overlap two forks on GitHub Actions.
+        if (System.getenv("GITHUB_ACTIONS") == "true") it.maxParallelForks = 2
         it.maxHeapSize = "2g"
         it.systemProperty("java.io.tmpdir", rootProject.file(".gradle/test-tmp").also { it.mkdirs() }.absolutePath)
         it.systemProperty("user.home", rootProject.file(".gradle/task-home").also { it.mkdirs() }.absolutePath)
