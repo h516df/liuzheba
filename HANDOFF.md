@@ -2,7 +2,7 @@
 
 - **现场**：纯维护 PR [#65](https://github.com/h516df/liuzheba/pull/65) 在精确 head `5579bcec514b4cb694779a485bf380b61b1b9b9d` 上以 `ci_scope=maintenance` 真实执行 3 组 PR 检查，全 completed/success，创建至全部完成约 13 秒，未运行 Android Gradle；适用的 Android device PR path 条件未触发。squash 合入 main `161664d38aa70766008da1fabe1450ba29bd4d64`，两份文档变更不涉及 App。
 - **main 失败原证据**：该 SHA 的 [Cloud development 41190024539](https://github.com/h516df/liuzheba/actions/runs/41190024539) 330 个 JVM/Compose 用例中1个失败：`ProductJourneyUiTest.allMediaBackReturnsToTheExactViewerRatherThanLeavingIt` 在 `ProductJourneyUiTest.kt:103` 的档案标题 `onNodeWithText` 点击处抛 AssertionError；Android 41190024583、API35 device 41190024597、Secret 41190024443 均 success。上一个 App 源码相同的 main `7e8326b` 四组成功；测试入口的语义/首帧定位不稳是当前推断，不把偶发现象伪称业务回归或永久已修。
-- **正在验证的修正**：独立 `fix/ui-test-stable-archive-entry` 分支只调整该测试使用现有「打开档案：名称」content description，等待出现后执行真实点击；所有返回媒体位置的后续断言保持。等待 GitHub PR 的完整 Cloud、Android、设备和安全检查，成功后由负责人按原合并约定推进并核对新的 exact main SHA。普通调试编译/原签名/数据结构/正式 Release 未改；本云端宿主只有 JDK17，无 JDK21/SDK36，因此不能把本地语法审查冒充 Kotlin 单测通过。
+- **诊断返工**：[PR #66](https://github.com/h516df/liuzheba/pull/66) 第一版 head `34735794e16c2efeb3c15784009f9ab4e03be24d` 的 [Cloud 41190558908](https://github.com/h516df/liuzheba/actions/runs/41190558908) 仍在同一测试第107行 `idle` 等待处抛 ComposeTimeoutException；原因是「打开档案：名称」content description 仅在发现页存在，档案墙 `ArchiveStoryCard` 实际是点击包含标题的列（`ProductExperience.kt`）。此版不合并；当前迭代改为等待并点击**未合并语义树里实际可见的档案标题**，沿用本测试另一个已存在且成功的点击模式，保留所有媒体顺序和返回位置断言。普通调试编译/原签名/资料结构/正式 Release 未改；本云端宿主只有 JDK17，无 JDK21/SDK36，因此不能把本地语法审查冒充 Kotlin 单测通过。PR/new main 的准确结果仍须读回。
 
 ---
 

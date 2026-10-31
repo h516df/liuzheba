@@ -100,12 +100,12 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
     }
 
     @Test fun allMediaBackReturnsToTheExactViewerRatherThanLeavingIt()=fixture {_,a->
-        // The visible card title may be merged into its parent semantics while
-        // the first frame is settling. Use the accessible archive action and
-        // wait for it to appear, without skipping the actual user navigation.
-        val openArchive="打开档案：${a.name}"
-        idle{compose.onAllNodesWithContentDescription(openArchive).fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithContentDescription(openArchive).assertIsDisplayed().performClick()
+        // ArchiveStoryCard's visible title is inside its clickable column;
+        // the discovery-only "打开档案：..." description is not on library cards.
+        // As in undoRemovingAllMedia..., use the unmerged text's actual bounds
+        // and wait for library search/results to settle before the real touch.
+        idle{compose.onAllNodesWithText(a.name,useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText(a.name,useUnmergedTree=true).assertIsDisplayed().performClick()
         compose.onNodeWithTag("archive-media-${a.photos[1].id}").performScrollTo().performClick()
         assertEquals(2,mediaNumber(3))
         compose.onNodeWithContentDescription("更多").performClick()
