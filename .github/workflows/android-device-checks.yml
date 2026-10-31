@@ -130,6 +130,11 @@ jobs:
           # Keep this same image/coverage but give system services headroom.
           cores: 4
           ram-size: 4096M
+          # The default userdata partition can require >7 GiB of host disk;
+          # GitHub runners sometimes have <6.2 GiB free after SDK/build setup.
+          # Synthetic acceptance uses small files: 3 GiB is sufficient while
+          # retaining 4 GiB system RAM to avoid Pixel Launcher ANRs.
+          disk-size: 3072M
           disable-animations: true
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none

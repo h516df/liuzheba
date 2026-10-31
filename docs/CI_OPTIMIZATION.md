@@ -28,3 +28,9 @@ main push、正式发布、签名隔离、原包名/证书、v0.16→新 APK 数
 - squash 后 main `7e8326b0c5ea5c69f039ac2abb9ec2fe1e9d689f` 的 Cloud [41189449208](https://github.com/h516df/liuzheba/actions/runs/41189449208)、Android [41189449215](https://github.com/h516df/liuzheba/actions/runs/41189449215)、device [41189449216](https://github.com/h516df/liuzheba/actions/runs/41189449216) 和 Secret [41189449210](https://github.com/h516df/liuzheba/actions/runs/41189449210) 均 success。
 - PR 与 main 各完成一次 API35 原生设备验收且没有再出现 Pixel Launcher ANR，说明扩大资源配置后的两次观测有效。两次绿灯不证明系统级 ANR 已永远消失；故障再次出现时以收集的系统事件调查。没有修改/忽略原生验收用例。
 - 新快车道尚未由独立纯维护 PR 证明实际耗时。本次后续的交接文档改动只触及 `HANDOFF.md` 与本文件，恰属于保守允许名单；其真实 PR 工作流需要展示 `ci_scope=maintenance` 且没有 Android Gradle 构建，才能记为端到端提效通过。
+
+## 维护快车道与第三轮设备异常补充
+
+- [PR #65](https://github.com/h516df/liuzheba/pull/65) 仅修改 `HANDOFF.md` 与本文件，GitHub Cloud/Android 日志均为 `ci_scope=maintenance`、`changed_files=2`；Cloud 41189973646、Android 41189973624、Secret 41189973603 全 success，最慢 Cloud 从 09:45:21 UTC 创建到 09:45:34 UTC 完成，**约13秒**，且没有运行 Android Gradle。此提速只适用于严格的维护允许名单。
+- 该维护 PR 合入后的 main `161664d` 首次发现一项已有的 Compose 测试入口偶发失败（Cloud 41190024539 330项中1失败），已在 [PR #66](https://github.com/h516df/liuzheba/pull/66) 第二版改为 `useUnmergedTree=true` 与等待真实卡片标题，修正版 PR Cloud 41191105217 success，main `0899341` Cloud 41191628016 success。测试没有被删除/跳过。
+- main `0899341` 的 API35 device [41191628221](https://github.com/h516df/liuzheba/actions/runs/41191628221) 又暴露另一种独立环境失败：emulator 启动时报 `Not enough space to create userdata partition`，实际可用约6169 MB、需要约7373 MB，设备根本未连接，未执行一项 App 原生用例；不能归类为 Launcher ANR 或产品回归。下一次修正保留4GiB RAM，明确通过 pinned Android emulator runner 的 `disk-size: 3072M` 限制虚拟数据分区，待 GitHub PR/main 真实设备结果判定有效性。
