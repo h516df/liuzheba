@@ -1,3 +1,11 @@
+# 当前接续（2026-10-31）：Compose 共享测试夹具等待首屏数据
+
+- **新的失败证据**：[PR #67](https://github.com/h516df/liuzheba/pull/67) head `374c3dc4cd35b6a51fa20846416085dcc78d8d1c` 四组检查 success，设备实际执行8/8项，随后 squash 合入 main `23d1dc66b18c24e00cfbae090e97f5d0d6a97dfb`，源树 `beaa33986759e92b2e2dd5d75bdb649f9a0d972d` 精确一致。该 main 的 Secret 41193011776、Android 41193011666、device 41193011663 success，**Cloud [41193011635](https://github.com/h516df/liuzheba/actions/runs/41193011635) failed**：330 个 JVM/Compose 用例中 `ProductJourneyUiTest.undoRemovingAllMediaRestoresOrderCoverAndPreservesText` 在第15行初次点击档案标题抛 AssertionError；App 源码未变。
+- **共性根因**：`UnifiedNavigationFixture.fixture()` 原来只等待 `AppModel.ready`，但 `ArchiveLibraryScreen` 的搜索结果在独立的 `LaunchedEffect(s.library, selection, ...)` 后才填到 `results`。测试过早点击会偶发找不到档案卡片；PR #66 只在另一条用例单独等卡片，未覆盖全部同夹具测试。
+- **当前最小修复**：独立 `fix/compose-fixture-wait-ready` 从该 main 开始，在 `UnifiedNavigationFixture.fixture` 初始化后统一等待 seeded synthetic archive 的真实可见标题（未合并语义树），再调用各测试的 `check`。保留 15 秒有界等待、全部330项业务断言和原生设备测试，找不到卡片仍然失败；不添加任意 sleep、忽略失败或产品代码更改。本地仅可做 Python/源码检查，真实 Kotlin/Compose 回归以新的 PR + 精确 main SHA 的 CI 为准。v0.22 正式资产继续不变。
+
+---
+
 # 当前接续（2026-10-31）：API35 模拟器启动磁盘空间不足
 
 - **精确来源**：`fix/ui-test-stable-archive-entry` 的 [PR #66](https://github.com/h516df/liuzheba/pull/66) 修正版 head `f2e738b9463690683e47f475c16a1987c1fc6ae3` 三组 PR CI success 后 squash 合入 main `08993418601e65978ed5de449335363c91a2e97c`（树 `e906faf972644255f59357873c4a196b1623e73b` 与受测一致）。该 main 的 [Cloud 41191628016](https://github.com/h516df/liuzheba/actions/runs/41191628016)、Android 41191628093、Secret 41191628044 success，原 330 个 JVM/Compose 回归修复有效；但是 [API35 device 41191628221](https://github.com/h516df/liuzheba/actions/runs/41191628221) **在启动模拟器前失败，没有执行原生用例**。
