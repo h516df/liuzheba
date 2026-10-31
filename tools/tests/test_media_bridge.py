@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'app/src/main/python'))
-from liuce_media import LiuceXhsIE, LiuceDouyinIE, flatten_info, safe_headers, QuietLogger, xhs_album, xhs_login_redirect_target, resolve, work_author
+from liuce_media import LiuceXhsIE, LiuceDouyinIE, flatten_info, safe_headers, QuietLogger, xhs_album, xhs_login_redirect_target, xhs_error_redirect_target, resolve, work_author
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import ExtractorError
 
@@ -87,6 +87,28 @@ class MediaBridgeTest(unittest.TestCase):
             result = json.loads(resolve('https://xhslink.cn/o/SyntheticShort'))
         extractor.assert_called_once_with(canonical)
         self.assertEqual(result['media'][0]['url'], 'https://example.com/picture.jpg')
+
+    def test_xhs_404_share_redirect_only_recovers_trusted_note_id_and_token(self):
+        note_id = '6956513d000000001e022eda'
+        target = f'https://www.xiaohongshu.com/discovery/item/{note_id}?source=webshare&xsec_token=synthetic-token%3D&xsec_source=pc_share'
+        broken = f'https://www.xiaohongshu.com/404?source=note&noteId={note_id}&xsec_token=synthetic-token%3D'
+        self.assertEqual(target, xhs_error_redirect_target(broken))
+        self.assertIsNone(xhs_error_redirect_target(broken.replace('xiaohongshu.com', 'xiaohongshu.com.attacker.example')))
+        self.assertIsNone(xhs_error_redirect_target(broken.replace(note_id, 'invalid-id')))
+        self.assertIsNone(xhs_error_redirect_target(broken + '&xsec_token=second-token'))
+
+        class Redirect:
+            url = broken
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+
+        album = {'title': '可访问图文', '_type': 'liuce_album',
+                 'media': [{'url': 'https://example.com/original.jpg', 'kind': 'image', 'ext': 'jpg'}]}
+        with patch.object(YoutubeDL, 'urlopen', return_value=Redirect()), \
+                patch.object(LiuceXhsIE, 'extract', return_value=album) as extractor:
+            result = json.loads(resolve('https://xhslink.cn/o/SyntheticShort'))
+        extractor.assert_called_once_with(target)
+        self.assertEqual(result['source'], target)
 
     def test_douyin_album_uses_images_not_video_cover(self):
         extractor = LiuceDouyinIE(self.engine())

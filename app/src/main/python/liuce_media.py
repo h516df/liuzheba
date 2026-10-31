@@ -5,7 +5,7 @@ They return actual album images, never the video thumbnail collection.
 """
 import json
 import re
-from urllib.parse import urlparse, urlunparse, parse_qs
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 from http.cookiejar import Cookie
 
 from yt_dlp import YoutubeDL
@@ -147,6 +147,27 @@ def xhs_login_redirect_target(url):
     return urlunparse(('https', note.netloc, note.path, '', note.query, ''))
 
 
+def xhs_error_redirect_target(url):
+    """Recover a literal note ID/token when a trusted share redirects to /404.
+
+    Some platform shares use a fallback error URL even though the note remains
+    readable in a normal browser. This only reconstructs that same platform's
+    public note address; it cannot turn an inaccessible note into a download.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme != 'https' or parsed.hostname not in ('www.xiaohongshu.com', 'xiaohongshu.com') or parsed.path != '/404':
+        return None
+    values = parse_qs(parsed.query)
+    ids = values.get('noteId') or []
+    if len(ids) != 1 or not re.fullmatch(r'[0-9a-fA-F]{24}', ids[0]):
+        return None
+    tokens = values.get('xsec_token') or []
+    if len(tokens) > 1 or tokens and not re.fullmatch(r'[A-Za-z0-9_=-]{1,256}', tokens[0]):
+        return None
+    query = urlencode({'source': 'webshare', 'xsec_token': tokens[0], 'xsec_source': 'pc_share'}) if tokens else ''
+    return urlunparse(('https', 'www.xiaohongshu.com', '/discovery/item/' + ids[0], '', query, ''))
+
+
 def flatten_info(info, limit=100):
     if info.get('_type') == 'liuce_album':
         return info['media'][:limit]
@@ -192,7 +213,7 @@ def resolve(url, browser_cookies=''):
         if host in ('v.douyin.com', 'xhslink.com', 'xhslink.cn') or host.endswith('.xhslink.com'):
             with ydl.urlopen(url) as response:
                 url = response.url
-            recovered = xhs_login_redirect_target(url)
+            recovered = xhs_login_redirect_target(url) or xhs_error_redirect_target(url)
             if recovered:
                 url = recovered
         parsed = urlparse(url)
