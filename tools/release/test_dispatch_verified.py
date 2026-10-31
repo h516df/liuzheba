@@ -150,6 +150,30 @@ class DispatchTests(unittest.TestCase):
             self.assertEqual(release.main(["--expected-sha", SHA, "--tag", TAG, "--dispatch"]), 0)
         self.assertEqual(command.call_args.args[-1], f"expected_sha={SHA}")
 
+    def test_dispatch_can_wait_for_verified_publish(self):
+        result = type("Result", (), {"returncode": 0, "stdout": "queued"})()
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), \
+             patch.object(release, "preflight", return_value={"sourceSha": SHA, "tag": TAG}), \
+             patch.object(release, "command", return_value=result), \
+             patch("observe_verified.observe", return_value={"status": "verified"}) as observer, \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(release.main(["--expected-sha", SHA, "--tag", TAG,
+                                           "--dispatch", "--wait-seconds", "1200"]), 0)
+        observer.assert_called_once_with(SHA, TAG, wait_seconds=1200)
+        self.assertIn('"status": "verified"', output.getvalue())
+
+    def test_dispatch_observation_failure_does_not_retry_dispatch(self):
+        result = type("Result", (), {"returncode": 0, "stdout": "queued"})()
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), \
+             patch.object(release, "preflight", return_value={"sourceSha": SHA, "tag": TAG}), \
+             patch.object(release, "command", return_value=result) as command, \
+             patch("observe_verified.observe", side_effect=RuntimeError("release still pending")), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(release.main(["--expected-sha", SHA, "--tag", TAG,
+                                           "--dispatch", "--wait-seconds", "30"]), 2)
+        command.assert_called_once()
+        self.assertIn("BLOCKED", output.getvalue())
+
     def test_ci_cannot_dispatch(self):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
              patch.object(release, "preflight") as preflight, \

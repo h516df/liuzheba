@@ -17,6 +17,12 @@ bash cloud/check.sh
 
 GitHub Actions 的 **Cloud development** 在 PR、main 推送及手动运行时检查。通过结果绑定当前提交；构建和模拟器通过不能替代实体手机验收。依赖与缓存可重建，代码必须提交到分支并推送，临时工作区不是长期资料备份。
 
+### 按实际变更分层验收（2026-10-31）
+
+PR 的 Cloud development / Android checks 共用只读 `cloud/ci_scope.py`：仅对**准确列入允许名单**的文档/发布辅助工具改动执行 Python 回归与安全检查；只修改 Python 社媒提取器时执行离线桥接测试；其他变更、缺少 PR merge parent、未知路径或变更分类器自身时继续完整 Android 检查。`cloud/test_ci_scope.py` 对分层规则做失败保护回归。隔离设备检查仍按其独立 paths 运行，不在分层脚本内伪造绿灯。
+
+**main push 一律保留完整构建/设备验收**，正式发布仍要求精确同源四组 main push 成功和受保护原签名覆盖升级；优化 PR 等待不允许跳过发布门禁。当前测量和设备 ANR 跟踪见 [CI 优化记录](docs/CI_OPTIMIZATION.md)。
+
 ## 当前边界
 
 原证书已接入受保护的 `android-signing` 环境，普通检查不读取正式密钥。普通 debug 为 `.dev`，原生合成验证包为 `.verification`；正式包名不变。真实产品签名与可移植恢复入口及验收边界见 [SIGNING_PREPARATION](docs/SIGNING_PREPARATION.md)。安装升级与资料保留仍需单独验证。

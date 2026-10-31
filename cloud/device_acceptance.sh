@@ -1,5 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Diagnostics are limited to the disposable synthetic-test emulator. In
+# particular, an Android launcher ANR should not be reported as an app bug or
+# silently retried until it happens to pass. Keep the real test exit status.
+device_diagnostics_on_failure() {
+  local result=$?
+  if (( result != 0 )) && command -v adb >/dev/null 2>&1; then
+    echo '::group::Android emulator failure diagnostics (synthetic device)'
+    echo 'Device state:'
+    timeout 10s adb devices -l || true
+    echo 'Android boot completed:'
+    timeout 10s adb shell getprop sys.boot_completed || true
+    echo 'Recent system ANR/crash events:'
+    timeout 15s adb logcat -b events -d -t 800 -v brief 2>/dev/null \
+      | grep -Ei 'am_anr|am_crash|am_proc_died|wm_activity_launch_time' \
+      | tail -n 60 || true
+    echo '::endgroup::'
+  fi
+}
+trap device_diagnostics_on_failure EXIT
+
+if [[ "$(timeout 15s adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]]; then
+  echo '::error::Android emulator has not completed boot; UI tests were not started.'
+  exit 1
+fi
 adb shell settings put secure show_ime_with_hard_keyboard 1
 adb shell wm size 720x1280
 adb shell wm density 240

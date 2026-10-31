@@ -119,9 +119,15 @@ def main(argv=None):
     parser.add_argument("--expected-sha", required=True)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--dispatch", action="store_true", help="explicitly start the existing protected workflow")
+    parser.add_argument("--wait-seconds", type=int, default=0,
+                        help="after explicit dispatch, observe its run and public assets for at most 1800 seconds")
     args = parser.parse_args(argv)
     if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
         parser.error("Use an existing user GitHub session, never GitHub Actions GITHUB_TOKEN")
+    if args.wait_seconds and not args.dispatch:
+        parser.error("--wait-seconds needs --dispatch; inspect an existing run with observe_verified.py")
+    if not 0 <= args.wait_seconds <= 1800:
+        parser.error("--wait-seconds must be between 0 and 1800")
 
     try:
         receipt = preflight(args.expected_sha, args.tag)
@@ -134,6 +140,11 @@ def main(argv=None):
         if result.returncode:
             raise RuntimeError("Dispatch result is unknown; inspect workflow runs before retrying")
         print(result.stdout.strip() or "Dispatched; inspect the workflow page for its run ID")
+        if args.wait_seconds:
+            # Import after dispatch so this utility is still usable by itself.
+            from observe_verified import observe
+            print(json.dumps(observe(args.expected_sha, args.tag, wait_seconds=args.wait_seconds),
+                             ensure_ascii=False))
         return 0
     except (RuntimeError, ValueError) as exc:
         print(f"BLOCKED: {exc}")

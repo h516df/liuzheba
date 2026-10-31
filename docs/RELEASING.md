@@ -79,6 +79,20 @@ python tools/release/dispatch_verified.py --expected-sha <当前main完整SHA> -
 python tools/release/dispatch_verified.py --expected-sha <当前main完整SHA> --tag v0.23 --dispatch
 ```
 
+新版本获明确发行授权、上述预检合格后，可在**同一已登录的用户终端**一次性启动并等待正式结果：
+
+```sh
+python tools/release/dispatch_verified.py --expected-sha <当前main完整SHA> --tag v0.23 --dispatch --wait-seconds 1200
+```
+
+这只是调用原有受保护流水线并**只读**核对已完成的 build/sign/upgrade/publish、同源公开 Release、三个资产大小与 GitHub SHA256 及 stable latest；并不会绕开签名/覆盖安装门禁，也不会声称已验证手机。如果派发后网络中断、等待超时或返回状态未知，**不要重复 --dispatch**。先用以下命令只读恢复对原运行的核查；已有失败或多次运行要人工分析原任务和副作用：
+
+```sh
+python tools/release/observe_verified.py --expected-sha <原main完整SHA> --tag v0.23 --wait-seconds 1200
+```
+
+观察脚本本身不能发布，所有返回的 `phoneUpgrade` 固定为 `not_tested`。默认不等待；无真实匹配运行、同源/作业/附件/摘要证据缺失时拒绝报成功。`--wait-seconds` 最大 1800；此选项不会在 GitHub Actions 内运行。
+
 Windows 使用同一条 `python` 命令；须在具备 `gh` 且已获授权登录的工作环境运行。脚本不替代受保护 `production-release.yml`、`release_gate.py`、原签名隔离和旧版真实升级验证；不允许在 GitHub Actions 中以自带 `GITHUB_TOKEN` 运行。已经发布的版本会因标签占用而拒绝，不能拿以上示例修改或重发 v0.22。用户明确使用本机/DSH时，先发现现有可用终端和身份，不预设浏览器已登录，也不因某个连接器缺少 dispatch 就提前交还用户；没有可用权限时明确停下。
 
 发布后仍由负责人读回完整 Actions 结论、公开正式 Release 的准确源码、非草稿/非预发行、三个原生附件的大小和 GitHub 摘要及 latest；最后才给 APK 下载链接。**v0.22 已发布**：[Run #41178310812](https://github.com/h516df/liuzheba/actions/runs/41178310812) 的 build、sign、upgrade、publish 均 success；[正式 Release](https://github.com/h516df/liuzheba/releases/tag/v0.22) 为非草稿稳定版，APK `shicang-v0.22-universal.apk` 大小 105720492 字节、SHA256 `9a6342ba36d944b5c31e4f1bc4bbd02bf17282aa47c985933aa62d3730d0c327`。模拟器原签名旧版覆盖升级通过，不代表用户 v0.20 手机实际安装与私人资料检查已完成。
