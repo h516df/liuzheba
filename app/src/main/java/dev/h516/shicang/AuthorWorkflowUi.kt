@@ -20,8 +20,9 @@ import androidx.compose.ui.unit.dp
 
 private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nickname.isNotBlank()}?.nickname ?: "未填写称呼的作者"}
 
-@Composable internal fun AuthorsLibrary(model:AppModel,s:AppState) {
+@Composable internal fun AuthorsLibrary(model:AppModel,s:AppState,openArchive:(String)->Unit) {
     var query by rememberSaveable{mutableStateOf("")}
+    var browsing by remember {mutableStateOf<String?>(null)}
     val authors=remember(s.library.authors,query){s.library.authors.filter{author->
         query.isBlank() || authorTitle(author).contains(query,true) || author.identities.any{it.nickname.contains(query,true) || it.publicAccount.contains(query,true) || it.platform.contains(query,true)}
     }}
@@ -34,9 +35,30 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
         LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             if(authors.isEmpty())item{Text(if(query.isBlank()) "还没有作者，添加主页后可关联档案。" else "没有匹配的作者。",color=MaterialTheme.colorScheme.onSurfaceVariant)}
             items(authors,key={it.id}){author->AuthorCard(author,model){
+                val count=s.library.active.count{archive->author.id in archive.authorIds}
+                GalleryTextButton(onClick={browsing=author.id}){Text("查看珍藏（$count）")}
                 GalleryTextButton(onClick={model.openAuthors();model.previewAuthor(author)},enabled=!s.busy){Text("编辑作者卡")}
                 GalleryTextButton(onClick={model.openAuthors()},enabled=!s.busy){Text("管理关联档案")}
             }}
+        }
+    }
+    val chosen=s.library.authors.firstOrNull{it.id==browsing}
+    if(chosen!=null) {
+        val linked=s.library.active.filter{chosen.id in it.authorIds}.sortedByDescending{it.updated}
+        ModalBottomSheet(onDismissRequest={browsing=null}) {
+            Column(Modifier.fillMaxWidth().padding(horizontal=20.dp)) {
+                Text(authorTitle(chosen),style=MaterialTheme.typography.headlineSmall)
+                Text("${linked.size} 份档案 · ${linked.sumOf{it.photos.size}} 项珍藏",
+                    Modifier.padding(vertical=8.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max=520.dp),verticalArrangement=Arrangement.spacedBy(12.dp),
+                    contentPadding=PaddingValues(bottom=24.dp)) {
+                    if(linked.isEmpty())item{Text("还没有关联的珍藏；可以在档案详情中关联这位作者。")}
+                    items(linked,key={it.id}) { archive ->
+                        ArchiveStoryCard(archive,s.library,model,true,
+                            open={browsing=null;openArchive(archive.id)},view={browsing=null;openArchive(archive.id)})
+                    }
+                }
+            }
         }
     }
 }

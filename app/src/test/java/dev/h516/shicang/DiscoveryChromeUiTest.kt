@@ -77,6 +77,16 @@ class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
     }
 }
 
+class AuthorCollectedWorksUiTest:UnifiedNavigationFixture() {
+    @Test fun creatorCardOpensItsLinkedWorksWithoutEditingAnything()=fixture {model,a->
+        compose.onNodeWithText("作者").performClick()
+        compose.onNodeWithText("查看珍藏（1）").performClick()
+        compose.onNodeWithText("1 份档案 · 3 项珍藏").assertExists()
+        compose.onNodeWithText(a.name).assertExists()
+        assertTrue(model.state.value.library.drafts.isEmpty())
+    }
+}
+
 /** A fake player verifies control geometry only, without claiming codec playback. */
 class DiscoveryPlayerChromeUiTest:UnifiedNavigationFixture() {
     @Test fun progressStaysAboveFloatingNavigation() {
