@@ -61,3 +61,9 @@
 - **同一负责人留在任务中跟到结果**。尽早建立 PR，等待时只做不冲突的工作；全绿后及时核对精确 SHA、分支保护、现有授权和变更范围并合并。默认使用已有授权的 GitHub 连接；有现成用户态 `gh` 的开发环境可用 `python3 cloud/finish_green_pr.py --pr N --expected-head FULL_SHA --wait-seconds 1800 --merge` 在有界时间内接续，脚本先确认安全条件，基础设施与发行敏感变更走人工核对。没有现成 CLI 时通过已连接 GitHub 工具处理，不要求用户配置新凭据。
 - **禁止在 GitHub Actions 内用自带 `GITHUB_TOKEN` 自动合并本仓库产品 PR**：此类合并可能不触发 main 推送工作流，而正式 `release_gate.py` 强制要求精确 main SHA 的 push 检查。助手不得为了缩短等待绕过这一门禁、自动触发签名发布或新添高权限 token；生产发行仍按现有明确授权、安全条件和真实验收执行。
 - 合并后继续确认 main 上同源检查和（任务确实要求时的）正式产物状态，HANDOFF 首页用最新实际证据替换过时“待发版”记录；不能仅以脚本已执行或 PR 已合并宣称手机可用。
+
+## 2026-10-31 正式发行的工具接力经验
+
+- v0.22 发行期间，GitHub 连接器能审阅/合并但不提供 `workflow_dispatch`；云端浏览器未登录并不等于用户没有可用发布权限。下一次已获正式发布授权时，**主动发现当前已连接的用户态本机终端/DSH/Remote Desktop Commander 等通道**，逐项核对设备在线、`gh` 存在、实际登录账号与仓库权限；本轮经核实可用的是一台已授权本机的 Desktop Commander 和 `gh`，不能据此声称所有将来的设备或 DSH 都可用。
+- 优先在已有授权环境中运行只读 `tools/release/dispatch_verified.py --expected-sha <精确main SHA> --tag <新版本>`，确认官方公开仓库、发布说明、未占用标签及同源四组 main push 全绿；**只有本次已有明确发行授权**才用 `--dispatch` 调用既有 `production-release.yml`。脚本只是便利入口，正式安全门禁仍在受保护的 GitHub 工作流里。
+- 不从本地终端提取/打印 GitHub 凭据，不安装新认证、不新增 Actions 高权限 token，不修改触发器来绕过手动发行；失败回执不确定时先查是否已产生 Actions run，不能盲重放。发布后实际回读 run 的 build/sign/upgrade/publish、Release/最新版本、源码 SHA、三资产大小和 SHA256；模拟器升级与手机实测分开写明。
