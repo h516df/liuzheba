@@ -172,7 +172,8 @@ import java.io.File
                         current?.let{p->DropdownMenuItem(text={Text("写这项媒体的笔记")},onClick={menu=false;model.noteEditor.open("media",p.id,"${a.name} · ${if(p.isVideo) "视频" else "照片"}")})}
                         DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
                         discovery?.let { action ->
-                            DropdownMenuItem(text={Text(if(action.random) "随机预览 · 已开启" else "固定封面 · 已开启")},onClick={menu=false;action.toggle()})
+                            action.filter?.let { open -> DropdownMenuItem(text={Text("筛选珍藏")},onClick={menu=false;open()}) }
+                            if(!action.workMode) DropdownMenuItem(text={Text(if(action.random) "随机预览 · 已开启" else "固定封面 · 已开启")},onClick={menu=false;action.toggle()})
                             DropdownMenuItem(text={Text("换一轮")},onClick={menu=false;action.refresh()})
                         }
                         if(a.photos.isNotEmpty()) DropdownMenuItem(text={Text("全部媒体")},onClick={menu=false;allPhotos()})
