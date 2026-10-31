@@ -237,7 +237,7 @@ private val Muted: Color
                     route=="library"->libraryState.SaveableStateProvider("library:$librarySection") {
                         when(librarySection) {
                             "notes"->NotesLibrary(model,s.library)
-                            "authors"->AuthorsLibrary(model,s)
+                            "authors"->AuthorsLibrary(model,s,::openDetails)
                             else->ArchiveLibraryScreen(model,s,{openDetails(it)},{a->selected=a.id;zoomPhoto=positions[a.id]?.takeIf{id->a.photos.any{it.id==id}} ?: a.coverPhoto()?.id.orEmpty()})
                         }
                     }

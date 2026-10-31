@@ -43,6 +43,37 @@ class AuthorStoreTest {
         val a=Author(identities=listOf(AuthorProfiles.parse("https://www.douyin.com/user/synthetic_sec_uid")!!))
         store.saveAuthor(a);assertEquals("",store.load().authors.single().name);assertEquals("",store.load().authors.single().identities.single().nickname)
     }
+    @Test fun importedWorksReuseTheSameVerifiedPlatformAuthorWithoutTouchingDrafts()=runBlocking {
+        val profile="https://www.xiaohongshu.com/user/profile/syntheticAccount123"
+        val first=Archive(name="第一条作品");val second=Archive(name="第二条作品");val third=Archive(name="已有手稿")
+        store.draft(first);store.draft(second);store.save(third);store.draft(third.copy(name="未保存的文字编辑"))
+        val firstId=store.linkImportedAuthor(profile,"创作者原昵称",first.id)
+        val secondId=store.linkImportedAuthor(profile,"改名后的昵称",second.id)
+        val thirdId=store.linkImportedAuthor(profile,"第三个昵称",third.id)
+        assertEquals(firstId,secondId);assertEquals(firstId,thirdId)
+        val l=store.load()
+        assertEquals(1,l.authors.size)
+        assertEquals("创作者原昵称",l.authors.single().name)
+        assertTrue(l.drafts.all{firstId in it.authorIds})
+        assertEquals("未保存的文字编辑",l.drafts.first{it.id==third.id}.name)
+        assertEquals(listOf(firstId),l.active.single().authorIds)
+    }
+    @Test fun sameNicknamesAcrossDifferentPlatformIdsNeverMerge()=runBlocking {
+        val a=Archive(name="甲");val b=Archive(name="乙")
+        store.draft(a);store.draft(b)
+        val one=store.linkImportedAuthor("https://www.douyin.com/user/syntheticOne","同名",a.id)
+        val two=store.linkImportedAuthor("https://www.douyin.com/user/syntheticTwo","同名",b.id)
+        assertNotEquals(one,two)
+        assertEquals(2,store.load().authors.size)
+        assertEquals(listOf(one),store.load().drafts.first{it.id==a.id}.authorIds)
+        assertEquals(listOf(two),store.load().drafts.first{it.id==b.id}.authorIds)
+    }
+    @Test fun workUrlCanNeverBecomeAnAuthorCard()=runBlocking {
+        val a=Archive(name="素材");store.draft(a)
+        assertTrue(runCatching{store.linkImportedAuthor("https://www.xiaohongshu.com/explore/123","错误的作者",a.id)}.isFailure)
+        assertTrue(store.load().authors.isEmpty())
+        assertTrue(store.load().drafts.single().authorIds.isEmpty())
+    }
     @Test fun backupRestoreAndUndoPreserveAuthorCardsAndArchiveLinks()=runBlocking {
         val provider=BackupStoreTest.BackupProvider(File(app.cacheDir,"authors.zip"))
         provider.attachInfo(app,ProviderInfo().apply{authority="authors.fixture"});ShadowContentResolver.registerProviderInternal("authors.fixture",provider)

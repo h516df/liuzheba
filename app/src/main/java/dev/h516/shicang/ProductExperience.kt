@@ -21,24 +21,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-/** Discover is for consuming archives, while the library owns searching and managing them. */
+/** Discover is for revisiting saved works, while the library owns organizing archives. */
 @Composable internal fun DiscoveryScreen(
     model:AppModel,s:AppState,positions:Map<String,String>,rememberPhoto:(String,String)->Unit,
     open:(String)->Unit,photos:(String)->Unit,settings:()->Unit,library:()->Unit,
     enabled:Boolean=true
 ) {
     val active=s.library.active
-    if(active.isEmpty()) {
+    if(active.none { it.photos.isNotEmpty() }) {
         Column(Modifier.fillMaxSize().padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
             ArchiveNameplate("留",Modifier.size(88.dp))
             Text("值得留下的，都在这里",Modifier.padding(top=24.dp),style=MaterialTheme.typography.titleLarge)
-            Text("照片、视频，或几句想留下的话。",Modifier.padding(top=10.dp,bottom=24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            GalleryButton(onClick={model.edit()},enabled=!s.busy){Text("新建第一份档案")}
+            Text("发现会混合播放已保存的照片和视频；文字仍在档案里。",Modifier.padding(top=10.dp,bottom=24.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            GalleryButton(onClick=library,enabled=!s.busy){Text("打开档案")}
         }
         return
     }
-    ArchiveFeed(active,"",model,s.appearance,positions,rememberPhoto,{},library,open,photos,
-        settings,{model.edit(it)},{model.edit()},s.busy,enabled=enabled,autoplay=true,navigationInset=72.dp)
+    DiscoveryWorkFeed(active,s.library.labels,model,s.appearance,rememberPhoto,library,open,photos,
+        settings,{model.edit(it)},{model.edit()},s.busy,enabled=enabled,navigationInset=72.dp)
 }
 
 /** Shared cover, type and action placement across discovery and the archive wall. */

@@ -71,7 +71,8 @@ import java.io.File
     position:(String)->Unit, next:(()->Unit)?, previous:(()->Unit)?,
     library:()->Unit, details:()->Unit, allPhotos:()->Unit, settings:()->Unit, edit:()->Unit, create:()->Unit,
     busy:Boolean=false, close:(()->Unit)?=null, active:Boolean=true, onPagingAllowed:(Boolean)->Unit={},
-    discovery:DiscoveryActions?=null,autoplay:Boolean=false,navigationInset:androidx.compose.ui.unit.Dp=0.dp
+    discovery:DiscoveryActions?=null,autoplay:Boolean=false,navigationInset:androidx.compose.ui.unit.Dp=0.dp,
+    workCounter:String?=null
 ) {
     val pager=rememberPagerState(initialPage=photoIndex(a,initialPhoto),pageCount={a.photos.size.coerceAtLeast(1)})
     var playingVideo by remember {mutableStateOf<String?>(null)}
@@ -152,7 +153,7 @@ import java.io.File
         }
         if(active && hint && !videoPlaying) Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal=24.dp).padding(bottom=bottomInset+16.dp)
             .clickable {touch()},color=Color.Black.copy(alpha=.64f),shape=RoundedCornerShape(16.dp)) {
-            Text("轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
+            Text(if(discovery?.workMode==true) "轻触显示工具\n上下刷珍藏作品 · 图文左右翻看" else "轻触显示工具\n左右翻照片与视频 · 上下换档案",Modifier.padding(horizontal=20.dp,vertical=12.dp),color=Color.White,fontSize=13.sp)
         }
         // Navigation and actions sit on the edges; metadata never covers the media until requested.
         AnimatedVisibility(visible=active && controls && (!videoPlaying || autoplay) && editingVideo==null && !reading && !information,modifier=Modifier.align(Alignment.TopCenter),enter=fadeIn(tween(180)),exit=fadeOut(tween(160))) {
@@ -161,7 +162,7 @@ import java.io.File
                 if(close!=null) GalleryTextButton(onClick={touch();close()},modifier=Modifier.align(Alignment.CenterStart),
                     colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text("返回",maxLines=1)}
                 else if(discovery!=null) Text("发现",Modifier.align(Alignment.CenterStart),color=Color.White,fontSize=17.sp,fontWeight=FontWeight.SemiBold)
-                Text(if(a.photos.isEmpty()) "档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.align(Alignment.Center),color=Color.White.copy(alpha=.85f),
+                Text(workCounter ?: if(a.photos.isEmpty()) "档案" else "${pager.currentPage+1} / ${a.photos.size}",Modifier.align(Alignment.Center),color=Color.White.copy(alpha=.85f),
                     fontSize=13.sp,fontWeight=FontWeight.Medium)
                 Row(Modifier.align(Alignment.CenterEnd),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
 
@@ -172,7 +173,8 @@ import java.io.File
                         current?.let{p->DropdownMenuItem(text={Text("写这项媒体的笔记")},onClick={menu=false;model.noteEditor.open("media",p.id,"${a.name} · ${if(p.isVideo) "视频" else "照片"}")})}
                         DropdownMenuItem(text={Text("查看资料")},onClick={menu=false;touch();information=true})
                         discovery?.let { action ->
-                            DropdownMenuItem(text={Text(if(action.random) "随机预览 · 已开启" else "固定封面 · 已开启")},onClick={menu=false;action.toggle()})
+                            action.filter?.let { open -> DropdownMenuItem(text={Text("筛选珍藏")},onClick={menu=false;open()}) }
+                            if(!action.workMode) DropdownMenuItem(text={Text(if(action.random) "随机预览 · 已开启" else "固定封面 · 已开启")},onClick={menu=false;action.toggle()})
                             DropdownMenuItem(text={Text("换一轮")},onClick={menu=false;action.refresh()})
                         }
                         if(a.photos.isNotEmpty()) DropdownMenuItem(text={Text("全部媒体")},onClick={menu=false;allPhotos()})

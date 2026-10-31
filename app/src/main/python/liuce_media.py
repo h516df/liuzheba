@@ -5,7 +5,7 @@ They return actual album images, never the video thumbnail collection.
 """
 import json
 import re
-from urllib.parse import urlparse, urlunparse, parse_qs
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 from http.cookiejar import Cookie
 
 from yt_dlp import YoutubeDL
@@ -20,6 +20,28 @@ class QuietLogger:
     def info(self, *_): pass
     def warning(self, *_): pass
     def error(self, *_): pass
+
+
+def work_author(platform, payload):
+    """Only a platform-owned immutable author ID can create an author card."""
+    if not isinstance(payload, dict):
+        return None
+    if platform == 'xiaohongshu':
+        user_id = payload.get('userId') or payload.get('user_id')
+        profile = ('https://www.xiaohongshu.com/user/profile/' + user_id
+                   if isinstance(user_id, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,160}', user_id) else '')
+    elif platform == 'douyin':
+        sec_uid = payload.get('sec_uid') or payload.get('secUid')
+        profile = ('https://www.douyin.com/user/' + sec_uid
+                   if isinstance(sec_uid, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,200}', sec_uid) else '')
+    else:
+        profile = ''
+    if not profile:
+        return None
+    name = payload.get('nickname') or payload.get('nickName') or ''
+    if not isinstance(name, str) or len(name) > 100 or any(ord(c) < 32 or c in '<>' for c in name):
+        name = ''
+    return {'profile_url': profile, 'name': name}
 
 
 def xhs_album(note, note_id):
@@ -41,7 +63,8 @@ def xhs_album(note, note_id):
     if not entries:
         raise ExtractorError('No album images available', expected=True)
     return {'id': note_id, 'title': note.get('title') or note.get('desc') or '小红书图集',
-            '_type': 'liuce_album', 'media': entries}
+            '_type': 'liuce_album', 'media': entries,
+            'author': work_author('xiaohongshu', note.get('user'))}
 
 
 class LiuceXhsIE(XiaoHongShuIE):
@@ -60,7 +83,10 @@ class LiuceXhsIE(XiaoHongShuIE):
         album = xhs_album(note, note_id)
         if album:
             return album
-        return super()._real_extract(url)
+        info = super()._real_extract(url)
+        if isinstance(info, dict):
+            info['author'] = work_author('xiaohongshu', note.get('user'))
+        return info
 
 
 class LiuceDouyinIE(DouyinIE):
@@ -82,8 +108,12 @@ class LiuceDouyinIE(DouyinIE):
                     media.append({'url': addresses[0], 'kind': 'image', 'ext': 'jpg'})
             if media:
                 return {'id': post_id, 'title': detail.get('desc') or '抖音图集',
-                        '_type': 'liuce_album', 'media': media}
-        return self._parse_aweme_video_app(detail)
+                        '_type': 'liuce_album', 'media': media,
+                        'author': work_author('douyin', detail.get('author'))}
+        info = self._parse_aweme_video_app(detail)
+        if isinstance(info, dict):
+            info['author'] = work_author('douyin', detail.get('author'))
+        return info
 
 
 def safe_headers(headers):
@@ -115,6 +145,27 @@ def xhs_login_redirect_target(url):
     if not re.fullmatch(r'/(?:discovery/item|explore)/[0-9a-fA-F]{24}/?', note.path):
         return None
     return urlunparse(('https', note.netloc, note.path, '', note.query, ''))
+
+
+def xhs_error_redirect_target(url):
+    """Recover a literal note ID/token when a trusted share redirects to /404.
+
+    Some platform shares use a fallback error URL even though the note remains
+    readable in a normal browser. This only reconstructs that same platform's
+    public note address; it cannot turn an inaccessible note into a download.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme != 'https' or parsed.hostname not in ('www.xiaohongshu.com', 'xiaohongshu.com') or parsed.path != '/404':
+        return None
+    values = parse_qs(parsed.query)
+    ids = values.get('noteId') or []
+    if len(ids) != 1 or not re.fullmatch(r'[0-9a-fA-F]{24}', ids[0]):
+        return None
+    tokens = values.get('xsec_token') or []
+    if len(tokens) > 1 or tokens and not re.fullmatch(r'[A-Za-z0-9_=-]{1,256}', tokens[0]):
+        return None
+    query = urlencode({'source': 'webshare', 'xsec_token': tokens[0], 'xsec_source': 'pc_share'}) if tokens else ''
+    return urlunparse(('https', 'www.xiaohongshu.com', '/discovery/item/' + ids[0], '', query, ''))
 
 
 def flatten_info(info, limit=100):
@@ -162,7 +213,7 @@ def resolve(url, browser_cookies=''):
         if host in ('v.douyin.com', 'xhslink.com', 'xhslink.cn') or host.endswith('.xhslink.com'):
             with ydl.urlopen(url) as response:
                 url = response.url
-            recovered = xhs_login_redirect_target(url)
+            recovered = xhs_login_redirect_target(url) or xhs_error_redirect_target(url)
             if recovered:
                 url = recovered
         parsed = urlparse(url)
@@ -179,4 +230,4 @@ def resolve(url, browser_cookies=''):
                 item['url'] = 'https://' + item['url'][7:]
             item.setdefault('headers', {'Referer': url, 'User-Agent': ydl.params.get('http_headers', {}).get('User-Agent', 'Mozilla/5.0')})
         return json.dumps({'title': (info.get('title') or '链接收录')[:160],
-                           'source': url, 'media': media}, ensure_ascii=False)
+                           'source': url, 'media': media, 'author': info.get('author')}, ensure_ascii=False)

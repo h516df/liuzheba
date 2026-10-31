@@ -258,6 +258,17 @@ class AppModel(app: Application): AndroidViewModel(app) {
                 target=targetId
                 message("已添加 ${result.photos.size} 项照片与视频")
             }
+            val importedAuthor=jobs.map{it.authorProfile}.distinct().singleOrNull().orEmpty()
+            if(importedAuthor.isNotBlank()) {
+                try {
+                    val authorId=store.linkImportedAuthor(importedAuthor,jobs.first().authorName,target)
+                    mutable.update{state->state.copy(editor=state.editor?.let{draft->
+                        if(draft.id==target)draft.copy(authorIds=(draft.authorIds+authorId).distinct()) else draft
+                    })}
+                    message("已收录 ${result.photos.size} 项，并关联同一位作者")
+                } catch(e:CancellationException) {throw e}
+                catch(e:Exception) {message("媒体已收录；作者自动关联未完成：${e.message.orEmpty()}。可在档案中手动关联")}
+            }
             // Only records whose copies were linked may release their temporary downloads.
             // Failed sources remain available for retry. This never submits unrelated draft fields.
             withContext(NonCancellable+Dispatchers.IO){result.sourceIndices.forEach{mediaDownloads.imported(jobs[it].id,target)}}

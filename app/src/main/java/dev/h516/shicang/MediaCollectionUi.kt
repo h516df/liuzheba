@@ -93,6 +93,12 @@ import coil3.compose.AsyncImage
                     if(plan!=null) {
                         item {
                             Text(plan.title,style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=TextOverflow.Ellipsis)
+                            if(plan.authorProfile.isNotBlank()) Text(
+                                "已识别作者：${plan.authorName.ifBlank{AuthorProfiles.platform(plan.authorProfile).orEmpty()+"作者"}} · 收录后自动归档",
+                                Modifier.padding(top=6.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
+                            else if(AuthorProfiles.platform(plan.source) in listOf("小红书","抖音")) Text(
+                                "未确认平台作者编号；收录后仍可手动关联作者",
+                                Modifier.padding(top=6.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
                             Row(verticalAlignment=Alignment.CenterVertically) {
                                 GalleryTextButton(onClick={selection=if(selection.size==plan.items.size) emptySet() else plan.items.indices.toSet()}){Text(if(selection.size==plan.items.size)"取消全选" else "全选")}
                                 Spacer(Modifier.weight(1f))

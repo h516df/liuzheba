@@ -16,7 +16,7 @@ import java.net.URI
 
 /** Extraction is local and lazy: the Python runtime never starts just for browsing. */
 data class RemoteMedia(val url:String,val kind:String,val ext:String,val bytes:Long=0,val headers:Map<String,String> = emptyMap())
-data class MediaPlan(val title:String,val source:String,val items:List<RemoteMedia>)
+data class MediaPlan(val title:String,val source:String,val items:List<RemoteMedia>,val authorProfile:String="",val authorName:String="")
 object MediaLinks {
     private val images=setOf("jpg","jpeg","png","gif","webp","heic","avif")
     private val videos=setOf("mp4","mov","m4v","webm","mkv")
@@ -39,7 +39,13 @@ object MediaLinks {
         }
         require(items.isNotEmpty() && items.all{it.kind in listOf("image","video")}) {"没有可下载的图片或视频"}
         require(items.all{it.bytes<=if(it.kind=="image")Codec.MAX_PHOTO_BYTES else Codec.MAX_MEDIA_BYTES}) {"媒体超过单项大小限制"}
-        return MediaPlan(value.optString("title","链接收录").take(160),value.optString("source"),items)
+        val source=value.optString("source")
+        val author=value.optJSONObject("author")
+        val identity=author?.optString("profile_url")?.let(AuthorProfiles::parse)
+            ?.takeIf{it.platform==AuthorProfiles.platform(source)}
+        val name=author?.optString("name").orEmpty().trim()
+            .takeIf{it.length<=100 && it.none{char->char.isISOControl() || char in "<>"}}.orEmpty()
+        return MediaPlan(value.optString("title","链接收录").take(160),source,items,identity?.profileUrl.orEmpty(),if(identity!=null)name else "")
     }
     suspend fun resolve(context:Context,input:String):MediaPlan=withContext(Dispatchers.IO) {
         val url=validUrl(input)
@@ -63,7 +69,8 @@ object MediaLinks {
 }
 
 data class MediaDownload(val id:String,val title:String,val source:String,val kind:String,val ext:String,val managerId:Long,
-    val generation:String,val state:String="等待下载",val percent:Int=0,val bytes:Long=0,val archiveId:String="",val failure:String="")
+    val generation:String,val state:String="等待下载",val percent:Int=0,val bytes:Long=0,val archiveId:String="",val failure:String="",
+    val authorProfile:String="",val authorName:String="")
 
 /** Only formal archives are safe to hide from the download queue. Drafts need their resume entry. */
 internal fun completedDownloadRecords(jobs:List<MediaDownload>,formalArchiveIds:Set<String>):List<MediaDownload> =
@@ -89,11 +96,13 @@ class MediaDownloads(private val context:Context) {
     private val folder=context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: error("下载目录暂不可用")
     private fun generation()=device.getString("generation","initial").orEmpty()
     private fun read()=runCatching {JSONArray(prefs.getString("jobs","[]")).objects().map {o ->
-        MediaDownload(o.getString("id"),o.getString("title"),o.getString("source"),o.getString("kind"),o.getString("ext"),o.getLong("managerId"),o.getString("generation"),archiveId=o.optString("archiveId"))
+        MediaDownload(o.getString("id"),o.getString("title"),o.getString("source"),o.getString("kind"),o.getString("ext"),o.getLong("managerId"),o.getString("generation"),archiveId=o.optString("archiveId"),
+            authorProfile=o.optString("authorProfile"),authorName=o.optString("authorName"))
     }}.getOrDefault(emptyList())
     private fun write(jobs:List<MediaDownload>) {check(prefs.edit().putString("jobs",JSONArray(jobs.map {j ->JSONObject()
         .put("id",j.id).put("title",j.title).put("source",j.source).put("kind",j.kind).put("ext",j.ext)
-        .put("managerId",j.managerId).put("generation",j.generation).put("archiveId",j.archiveId)}).toString()).commit())}
+        .put("managerId",j.managerId).put("generation",j.generation).put("archiveId",j.archiveId)
+        .put("authorProfile",j.authorProfile).put("authorName",j.authorName)}).toString()).commit())}
     fun file(job:MediaDownload)=File(folder,"${job.id}.download")
     @Synchronized fun enqueue(plan:MediaPlan,items:List<RemoteMedia>) {
         val jobs=read().toMutableList()
@@ -111,7 +120,8 @@ class MediaDownloads(private val context:Context) {
                 val cookie=CookieManager.getInstance().getCookie(item.url)
                 if(!cookie.isNullOrBlank()) request.addRequestHeader("Cookie",cookie)
                 val managerId=manager.enqueue(request)
-                newJobs+=MediaDownload(id,plan.title,plan.source,item.kind,item.ext.filter{it.isLetterOrDigit()}.take(8),managerId,generation())
+                newJobs+=MediaDownload(id,plan.title,plan.source,item.kind,item.ext.filter{it.isLetterOrDigit()}.take(8),managerId,generation(),
+                    authorProfile=plan.authorProfile,authorName=plan.authorName)
             }
             write(jobs+newJobs)
         } catch(e:Exception) {newJobs.forEach{manager.remove(it.managerId)};throw e}

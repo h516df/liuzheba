@@ -28,6 +28,16 @@ class MediaLinksTest {
         assertEquals("图集",plan.title)
         assertEquals(mapOf("Referer" to "https://example.com/post"),plan.items.single().headers)
     }
+    @Test fun extractedPlatformAuthorIsOptionalAndBoundToItsOwnSource() {
+        fun payload(source:String,profile:String)="""{"source":"$source","author":{"profile_url":"$profile","name":"同名创作者"},"media":[{"url":"https://cdn.example.com/a.jpg","kind":"image","ext":"jpg"}]}"""
+        val xhs="https://www.xiaohongshu.com/user/profile/syntheticUser123"
+        val verified=MediaLinks.read(payload("https://www.xiaohongshu.com/explore/0123456789abcdef01234567",xhs))
+        assertEquals(xhs,verified.authorProfile)
+        assertEquals("同名创作者",verified.authorName)
+        assertEquals("",MediaLinks.read(payload("https://www.douyin.com/video/123456789",xhs)).authorProfile)
+        assertEquals("",MediaLinks.read(payload("https://www.xiaohongshu.com/explore/0123456789abcdef01234567","https://www.xiaohongshu.com/explore/abcdef")).authorProfile)
+        assertEquals("",MediaLinks.read("""{"media":[{"url":"https://cdn.example.com/a.jpg","kind":"image"}]}""").authorProfile)
+    }
     @Test fun mediaSizeLimitIsCheckedBeforeEnqueue() {
         assertThrows(IllegalArgumentException::class.java){MediaLinks.read("""{"media":[{"url":"https://example.com/large.jpg","kind":"image","bytes":1073741824}]}""")}
     }

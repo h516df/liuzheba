@@ -18,4 +18,7 @@ internal fun discoveryPreview(a: Archive, round: Int, seed: Long, random: Boolea
     return deck[Math.floorMod(round, deck.size)]
 }
 
-internal data class DiscoveryActions(val random: Boolean, val toggle: () -> Unit, val refresh: () -> Unit)
+internal data class DiscoveryActions(
+    val random: Boolean, val toggle: () -> Unit, val refresh: () -> Unit,
+    val workMode: Boolean = false, val filter: (() -> Unit)? = null
+)
