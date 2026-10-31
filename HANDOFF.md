@@ -1,3 +1,11 @@
+# 当前接续（2026-10-31）：API35 模拟器启动磁盘空间不足
+
+- **精确来源**：`fix/ui-test-stable-archive-entry` 的 [PR #66](https://github.com/h516df/liuzheba/pull/66) 修正版 head `f2e738b9463690683e47f475c16a1987c1fc6ae3` 三组 PR CI success 后 squash 合入 main `08993418601e65978ed5de449335363c91a2e97c`（树 `e906faf972644255f59357873c4a196b1623e73b` 与受测一致）。该 main 的 [Cloud 41191628016](https://github.com/h516df/liuzheba/actions/runs/41191628016)、Android 41191628093、Secret 41191628044 success，原 330 个 JVM/Compose 回归修复有效；但是 [API35 device 41191628221](https://github.com/h516df/liuzheba/actions/runs/41191628221) **在启动模拟器前失败，没有执行原生用例**。
+- **根因有直接日志证据**：emulator `FATAL | Not enough space to create userdata partition. Available: 6169.68 MB ... need 7372.80 MB`，随后重复 `adb: device emulator-5554 not found` 至600秒启动超时。不是 App 或测试断言失败；不能把已有 PR/main 设备绿灯移用于此 SHA，也不能盲重跑。
+- **当前最小修正**：`fix/emulator-disk-space-20261031` 基于该 main，在现有 `ReactiveCircus/android-emulator-runner` API35/Google APIs 保留4核心、4 GiB RAM、原8项测试的同时，按官方 pinned action `disk-size` 参数明确设 userdata 分区为3072M。目标是在约6 GiB可用空间的 runner 上稳定启动；真实效果须由本 PR 与新 main 的设备验证证明。没有改 Android App、原证书、正式发行或 v0.22 已发布资产。其余原生检查和 main 精确源码门禁不降。
+
+---
+
 # 当前接续（2026-10-31）：修复完整 Cloud 回归偶发找不到档案入口
 
 - **现场**：纯维护 PR [#65](https://github.com/h516df/liuzheba/pull/65) 在精确 head `5579bcec514b4cb694779a485bf380b61b1b9b9d` 上以 `ci_scope=maintenance` 真实执行 3 组 PR 检查，全 completed/success，创建至全部完成约 13 秒，未运行 Android Gradle；适用的 Android device PR path 条件未触发。squash 合入 main `161664d38aa70766008da1fabe1450ba29bd4d64`，两份文档变更不涉及 App。
