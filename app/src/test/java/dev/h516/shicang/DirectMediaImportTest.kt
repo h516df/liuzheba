@@ -189,10 +189,10 @@ class DirectMediaImportTest {
             }
         }finally{image.delete()}
     }
-    private fun downloadedBatch():Pair<MediaDownloads,List<MediaDownload>> {
+    private fun downloadedBatch(authorProfile:String="",authorName:String=""):Pair<MediaDownloads,List<MediaDownload>> {
         val downloads=MediaDownloads(app)
         val media=(1..2).map{RemoteMedia("https://example.com/$it.mp4","video","mp4")}
-        downloads.enqueue(MediaPlan("合成图集","https://example.com/post",media),media)
+        downloads.enqueue(MediaPlan("合成图集","https://example.com/post",media,authorProfile,authorName),media)
         val manager=app.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
         downloads.list().forEach{job->
             source.copyTo(downloads.file(job),overwrite=true)
@@ -200,6 +200,18 @@ class DirectMediaImportTest {
                 .setStatus(android.app.DownloadManager.STATUS_SUCCESSFUL)
         }
         return downloads to downloads.list()
+    }
+    @Test fun downloadedWorksAutoLinkVerifiedCreatorAndKeepOriginalMedia() {
+        val profile="https://www.xiaohongshu.com/user/profile/syntheticMediaAuthor"
+        val (downloads,jobs)=downloadedBatch(profile,"作品作者")
+        assertTrue(jobs.all{it.authorProfile==profile && it.authorName=="作品作者"})
+        model.importDownloads(jobs,formal.id);await{!model.state.value.busy}
+        val result=runBlocking{model.store.load()}
+        assertEquals(1,result.authors.size)
+        assertEquals("作品作者",result.authors.single().name)
+        assertEquals(listOf(result.authors.single().id),result.active.single().authorIds)
+        assertEquals(2,result.active.single().photos.size)
+        assertTrue(downloads.list().all{it.state=="已收录"})
     }
     @Test fun downloadedBatchAppendsOnceAndKeepsUnsubmittedTitle() {
         runBlocking{model.store.draft(formal.copy(name="未提交的下载标题"))}
