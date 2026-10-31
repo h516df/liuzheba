@@ -23,29 +23,7 @@ jobs:
       - name: Detect isolated PR maintenance changes
         id: scope
         if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && !startsWith(github.head_ref, 'release/') && !startsWith(github.head_ref, 'codex/release/') }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import subprocess
-
-          allowed = {'cloud/finish_green_pr.py', 'cloud/test_finish_green_pr.py'}
-          changed = set()
-          try:
-              parents = subprocess.check_output(
-                  ['git', 'rev-list', '--parents', '-n', '1', 'HEAD'], text=True
-              ).split()
-              if len(parents) == 3:
-                  raw = subprocess.check_output(
-                      ['git', 'diff', '--name-only', '--no-renames', '-z', 'HEAD^1', 'HEAD']
-                  )
-                  changed = set(filter(None, raw.decode('utf-8', 'surrogateescape').split('\0')))
-          except (OSError, subprocess.CalledProcessError, UnicodeError):
-              pass
-          tool_only = bool(changed) and changed <= allowed
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-              output.write(f"tool_only={'true' if tool_only else 'false'}\n")
-          print(f'Isolated maintenance PR: {tool_only}; changed files: {len(changed)}')
-          PY
+        run: python3 cloud/ci_scope.py
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'

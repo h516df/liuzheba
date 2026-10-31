@@ -125,8 +125,11 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          cores: 2
-          ram-size: 2048M
+          # A 2 GiB / two-core API 35 Google APIs image showed repeatable
+          # Pixel Launcher ANR overlays that obstructed unrelated UI tests.
+          # Keep this same image/coverage but give system services headroom.
+          cores: 4
+          ram-size: 4096M
           disable-animations: true
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none

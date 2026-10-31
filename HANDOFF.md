@@ -1,3 +1,12 @@
+# 当前接续（2026-10-31）：开发反馈提速、设备稳定性与发布观察
+
+- **基线**：v0.22 已正式发布且公开，最新已核实 main `960e917c84f0176067c3ee0deea1947332647f15`，保留原包名/正式签名/资料格式及已有 Release。当前主分支文档工具 PR #62 合并后的 [设备验收 41181386589](https://github.com/h516df/liuzheba/actions/runs/41181386589) 首次和重跑都因 Pixel Launcher 系统 ANR 遮挡 UI 失败；其余 Cloud、Android、Secret push checks 通过。原因调查 [Issue #63](https://github.com/h516df/liuzheba/issues/63)。
+- **实施任务**：分支 `chore/ci-fast-device-stability`，只改 GitHub PR 轻量验收的保守变更分类、API35 模拟器资源与失败诊断、发布后安全观察/断线续查及说明，不修改 Android 产品代码、签名或发布工作流。`cloud/ci_scope.py` 与 tests 限制文档/用户态工具变更走 Python 回归，版本元数据/发行工具链/任何不明改动仍完整编译；main push 与正式发行门禁不减。
+- **本地检查**：`python3 -m unittest discover -s cloud -p 'test_*.py'` 95/95、`python3 -m unittest discover -s tools/release -p 'test_*.py'` 21/21；`bash -n cloud/device_acceptance.sh`、三个 Actions YAML 解析、`git diff --check` 均通过。这些只是离线验证，不是 GitHub PR/原生设备通过。正式 GitHub PR、main push 和设备重跑结果必须以精确 SHA 实际记录为准。
+- **发布续查**：在已有授权本机 `gh` 会话，新版可 `dispatch_verified.py --dispatch --wait-seconds 1200` 观察完成，超时后仅以 `observe_verified.py` 只读核对同源现有 run；不得重复派发。脚本不执行生产签名、重打已发布 v0.22、手机覆盖升级或三条真实平台作品下载。后续优先完成 GitHub 上的全量 CI、确认 Issue #63 是否真正可关闭，并以真实维护类 PR 测量快速通道耗时。
+
+---
+
 # 当前接续（2026-10-31）：v0.22 已正式发布；改进开发/发布接力
 
 - **真实已发布成果**：v0.22/versionCode23（原包名 `dev.h516.shicang`，原正式证书，SQLite schema1 / 备份 format6）已由 [PR #61](https://github.com/h516df/liuzheba/pull/61) 的 4 组检查全绿后 squash 合入 main `3b4123c4890e7108d884b5f1c64b23b88b3d045b`。该精确 main SHA 的 Cloud [41177417026](https://github.com/h516df/liuzheba/actions/runs/41177417026)、Android device [41177416468](https://github.com/h516df/liuzheba/actions/runs/41177416468)、Secret [41177416634](https://github.com/h516df/liuzheba/actions/runs/41177416634)、Android [41177416505](https://github.com/h516df/liuzheba/actions/runs/41177416505) 均 completed/success。
