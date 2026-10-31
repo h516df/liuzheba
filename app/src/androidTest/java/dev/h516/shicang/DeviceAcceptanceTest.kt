@@ -167,10 +167,7 @@ class DeviceAcceptanceTest {
         // Exercise advanced editing/player controls in the dedicated media viewer.
         // Discover is intentionally a minimal swipe experience with fading playback chrome.
         click("更多");click("全部媒体");click("查看第1项照片或视频")
-        val resumeOrPlay = waitNode("portrait playback button") {
-            it.text?.toString()?.let { label -> label == "播放视频" || label.startsWith("继续播放 · ") } == true
-        }
-        click(resumeOrPlay)
+        clickPlayOrResume("portrait playback button")
         await("portrait decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.height>it.videoSize.width}==true}}
         click("横屏观看")
         await("manual landscape layout"){context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE}
@@ -183,7 +180,7 @@ class DeviceAcceptanceTest {
         click("返回");waitText("收起播放")
         await("reader returns to paused position"){onMain{player()?.let{!it.playWhenReady && kotlin.math.abs(it.currentPosition-paused)<500}==true}}
         click("收起播放");click("更多");click("全部媒体")
-        click("查看第2项照片或视频");click("播放视频")
+        click("查看第2项照片或视频");clickPlayOrResume("landscape playback button")
         await("landscape decoder ready",20000){onMain{player()?.let{it.playbackState==Player.STATE_READY && it.videoSize.width>it.videoSize.height}==true}}
         assertEquals(listOf(portrait,landscape),store.load().active.single().photos)
         assertEquals(note.body,store.load().archiveNote(archive.id)!!.body)
@@ -534,6 +531,13 @@ class DeviceAcceptanceTest {
         while (node != null && !node.isClickable) node = node.parent
         check(node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) { "Control is not clickable: ${target.text}" }
         Thread.sleep(250)
+    }
+
+    private fun clickPlayOrResume(label:String) {
+        val button=waitNode(label) { node ->
+            node.text?.toString()?.let { it=="播放视频" || it.startsWith("继续播放 · ") } == true
+        }
+        click(button)
     }
 
     private fun clickScrolling(text: String) {
