@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'app/src/main/python'))
-from liuce_media import LiuceXhsIE, LiuceDouyinIE, flatten_info, safe_headers, QuietLogger, xhs_album, xhs_login_redirect_target, resolve
+from liuce_media import LiuceXhsIE, LiuceDouyinIE, flatten_info, safe_headers, QuietLogger, xhs_album, xhs_login_redirect_target, resolve, work_author
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import ExtractorError
 
@@ -13,9 +13,18 @@ class MediaBridgeTest(unittest.TestCase):
     def engine(self):
         return YoutubeDL({'quiet': True, 'logger': QuietLogger(), 'cachedir': False})
 
+    def test_creator_identity_requires_explicit_platform_id(self):
+        self.assertEqual(work_author('xiaohongshu', {'userId': 'syntheticUser123', 'nickname': '同名'}),
+                         {'profile_url': 'https://www.xiaohongshu.com/user/profile/syntheticUser123', 'name': '同名'})
+        self.assertEqual(work_author('douyin', {'sec_uid': 'syntheticSecUid', 'nickname': '同名'})['profile_url'],
+                         'https://www.douyin.com/user/syntheticSecUid')
+        self.assertIsNone(work_author('xiaohongshu', {'nickname': '仅有昵称'}))
+        self.assertIsNone(work_author('douyin', {'sec_uid': '/malicious/path'}))
+        self.assertIsNone(work_author('instagram', {'userId': 'syntheticUser123'}))
+
     def test_xhs_album_preserves_image_order_without_previews(self):
         note_id = '6411cf99000000001300b6d9'
-        note = {'type':'normal', 'title':'合成图集', 'imageList':[
+        note = {'type':'normal', 'title':'合成图集', 'user':{'userId':'syntheticAuthor','nickname':'合成作者'}, 'imageList':[
             {'urlDefault':'https://example.com/full-1.jpg','urlPre':'https://example.com/thumbnail-1.jpg'},
             {'urlDefault':'https://example.com/full-2.jpg'}]}
         state = {'note':{'noteDetailMap':{note_id:{'note':note}}}}
@@ -24,6 +33,7 @@ class MediaBridgeTest(unittest.TestCase):
         result = extractor._real_extract('https://www.xiaohongshu.com/explore/' + note_id)
         self.assertEqual([m['url'] for m in flatten_info(result)], ['https://example.com/full-1.jpg','https://example.com/full-2.jpg'])
         self.assertTrue(all(m['kind']=='image' for m in flatten_info(result)))
+        self.assertEqual(result['author']['profile_url'], 'https://www.xiaohongshu.com/user/profile/syntheticAuthor')
 
     def test_xhs_alternate_image_data_prefers_full_items_not_preview(self):
         note = {'type': 'normal', 'image_list': [
@@ -80,13 +90,14 @@ class MediaBridgeTest(unittest.TestCase):
 
     def test_douyin_album_uses_images_not_video_cover(self):
         extractor = LiuceDouyinIE(self.engine())
-        extractor._download_json = lambda *_, **__: {'aweme_detail':{'desc':'合成作品','images':[
+        extractor._download_json = lambda *_, **__: {'aweme_detail':{'desc':'合成作品','author':{'sec_uid':'syntheticSec','nickname':'抖音作者'},'images':[
             {'url_list':['https://example.com/image-1.webp']},
             {'display_image':{'url_list':['https://example.com/image-2.webp']}}],
             'video':{'cover':{'url_list':['https://example.com/cover.jpg']}}}}
         result = extractor._real_extract('https://www.douyin.com/note/123456789')
         self.assertEqual(len(flatten_info(result)), 2)
         self.assertNotIn('cover.jpg', json.dumps(result))
+        self.assertEqual(result['author']['profile_url'], 'https://www.douyin.com/user/syntheticSec')
 
     def test_douyin_public_playback_remains_usable_when_creator_disables_download(self):
         """No download_addr is needed when the publisher still exposes a public playable MP4."""

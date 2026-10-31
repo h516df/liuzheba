@@ -183,6 +183,28 @@ class Store(private val context: Context) {
             db.setTransactionSuccessful()
         }finally{db.endTransaction()}
     }}
+    /** Bind an imported work to an exact platform user ID, never a mutable display name. */
+    suspend fun linkImportedAuthor(profileUrl:String,nickname:String,archiveId:String):String=withContext(Dispatchers.IO) {gate.withLock {
+        val identity=AuthorProfiles.parse(profileUrl) ?: error("作品没有可验证的作者主页")
+        require(nickname.length<=100 && nickname.none{it.isISOControl() || it in "<>"}){"作者称呼无效"}
+        val library=loadUnsafe()
+        val formal=library.active.firstOrNull{it.id==archiveId}
+        val draft=library.drafts.firstOrNull{it.id==archiveId}
+        require(formal!=null || draft!=null){"收录的档案已变化"}
+        val matches=library.authors.filter { author -> author.identities.any {
+            it.platform==identity.platform && it.platformId==identity.platformId && it.idType==identity.idType
+        }}
+        require(matches.size<=1){"发现多个相同平台身份的作者卡，请手动选择关联"}
+        val author=matches.singleOrNull() ?: Author(name=nickname,identities=listOf(identity.copy(nickname=nickname)))
+        fun linked(a:Archive)=a.copy(authorIds=(a.authorIds+author.id).distinct(),updated=System.currentTimeMillis())
+        db.beginTransaction();try {
+            if(matches.isEmpty())put("author",author.id,Codec.author(author))
+            formal?.let{put("archive",it.id,Codec.archive(linked(it)))}
+            draft?.let{put("draft",it.id,Codec.archive(linked(it)))}
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
+        author.id
+    }}
     suspend fun linkAuthor(authorId:String,archiveId:String,linked:Boolean)=withContext(Dispatchers.IO) {gate.withLock {
         val library=loadUnsafe()
         require(library.authors.any{it.id==authorId}) {"作者已不存在"}

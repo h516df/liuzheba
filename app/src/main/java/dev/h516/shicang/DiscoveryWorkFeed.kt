@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package dev.h516.shicang
 
 import androidx.compose.foundation.background
