@@ -4,7 +4,7 @@
 - **受保护发行**：GitHub 连接器能合并 PR，却没有 `workflow_dispatch` 写能力；云端浏览器未登录。用户曾要求本机操作，之后通过已授权的 Desktop Commander 本机终端执行既有登录账号 `h516df` 的 `gh workflow run`，不读取令牌值、不改变签名或门禁。正式 [Run #41178310812](https://github.com/h516df/liuzheba/actions/runs/41178310812) 的 build/sign/upgrade/publish 全部 success，精确源码仍为该 main SHA。
 - **公开交付已读回**：[Release v0.22](https://github.com/h516df/liuzheba/releases/tag/v0.22) `draft=false`、`prerelease=false`，三资产为 `shicang-v0.22-universal.apk`（105720492 字节，SHA256 `9a6342ba36d944b5c31e4f1bc4bbd02bf17282aa47c985933aa62d3730d0c327`）、`shicang-v0.22-release-notes.json`、`shicang-v0.22-SHA256.txt`；官方发布脚本回读通过。模拟器 v0.16→v0.22 真实覆盖升级通过，用户的 v0.20 手机实际安装、资料及下载仍 **not run**，不要冒充真机验收。
 - **业务保留的未知项**：发现页默认混刷、可选分类/媒体筛选、可信作者 ID 自动建档及小红书可信 `/404` 回退已在 v0.22；用户先前三条真实抖音、小红书、Instagram 作品仍没有完整的个人会话下载成功证据。不能把离线提取器样例或正式发行成功说成真实平台链接均已解决。
-- **本轮流程改进任务**：基于已发行 main `3b4123c`，独立分支 `chore/release-handoff-v022`，只补用户态发布安全预检 `tools/release/dispatch_verified.py`、对应 19 项合成测试（通过现有 `cloud/test_*.py` 自动进入 CI）及 README/AGENTS/发布交接；不改已发布 APK、版本号、签名材料、正式 GitHub 工作流或用户数据。后续还要做本轮最终检查、源码推送和 PR 验收，**这段改进源码尚未当作已发行产品或 main 成果**。
+- **本轮流程改进任务**：基于已发行 main `3b4123c`，独立 [PR #62](https://github.com/h516df/liuzheba/pull/62)（分支 `chore/release-handoff-v022`），只补用户态发布安全预检 `tools/release/dispatch_verified.py`、对应 19 项合成测试（通过现有 `cloud/test_*.py` 自动进入 CI）及 README/AGENTS/发布交接；不改已发布 APK、版本号、签名材料、正式 GitHub 工作流或用户数据。真实 GitHub 受测/合并状态以 PR 的最新提交和检查为准，**这段工具改进不产生新的 App 版本或安装包**。
 
 ---
 
