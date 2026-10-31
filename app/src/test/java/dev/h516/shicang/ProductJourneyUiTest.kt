@@ -100,7 +100,12 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
     }
 
     @Test fun allMediaBackReturnsToTheExactViewerRatherThanLeavingIt()=fixture {_,a->
-        compose.onNodeWithText(a.name).performClick()
+        // ArchiveStoryCard's visible title is inside its clickable column;
+        // the discovery-only "打开档案：..." description is not on library cards.
+        // As in undoRemovingAllMedia..., use the unmerged text's actual bounds
+        // and wait for library search/results to settle before the real touch.
+        idle{compose.onAllNodesWithText(a.name,useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText(a.name,useUnmergedTree=true).assertIsDisplayed().performClick()
         compose.onNodeWithTag("archive-media-${a.photos[1].id}").performScrollTo().performClick()
         assertEquals(2,mediaNumber(3))
         compose.onNodeWithContentDescription("更多").performClick()

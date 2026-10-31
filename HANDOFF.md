@@ -1,3 +1,11 @@
+# 当前接续（2026-10-31）：修复完整 Cloud 回归偶发找不到档案入口
+
+- **现场**：纯维护 PR [#65](https://github.com/h516df/liuzheba/pull/65) 在精确 head `5579bcec514b4cb694779a485bf380b61b1b9b9d` 上以 `ci_scope=maintenance` 真实执行 3 组 PR 检查，全 completed/success，创建至全部完成约 13 秒，未运行 Android Gradle；适用的 Android device PR path 条件未触发。squash 合入 main `161664d38aa70766008da1fabe1450ba29bd4d64`，两份文档变更不涉及 App。
+- **main 失败原证据**：该 SHA 的 [Cloud development 41190024539](https://github.com/h516df/liuzheba/actions/runs/41190024539) 330 个 JVM/Compose 用例中1个失败：`ProductJourneyUiTest.allMediaBackReturnsToTheExactViewerRatherThanLeavingIt` 在 `ProductJourneyUiTest.kt:103` 的档案标题 `onNodeWithText` 点击处抛 AssertionError；Android 41190024583、API35 device 41190024597、Secret 41190024443 均 success。上一个 App 源码相同的 main `7e8326b` 四组成功；测试入口的语义/首帧定位不稳是当前推断，不把偶发现象伪称业务回归或永久已修。
+- **诊断返工**：[PR #66](https://github.com/h516df/liuzheba/pull/66) 第一版 head `34735794e16c2efeb3c15784009f9ab4e03be24d` 的 [Cloud 41190558908](https://github.com/h516df/liuzheba/actions/runs/41190558908) 仍在同一测试第107行 `idle` 等待处抛 ComposeTimeoutException；原因是「打开档案：名称」content description 仅在发现页存在，档案墙 `ArchiveStoryCard` 实际是点击包含标题的列（`ProductExperience.kt`）。此版不合并；当前迭代改为等待并点击**未合并语义树里实际可见的档案标题**，沿用本测试另一个已存在且成功的点击模式，保留所有媒体顺序和返回位置断言。普通调试编译/原签名/资料结构/正式 Release 未改；本云端宿主只有 JDK17，无 JDK21/SDK36，因此不能把本地语法审查冒充 Kotlin 单测通过。PR/new main 的准确结果仍须读回。
+
+---
+
 # 当前接续（2026-10-31）：开发反馈提速已并入 main，验证轻量维护 PR
 
 - **成果**：v0.22 公开 Release 完全保留，包名/签名/数据格式未变。保守 PR 变更分类、模拟器资源/失败诊断与正式发布安全观察已通过 [PR #64](https://github.com/h516df/liuzheba/pull/64) 合入 main `7e8326b0c5ea5c69f039ac2abb9ec2fe1e9d689f`，其源码树 `f7fe89a8e84f6f38b21641404ff894e9380159c9` 与 PR 受测源码树一致。
