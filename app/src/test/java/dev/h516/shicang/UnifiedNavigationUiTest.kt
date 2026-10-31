@@ -49,6 +49,11 @@ abstract class UnifiedNavigationFixture {
         val model=AppModel(app);val owners=androidx.lifecycle.ViewModelStore().apply{put("fixture",model)}
         try {
             compose.setContent{ShicangApp(model,true,{},{},choose,take,{},{})};idle{kotlin.check(model.state.value.message.isEmpty()){model.state.value.message};model.state.value.ready}
+            // AppModel.ready can precede ArchiveLibraryScreen's asynchronous
+            // LaunchedEffect search. Every fixture seeds one real archive, so
+            // wait for its visible card before a test attempts its first touch.
+            // An absent card still fails after the bounded 15-second timeout.
+            idle{compose.onAllNodesWithText(a.name,useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()}
             check(model,a)
         } finally {owners.clear();idle{model.resourcesClosed};loader.shutdown()}
     }
