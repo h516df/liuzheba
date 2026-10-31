@@ -125,7 +125,8 @@ import kotlinx.coroutines.withContext
                 { edit(work.archive) }, create, busy,
                 active = enabled && index == pager.settledPage && !pager.isScrollInProgress,
                 onPagingAllowed = { if (index == pager.settledPage) gestureEnabled = it },
-                discovery = actions, autoplay = true, navigationInset = navigationInset)
+                discovery = actions, autoplay = true, navigationInset = navigationInset,
+                workCounter = if(work.media.size==1) "${index % order.size+1} / ${order.size}" else null)
             if (work.media.size < work.expectedCount) Text("部分原件不可用",
                 Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 76.dp)
                     .background(Color.Black.copy(alpha = .67f)).padding(horizontal = 12.dp, vertical = 7.dp),

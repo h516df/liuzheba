@@ -43,34 +43,37 @@ class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
         compose.onNodeWithText("保存").assertIsDisplayed()
     }
 
-    @Test fun emptyDiscoveryHasAnActualCreationAction()=fixture {model,a->
+    @Test fun emptyDiscoveryRoutesToArchiveOrganization()=fixture {model,a->
         compose.runOnIdle {model.trash(a)}
         idle{!model.state.value.busy && model.state.value.library.active.isEmpty()}
         compose.onNodeWithTag("nav-frame").performClick()
         compose.onNodeWithText("值得留下的，都在这里").assertIsDisplayed()
         screenshot("product-discovery-empty")
-        compose.onNodeWithText("新建第一份档案").performClick()
-        idle{model.state.value.editor!=null}
-        compose.onNodeWithText("新建档案").assertExists()
+        compose.onNodeWithText("打开档案").performClick()
+        compose.onNodeWithTag("nav-library").assertIsSelected()
+        assertTrue(model.state.value.library.active.isEmpty())
     }
 
-    @Test fun pureTextIsDiscoverableAndOpeningItNeverCreatesDrafts()=fixture {model,a->
+    @Test fun pureTextStaysInLibraryAndOpeningItNeverCreatesDrafts()=fixture {model,a->
         model.edit(a);model.change(a.copy(photos=emptyList()));model.changeArchiveText("只有文字，也是一份完整收藏。")
         model.saveEditor();idle{model.state.value.editor==null && !model.state.value.busy}
         compose.onNodeWithTag("nav-frame").performClick()
-        compose.onNodeWithContentDescription("打开档案：${a.name}").assertExists()
-        compose.onNodeWithContentDescription("打开档案：${a.name}").performClick()
+        compose.onNodeWithContentDescription("打开档案：${a.name}").assertDoesNotExist()
+        compose.onNodeWithText("打开档案").performClick()
+        compose.onNodeWithText(a.name).performClick()
         compose.onNodeWithTag("archive-text").assertTextContains("完整收藏",substring=true)
         assertTrue(model.state.value.library.drafts.isEmpty())
         assertTrue(model.state.value.library.noteDrafts.isEmpty())
     }
 
-    @Test fun aSingleArchiveOffersMediaShuffleButNoCardList()=fixture {_,_->
+    @Test fun aSingleArchiveOffersOptionalWorkFilteringButNoCardList()=fixture {_,_->
         compose.onNodeWithTag("nav-frame").performClick()
         compose.onNodeWithTag("discovery-stories").assertDoesNotExist()
         compose.onNodeWithText("换个顺序").assertDoesNotExist()
         compose.onNodeWithContentDescription("更多").performClick()
-        compose.onNodeWithText("换一轮").assertExists()
+        compose.onNodeWithText("筛选珍藏").performClick()
+        compose.onNodeWithText("按档案分类").assertExists()
+        compose.onNodeWithText("全部").assertExists()
     }
 }
 
