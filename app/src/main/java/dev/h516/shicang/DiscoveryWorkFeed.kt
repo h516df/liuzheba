@@ -45,6 +45,9 @@ import kotlinx.coroutines.withContext
         }
     }
     val usable = available
+    val presentIds=usable.orEmpty().flatMap{it.media}.map{it.id}.toSet()
+    val missingCount=if(usable==null)0 else sourceWorks.sumOf{it.media.count{photo->photo.id !in presentIds}}
+    val affectedArchive=if(missingCount>0)sourceWorks.firstOrNull{work->work.media.any{it.id !in presentIds}}?.archive else null
     if (usable == null) {
         Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color.White)
@@ -52,14 +55,25 @@ import kotlinx.coroutines.withContext
     } else if (usable.isEmpty()) {
         Column(Modifier.fillMaxSize().background(Color.Black), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center) {
-            Text(if (sourceWorks.isEmpty()) "当前筛选没有珍藏作品" else "这些作品的原件暂不可用", color = Color.White)
+            Text(if (sourceWorks.isEmpty()) "当前筛选没有珍藏作品" else "这些作品的原件不可用", color = Color.White)
+            affectedArchive?.let{archive->TextButton(onClick={details(archive.id)}){Text("查看原档案")}}
             TextButton(onClick = { mediaType = "全部";category = "" }) { Text("查看全部珍藏") }
         }
     } else {
         // A different temporary filter starts its own pager; stored archive media is unchanged.
-        key(mediaType, category) {
-            DiscoveryWorkPages(usable, model, appearance, rememberPhoto, library, details, photos,
-                settings, edit, create, busy, enabled && !filtersOpen, navigationInset, { filtersOpen = true })
+        Box(Modifier.fillMaxSize()) {
+            key(mediaType, category) {
+                DiscoveryWorkPages(usable, model, appearance, rememberPhoto, library, details, photos,
+                    settings, edit, create, busy, enabled && !filtersOpen, navigationInset, { filtersOpen = true })
+            }
+            affectedArchive?.let{archive->
+                Row(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top=64.dp)
+                    .background(Color.Black.copy(alpha=.78f)).padding(horizontal=12.dp,vertical=4.dp),
+                    verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Text("$missingCount 项原件不可用，已跳过",color=Color.White,style=MaterialTheme.typography.bodySmall)
+                    TextButton(onClick={details(archive.id)}){Text("查看原档案")}
+                }
+            }
         }
     }
     if (filtersOpen) ModalBottomSheet(onDismissRequest = { filtersOpen = false }) {

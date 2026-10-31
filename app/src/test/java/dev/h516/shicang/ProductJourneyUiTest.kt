@@ -75,8 +75,8 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
         val before=runBlocking{model.store.load()}
         model.photoFile(a.photos.first()).delete()
         compose.onNodeWithTag("nav-frame").performClick()
-        idle{compose.onAllNodesWithText("原件不可用").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText(a.name).performClick()
+        idle{compose.onAllNodesWithText("原件不可用",substring=true).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("查看原档案").performClick()
         compose.onNodeWithText("编辑").assertIsDisplayed()
         assertEquals(before,runBlocking{model.store.load()})
         screenshot("product-missing-original")
