@@ -32,11 +32,11 @@ import kotlinx.coroutines.withContext
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text("添加内容",style=MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
-            CollectionAction("新建档案","先写名称或文字，照片可以以后再加",archive)
-            CollectionAction("从相册添加","选择照片或视频，再决定放进哪份档案",photos)
-            CollectionAction("拍照添加","拍照后选择保存到哪份档案",camera)
-            CollectionAction("保存链接","把网址或分享文字保存到档案",link)
-            CollectionAction("下载链接媒体","下载完成后选择档案",download)
+            CollectionAction("发布帖子","写标题和正文，随后添加照片或视频",archive)
+            CollectionAction("从相册发帖","选择图片或视频，继续编辑帖子",photos)
+            CollectionAction("拍照发帖","拍照并保存到一篇新帖子",camera)
+            CollectionAction("下载链接作品","粘贴或分享链接，下载后自动保存为一篇作品",download)
+            CollectionAction("只保存链接","暂不下载媒体，保留原网址",link)
             GalleryTextButton(onClick=close,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("取消")}
             Spacer(Modifier.height(16.dp))
         }

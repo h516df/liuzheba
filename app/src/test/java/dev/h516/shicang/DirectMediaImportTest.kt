@@ -201,6 +201,23 @@ class DirectMediaImportTest {
         }
         return downloads to downloads.list().filter{it.archiveId.isEmpty()}
     }
+    @Test fun finishedDownloadsSaveOneFormalWorkWithoutASecondTap() {
+        val (downloads,jobs)=downloadedBatch(workId="automatic-work",caption="完整正文，应当自动入库")
+        assertEquals(2,jobs.count{it.state=="待收录"})
+        // The background watcher is persistent; a finished batch is imported once,
+        // preserving media order and source metadata without an archive picker.
+        scheduler.advanceTimeBy(1200)
+        scheduler.runCurrent()
+        await{runBlocking {model.store.load().active.size}==2 && !model.state.value.busy}
+        val saved=runBlocking{model.store.load()}.active.single{it.id!=formal.id}
+        assertEquals("automatic-work",saved.work?.workId)
+        assertEquals("完整正文，应当自动入库",saved.work?.description)
+        assertEquals(2,saved.photos.size)
+        assertTrue(downloads.list().all{it.state=="已收录"})
+        scheduler.advanceTimeBy(2400)
+        scheduler.runCurrent()
+        assertEquals(2,runBlocking{model.store.load()}.active.size)
+    }
     @Test fun downloadedWorksAutoLinkVerifiedCreatorAndKeepOriginalMedia() {
         val profile="https://www.xiaohongshu.com/user/profile/syntheticMediaAuthor"
         val (downloads,jobs)=downloadedBatch(profile,"作品作者")

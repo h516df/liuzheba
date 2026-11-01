@@ -80,7 +80,8 @@ import coil3.compose.AsyncImage
                         GalleryTextField(s.downloadInput,model::downloadInput,Modifier.fillMaxWidth(),enabled=!s.resolving,
                             label={Text("粘贴分享链接或媒体地址")},minLines=2,maxLines=4)
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                            GalleryButton(onClick=model::resolveMedia,enabled=!s.resolving && s.downloadInput.isNotBlank()) {Text(if(s.resolving) "正在解析…" else "解析链接")}
+                            GalleryButton(onClick={model.resolveMedia()},enabled=!s.resolving && s.downloadInput.isNotBlank()) {Text(if(s.resolving) "正在解析…" else "下载并保存")}
+                            GalleryTextButton(onClick={model.resolveMedia(false)},enabled=!s.resolving && s.downloadInput.isNotBlank()){Text("先预览")}
                             if(s.downloadInput.isNotBlank()) GalleryTextButton(onClick={
                                 val url=runCatching{MediaLinks.validUrl(s.downloadInput)}.getOrNull()
                                 if(url!=null)browser.launch(Intent(context,MediaBrowserActivity::class.java).putExtra("url",url))
@@ -124,7 +125,7 @@ import coil3.compose.AsyncImage
                             Text("保存「${batch.first().title.take(20)}」· ${batch.size} 项媒体",style=MaterialTheme.typography.labelLarge)
                         }
                     }
-                    if(s.downloads.isEmpty()) item {Text("下载完成后点保存作品，无须新建档案。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)}
+                    if(s.downloads.isEmpty()) item {Text("下载完成后自动保存作品，无须创建档案。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)}
                     items(s.downloads.asReversed(),key={it.id}) {job ->
                         Column(Modifier.fillMaxWidth().padding(vertical=6.dp)) {
                             Text(job.title,maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyLarge)
@@ -135,7 +136,7 @@ import coil3.compose.AsyncImage
                             if(job.state in listOf("下载中","等待网络","等待下载")) LinearProgressIndicator(progress={job.percent/100f},modifier=Modifier.fillMaxWidth().padding(top=8.dp))
                             Row {
                                 if(draft!=null)GalleryTextButton(onClick={model.closeDownloads();model.edit(draft)},enabled=!s.busy){Text("继续完成收录")}
-                                if(job.state=="待收录") GalleryTextButton(onClick={model.importDownload(job)},enabled=!s.busy){Text("保存作品")}
+                                if(job.state=="待收录") GalleryTextButton(onClick={model.importDownload(job)},enabled=!s.busy){Text("立即保存")}
                                 if(job.state in listOf("下载失败","文件已移除","下载已移除")) GalleryTextButton(onClick={model.retryDownload(job)}){Text("重新解析")}
                                 GalleryTextButton(onClick={model.removeDownload(job.id)},enabled=!s.busy){Text(if(job.state in listOf("下载中","等待网络","等待下载"))"取消下载" else "移除记录")}
                             }

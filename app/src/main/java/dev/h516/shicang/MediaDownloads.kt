@@ -71,7 +71,16 @@ object MediaLinks {
         try {read(Python.getInstance().getModule("liuce_media").callAttr("resolve",url,cookies).toString())}
         catch(e:Exception) {
             val platform=SharedLinks.platform(url) ?: Links.title(url).takeIf{it=="Instagram"}
-            val hint=if(platform=="小红书" || platform=="抖音")
+            val failures=generateSequence<Throwable>(e){it.cause}.mapNotNull{it.message}.joinToString(" ").lowercase()
+            val hint=if(listOf("certificate_verify_failed","certificate verify failed","ssl handshake","sslcertverificationerror").any{it in failures})
+                "安全连接证书校验失败，请检查当前网络或 VPN；未确认作品本身是否可下载，不会忽略证书验证。"
+            else if(listOf("http error 429","too many requests","rate limit").any{it in failures})
+                "平台请求次数受限，请稍后再试；已保存的作品不受影响。"
+            else if(listOf("http error 401","http error 403","login required","sign in to confirm").any{it in failures})
+                "平台要求访问授权或拒绝了本次请求，请打开网页确认作品可见，再返回重试。"
+            else if(listOf("unsupported url","no suitable extractor").any{it in failures})
+                "当前版本暂不支持解析此平台页面，请使用分享原图、视频的方式保存。"
+            else if(platform=="小红书" || platform=="抖音")
                 "$platform 没有返回可下载的原图或视频。请点「打开网页验证」，完成验证后返回重新解析；部分作品可能禁止下载。"
             else if(platform=="Instagram")
                 "Instagram 没有返回可保存的视频或图片。请点「打开网页验证」，在网页内确认能正常查看作品，再返回重新解析；有些作品需要登录后才能读取媒体。"

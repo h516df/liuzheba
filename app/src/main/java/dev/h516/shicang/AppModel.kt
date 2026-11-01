@@ -63,6 +63,9 @@ class AppModel(app: Application): AndroidViewModel(app) {
     private var operation: Job?=null
     private var resolution:Job?=null
     private val mediaDownloads by lazy {MediaDownloads(app)}
+    // A failed automatic save is not retried on every poll. The downloaded files
+    // remain in the journal and the user can retry the save explicitly.
+    private val automaticSaveAttempts=mutableSetOf<String>()
     private val incomingQueue=IncomingMediaQueue(app)
     private fun incomingGeneration()=if(::store.isInitialized)store.generationToken else appGeneration()
     private fun appGeneration()=getApplication<Application>().getSharedPreferences("device",0).getString("generation","initial")!!
@@ -70,7 +73,13 @@ class AppModel(app: Application): AndroidViewModel(app) {
         try { withContext(Dispatchers.IO) {store=Store(app)};reload();restoreIncoming();mutable.value=mutable.value.copy(ready=true,localModelStatus=if(localTextModel.installed)"本机 AI 已下载 · 不上传资料" else mutable.value.localModelStatus)
             launch {store.protection.collect {value->mutable.value=mutable.value.copy(protection=value)}}
             launch {store.runAutomaticProtection()}
-            launch {while(true) {runCatching{withContext(Dispatchers.IO){mediaDownloads.list()}}.onSuccess{jobs->mutable.value=mutable.value.copy(downloads=jobs)};delay(1200)}} }
+            launch {while(true) {
+                runCatching{withContext(Dispatchers.IO){mediaDownloads.list()}}.onSuccess{jobs->
+                    mutable.update{it.copy(downloads=jobs)}
+                    saveFinishedDownloadBatch(jobs)
+                }
+                delay(1200)
+            }} }
         catch(e:CancellationException){throw e}
         catch(e:Exception) {mutable.value=mutable.value.copy(message="资料打开失败：${e.message}")}
     }}
@@ -201,14 +210,20 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun openDownloads(input:String="") {mutable.value=mutable.value.copy(downloadsOpen=true,downloadInput=input.ifBlank{mutable.value.downloadInput})}
     fun closeDownloads() {resolution?.cancel();mutable.value=mutable.value.copy(downloadsOpen=false,resolving=false)}
     fun downloadInput(input:String) {mutable.value=mutable.value.copy(downloadInput=input.take(32000),mediaPlan=null,downloadError="")}
-    fun resolveMedia() {
+    fun resolveMedia(autoDownload:Boolean=true) {
         if(mutable.value.resolving)return
         val input=mutable.value.downloadInput
         mutable.value=mutable.value.copy(resolving=true,downloadError="",mediaPlan=null)
         resolution=viewModelScope.launch {
             try {
                 val plan=MediaLinks.resolve(getApplication(),input)
-                if(mutable.value.downloadInput==input)mutable.value=mutable.value.copy(mediaPlan=plan)
+                if(mutable.value.downloadInput==input) {
+                    if(autoDownload) {
+                        withContext(Dispatchers.IO) {mediaDownloads.enqueue(plan,plan.items)}
+                        mutable.update{it.copy(mediaPlan=null,downloadInput="")}
+                        message("已加入下载队列，完成后自动保存作品")
+                    } else mutable.update{it.copy(mediaPlan=plan)}
+                }
             } catch(e:CancellationException){throw e}
               catch(e:Exception){mutable.value=mutable.value.copy(downloadError=e.message ?: "暂时无法解析此链接")}
             finally {mutable.value=mutable.value.copy(resolving=false)}
@@ -231,6 +246,20 @@ class AppModel(app: Application): AndroidViewModel(app) {
         message(if(count==0) "没有可清理的正式收录记录" else "已清理 $count 条下载记录，正式档案和草稿均已保留")
     }
     fun retryDownload(job:MediaDownload) {downloadInput(job.source);resolveMedia()}
+    /** Save once every item in a work batch has either finished or failed.
+     * Incomplete batches are never silently presented as complete works.
+     * Failed files retain their records so that the original link can be retried.
+     */
+    private fun saveFinishedDownloadBatch(jobs:List<MediaDownload>) {
+        if(!mutable.value.ready || mutable.value.busy || mutable.value.editor!=null)return
+        val terminal=setOf("待收录","已收录","下载失败","文件已移除","下载已移除")
+        val batch=jobs.filter{it.archiveId.isEmpty() && it.batchId.isNotBlank()}
+            .groupBy{it.batchId}.entries.firstOrNull{(id,items)->
+                id !in automaticSaveAttempts && items.all{it.state in terminal} && items.any{it.state=="待收录"}
+            } ?: return
+        automaticSaveAttempts+=batch.key
+        importDownloads(batch.value.filter{it.state=="待收录"})
+    }
     fun importDownload(job:MediaDownload,targetId:String?=null)=importDownloads(listOf(job),targetId)
     fun importDownloads(jobs:List<MediaDownload>,targetId:String?=null) {
         if(jobs.isEmpty() || jobs.any{it.state!="待收录"})return

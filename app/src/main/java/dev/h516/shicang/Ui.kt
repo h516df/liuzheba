@@ -59,6 +59,7 @@ private val Muted: Color
     val s by model.state.collectAsState()
     val noteEditing by model.noteEditor.state.collectAsState()
     var librarySection by rememberSaveable {mutableStateOf("archives")}
+    var libraryMenu by remember {mutableStateOf(false)}
     val scheme=appearanceScheme(s.appearance)
     val dark=scheme.background.red<.2f
     MaterialTheme(colorScheme=scheme,typography=Typography(
@@ -186,11 +187,22 @@ private val Muted: Color
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
                     if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
-                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"档案";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},style=if(route in listOf("frame","library","settings")) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge)
+                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"我的";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},style=if(route in listOf("frame","library","settings")) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge)
                         if(route=="frame" && !editing && androidx.compose.ui.platform.LocalDensity.current.fontScale<=1.4f) Text("留着吧 · 私人档案",style=MaterialTheme.typography.bodySmall,color=Muted)
                         if(route=="library" && unlocked && s.ready && s.protection.location.isEmpty())Text("资料仅保存在应用内",fontSize=11.sp,color=Muted)}
                     if(unlocked && s.ready && route in listOf("frame","library")) {
                         GalleryTextButton(onClick={openSettings()},modifier=Modifier.testTag("nav-settings").semantics{contentDescription="设置"}){FrameGlyph("设置",scheme.onSurfaceVariant)}
+                    }
+                    if(unlocked && s.ready && !editing && route=="library") Box {
+                        GalleryTextButton(onClick={libraryMenu=true},modifier=Modifier.semantics{contentDescription="切换作品、笔记或作者"}) {
+                            Text(when(librarySection){"notes"->"笔记";"authors"->"作者";else->"作品"})
+                            FrameGlyph("展开",scheme.onSurfaceVariant)
+                        }
+                        DropdownMenu(libraryMenu,{libraryMenu=false}) {
+                            listOf("archives" to "全部作品","notes" to "笔记","authors" to "作者").forEach{(section,label)->
+                                DropdownMenuItem(text={Text(label)},onClick={librarySection=section;libraryMenu=false})
+                            }
+                        }
                     }
                     if(unlocked && s.ready && !editing && route in listOf("frame","library")) {
                         GalleryTonalButton(onClick={collectMenu=true},enabled=!s.busy,colors=ButtonDefaults.filledTonalButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurface),shape=RoundedCornerShape(24.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="添加内容"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
@@ -198,7 +210,6 @@ private val Muted: Color
                         }
                     }
                 }
-                if(unlocked && s.ready && !editing && route=="library") LibraryIndex(librarySection){librarySection=it}
                 if(unlocked && s.ready && !editing && route=="library" && !updater.promptDismissed) updater.hint()?.let { hint ->
                     Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically){
                         GalleryTextButton(onClick={route="updates"},modifier=Modifier.weight(1f)){Text(hint,style=MaterialTheme.typography.labelLarge)}
@@ -287,12 +298,12 @@ private val Muted: Color
         }
         if(unlocked && s.ready) MediaCollectionUi(model,s)
         if(unlocked && s.ready && s.shares.isNotEmpty()) GalleryAlertDialog(onDismissRequest={if(!s.busy)model.dismissShare()},
-            title={Text("拾取分享链接")},text={Column {Text(SharedLinks.parse(s.shares.first())?.let{"${it.platform} · ${it.kind}\n${it.name}"}.orEmpty());Text(if(s.editor!=null) "当前编辑会保留为草稿。新建后可核对名称、类型和链接。" else "自动填写平台、类型、名称与链接，保存前可修改。",Modifier.padding(top=12.dp))}},
+            title={Text("保存分享作品")},text={Column {Text(SharedLinks.parse(s.shares.first())?.let{"${it.platform} · ${it.kind}\n${it.name}"}.orEmpty());Text("解析后下载原图或视频，完成后自动保存为一篇作品。受限作品会保留失败原因和重试入口。",Modifier.padding(top=12.dp))}},
             confirmButton={GalleryTextButton(onClick={
                 if(SharedLinks.parse(s.shares.first())?.kind=="个人主页") {val text=s.shares.first();model.dismissShare();model.openAuthors(input=text);model.importAuthor()}
-                else model.importShare()
-            },enabled=!s.busy){Text(if(s.busy) "识别中…" else if(SharedLinks.parse(s.shares.first())?.kind=="个人主页") "预览作者资料" else "创建档案草稿")}},
-            dismissButton={Row {GalleryTextButton(onClick={val text=s.shares.first();model.dismissShare();model.openAuthors(input=text)},enabled=!s.busy){Text("导入作者")};GalleryTextButton(onClick={val text=s.shares.first();model.dismissShare();model.openDownloads(text)},enabled=!s.busy){Text("下载媒体")};GalleryTextButton(onClick=model::dismissShare,enabled=!s.busy){Text("取消")}}})
+                else {val text=s.shares.first();model.dismissShare();model.openDownloads(text);model.resolveMedia()}
+            },enabled=!s.busy){Text(if(s.busy) "识别中…" else if(SharedLinks.parse(s.shares.first())?.kind=="个人主页") "预览作者资料" else "下载并保存")}},
+            dismissButton={Row {GalleryTextButton(onClick=model::importShare,enabled=!s.busy){Text("只存链接")};GalleryTextButton(onClick=model::dismissShare,enabled=!s.busy){Text("取消")}}})
         if(unlocked) confirm?.let {(title,action)->GalleryAlertDialog(onDismissRequest={confirm=null},title={Text("确认操作")},text={Text(title)},confirmButton={GalleryTextButton(onClick={confirm=null;action()}){Text("确认")}},dismissButton={GalleryTextButton(onClick={confirm=null}){Text("取消")}})}
     }
 }

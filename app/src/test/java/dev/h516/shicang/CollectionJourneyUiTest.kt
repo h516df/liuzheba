@@ -10,11 +10,14 @@ import org.junit.Test
 class CollectionJourneyUiTest:UnifiedNavigationFixture() {
     @Test fun contentDestinationsAreVisibleAndKeepArchiveSearch()=fixture {model,_->
         compose.onNodeWithContentDescription("搜索档案").performTextInput("合成")
+        compose.onNodeWithContentDescription("切换作品、笔记或作者").performClick()
         compose.onNodeWithText("笔记").performClick()
         compose.onNodeWithText("还没有笔记").assertExists()
+        compose.onNodeWithContentDescription("切换作品、笔记或作者").performClick()
         compose.onNodeWithText("作者").performClick()
         compose.onNodeWithText("合成作者").assertExists()
-        compose.onNodeWithTag("index-archives").performClick()
+        compose.onNodeWithContentDescription("切换作品、笔记或作者").performClick()
+        compose.onNodeWithText("全部作品").performClick()
         compose.onNodeWithContentDescription("搜索档案").assertTextContains("合成")
         assertNull(model.state.value.editor)
         screenshot("refactor-library")
@@ -25,7 +28,7 @@ class CollectionJourneyUiTest:UnifiedNavigationFixture() {
         fixture(choose={picked=it}) {model,_->
             compose.onNodeWithContentDescription("添加内容").performClick()
             screenshot("refactor-collection")
-            compose.onNodeWithText("从相册添加").performClick()
+            compose.onNodeWithText("从相册发帖").performClick()
             assertEquals("",picked)
             assertNull(model.state.value.editor)
             assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
@@ -34,7 +37,7 @@ class CollectionJourneyUiTest:UnifiedNavigationFixture() {
 
     @Test fun savingLinkStartsAnEditorDirectlyWithoutAnotherMenu()=fixture {model,_->
         compose.onNodeWithContentDescription("添加内容").performClick()
-        compose.onNodeWithText("保存链接").performClick()
+        compose.onNodeWithText("只保存链接").performClick()
         idle{model.state.value.editor!=null}
         val draft=model.state.value.editor!!
         assertTrue(draft.fields.any{it.name=="来源" && it.type=="链接"})
@@ -74,7 +77,7 @@ class CollectionJourneyUiTest:UnifiedNavigationFixture() {
 
     @Test fun collectionRemainsReachableAtTwoHundredPercent()=fixture(font=2f) {_,_->
         compose.onNodeWithContentDescription("添加内容").assertIsDisplayed().performClick()
-        compose.onNodeWithText("新建档案").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("发布帖子").performScrollTo().assertIsDisplayed()
         screenshot("refactor-collection-font200")
         compose.onNodeWithText("取消").performScrollTo().performClick()
         compose.onNodeWithContentDescription("搜索档案").assertIsDisplayed()

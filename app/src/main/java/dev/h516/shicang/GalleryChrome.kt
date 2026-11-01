@@ -127,7 +127,7 @@ import androidx.compose.ui.window.Dialog
         Column {
             HorizontalDivider(color=if(immersive)Color.White.copy(alpha=.16f) else c.outlineVariant.copy(alpha=.35f))
             Row(Modifier.fillMaxWidth().selectableGroup().padding(horizontal=20.dp,vertical=4.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
-                listOf("frame" to "发现","library" to "档案").forEach{(destination,label)->
+                listOf("frame" to "发现","library" to "我的").forEach{(destination,label)->
                     val selected=route==destination
                     Column(Modifier.weight(1f).heightIn(min=56.dp).clip(RoundedCornerShape(14.dp))
                         .testTag("nav-$destination").semantics{contentDescription="切换到$label"}
