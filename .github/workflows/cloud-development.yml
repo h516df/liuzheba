@@ -9,49 +9,68 @@ permissions:
 concurrency:
   group: cloud-development-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
-  check:
+  # Classify once, using the conservative PR-only policy. Main always builds fully.
+  scope:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 5
+    outputs:
+      tool_only: ${{ steps.classify.outputs.tool_only }}
+      social_only: ${{ steps.classify.outputs.social_only }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
           fetch-depth: 2
-      # Preserve the required check job. Isolated PR-maintenance changes run
-      # Python policy tests; social-extractor-only PRs also run bridge tests.
-      # All other or uninspectable diffs build fully.
-      # Every main push still produces the APKs required by the official release gate.
       - name: Detect isolated PR maintenance changes
-        id: scope
+        id: classify
         if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && !startsWith(github.head_ref, 'release/') && !startsWith(github.head_ref, 'codex/release/') }}
         run: python3 cloud/ci_scope.py
+
+  # The original two APKs and lint report still live in the same named artifact.
+  # Release gating evaluates the whole Cloud workflow at the exact main SHA.
+  app_build:
+    name: app-build
+    needs: scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
-        if: steps.scope.outputs.tool_only != 'true' && steps.scope.outputs.social_only != 'true'
+        if: needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true'
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
-        if: steps.scope.outputs.tool_only != 'true' && steps.scope.outputs.social_only != 'true'
+        if: needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true'
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Signing rejection policy (no credentials)
         run: python3 -m unittest discover -s cloud -p 'test_*.py' -v
       - name: Offline social media extraction checks
-        if: steps.scope.outputs.tool_only != 'true'
+        if: needs.scope.outputs.tool_only != 'true'
         run: |
           python3 -m pip install --disable-pip-version-check 'yt-dlp==2026.10.26'
           python3 tools/tests/test_media_bridge.py
       - name: Prepare cloud toolchain
-        if: steps.scope.outputs.tool_only != 'true' && steps.scope.outputs.social_only != 'true'
+        if: needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true'
         run: bash .devcontainer/setup.sh
-      - name: Check this revision
-        if: steps.scope.outputs.tool_only != 'true' && steps.scope.outputs.social_only != 'true'
-        run: bash cloud/check.sh
-      - name: Preserve development APK and test reports
+      - name: Assemble APKs and run lint
+        if: needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true'
+        run: bash cloud/check.sh package
+      - name: Verify the two release-gated development APKs
+        if: needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true'
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+      - name: Preserve development APKs and lint report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -59,7 +78,77 @@ jobs:
           path: |
             **/build/outputs/apk/debug/*.apk
             **/build/outputs/apk/androidTest/debug/*.apk
-            **/build/test-results/**/*.xml
             **/build/reports/lint-results-debug.*
           retention-days: 3
           if-no-files-found: ignore
+
+  # Different standard public Linux runners execute complementary test classes.
+  # Each retains two forked JVMs and forkEvery=1; no local PC extra workload.
+  unit_tests:
+    name: unit-tests-${{ matrix.shard }}
+    needs: scope
+    if: ${{ needs.scope.result == 'success' && needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [ui, other]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          cache-read-only: true
+      - name: Prepare cloud toolchain
+        run: bash .devcontainer/setup.sh
+      - name: Run isolated JVM tests for this shard
+        env:
+          SHICANG_CI_TEST_SHARD: ${{ matrix.shard }}
+        run: bash cloud/check.sh tests
+      - name: Preserve this shard's JUnit XML
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: unit-tests-${{ matrix.shard }}-${{ github.sha }}
+          path: app/build/test-results/testDebugUnitTest/**/*.xml
+          retention-days: 3
+          if-no-files-found: error
+
+  # This check-run name is the existing PR requirement. It finishes last, and
+  # never reports success while either test shard or the APK build has failed.
+  check:
+    name: check
+    needs: [scope, app_build, unit_tests]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Enforce the complete required check status
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          BUILD_RESULT: ${{ needs.app_build.result }}
+          TEST_RESULT: ${{ needs.unit_tests.result }}
+          TOOL_ONLY: ${{ needs.scope.outputs.tool_only }}
+          SOCIAL_ONLY: ${{ needs.scope.outputs.social_only }}
+        run: python3 cloud/verify_cloud_gate.py
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        if: needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true'
+        with:
+          pattern: unit-tests-*-${{ github.sha }}
+          path: shard-reports
+      - name: Verify full JVM test coverage across both shards
+        if: needs.scope.outputs.tool_only != 'true' && needs.scope.outputs.social_only != 'true'
+        run: python3 cloud/verify_test_shards.py shard-reports "${{ github.sha }}" 330
