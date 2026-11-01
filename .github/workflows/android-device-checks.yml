@@ -63,7 +63,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
-          cache-read-only: true
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Start isolated build alongside emulator cold boot
         run: |
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
