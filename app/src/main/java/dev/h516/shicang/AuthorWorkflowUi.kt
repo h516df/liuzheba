@@ -90,12 +90,19 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
                 if(identity.platformId.isNotBlank())Text("${identity.idType.ifBlank{"平台标识"}}：${identity.platformId}",style=MaterialTheme.typography.bodySmall)
                 Row {
                     GalleryTextButton(onClick={
-                        val verified=AuthorProfiles.parse(identity.profileUrl)?.takeIf{AuthorProfiles.valid(identity)}
-                        if(verified==null)model.message("主页链接无效，请重新导入")
-                        else runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(verified.profileUrl)).addCategory(Intent.CATEGORY_BROWSABLE))}
+                        val instagram=if(identity.platform=="Instagram" && AuthorProfiles.valid(identity) && identity.publicAccount.isNotBlank())
+                            "https://www.instagram.com/${identity.publicAccount}/" else null
+                        val verified=AuthorProfiles.parse(identity.profileUrl)?.takeIf{AuthorProfiles.valid(identity)}?.profileUrl
+                        val url=instagram ?: verified
+                        if(url==null)model.message("主页链接无效，请重新导入")
+                        else runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))}
                             .onFailure{model.message("没有可打开主页的应用，可以复制链接后打开浏览器")}
-                    },enabled=identity.profileUrl.isNotBlank()){Text("打开${identity.platform}主页")}
-                    GalleryTextButton(onClick={(context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("作者主页",identity.profileUrl));model.message("主页链接已复制")},enabled=identity.profileUrl.isNotBlank()){Text("复制")}
+                    },enabled=identity.profileUrl.isNotBlank() || identity.platform=="Instagram" && identity.publicAccount.isNotBlank()){Text("打开${identity.platform}主页")}
+                    GalleryTextButton(onClick={
+                        val url=if(identity.platform=="Instagram" && AuthorProfiles.valid(identity) && identity.publicAccount.isNotBlank())
+                            "https://www.instagram.com/${identity.publicAccount}/" else identity.profileUrl
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("作者主页",url));model.message("主页链接已复制")
+                    },enabled=identity.profileUrl.isNotBlank() || identity.platform=="Instagram" && identity.publicAccount.isNotBlank()){Text("复制")}
                 }
             }
             GalleryTextButton(onClick={model.noteEditor.open("author",author.id,authorTitle(author))}){Text("编辑作者笔记")}
@@ -124,7 +131,7 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
                 if(preview==null) {
                     item {
                         Text(if(s.authorBase==null) "从作者主页开始" else "添加平台主页",style=MaterialTheme.typography.titleMedium)
-                        Text("小红书、抖音、快手、微博。只读取公开资料，不使用登录状态。",style=MaterialTheme.typography.bodySmall)
+                        Text("小红书、抖音、快手、微博、哔哩哔哩。只读取公开资料，不使用登录状态。",style=MaterialTheme.typography.bodySmall)
                         GalleryTextField(s.authorInput,model::authorInput,Modifier.fillMaxWidth().padding(top=12.dp),label={Text("粘贴作者主页分享链接")},enabled=!s.busy,minLines=2,maxLines=4)
                         GalleryButton(onClick=model::importAuthor,enabled=!s.busy && s.authorInput.isNotBlank(),modifier=Modifier.padding(top=8.dp)){Text("导入并预览")}
                         if(source!=null) {

@@ -67,7 +67,6 @@ import coil3.compose.AsyncImage
             }
         }
     }
-    var target by remember {mutableStateOf<List<MediaDownload>?>(null)}
     var confirmCleanup by remember {mutableStateOf(false)}
     val completedCount=completedDownloadRecords(s.downloads,s.library.active.map{it.id}.toSet()-s.library.drafts.map{it.id}.toSet()).size
     val plan=s.mediaPlan
@@ -81,7 +80,8 @@ import coil3.compose.AsyncImage
                         GalleryTextField(s.downloadInput,model::downloadInput,Modifier.fillMaxWidth(),enabled=!s.resolving,
                             label={Text("粘贴分享链接或媒体地址")},minLines=2,maxLines=4)
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                            GalleryButton(onClick=model::resolveMedia,enabled=!s.resolving && s.downloadInput.isNotBlank()) {Text(if(s.resolving) "正在解析…" else "解析链接")}
+                            GalleryButton(onClick={model.resolveMedia()},enabled=!s.resolving && s.downloadInput.isNotBlank()) {Text(if(s.resolving) "正在解析…" else "下载并保存")}
+                            GalleryTextButton(onClick={model.resolveMedia(false)},enabled=!s.resolving && s.downloadInput.isNotBlank()){Text("先预览")}
                             if(s.downloadInput.isNotBlank()) GalleryTextButton(onClick={
                                 val url=runCatching{MediaLinks.validUrl(s.downloadInput)}.getOrNull()
                                 if(url!=null)browser.launch(Intent(context,MediaBrowserActivity::class.java).putExtra("url",url))
@@ -94,10 +94,10 @@ import coil3.compose.AsyncImage
                         item {
                             Text(plan.title,style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=TextOverflow.Ellipsis)
                             if(plan.authorProfile.isNotBlank()) Text(
-                                "已识别作者：${plan.authorName.ifBlank{AuthorProfiles.platform(plan.authorProfile).orEmpty()+"作者"}} · 收录后自动归档",
+                                "已识别作者：${plan.authorName.ifBlank{AuthorProfiles.platform(plan.authorProfile).orEmpty()+"作者"}} · 保存作品后自动归集",
                                 Modifier.padding(top=6.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
                             else if(AuthorProfiles.platform(plan.source) in listOf("小红书","抖音")) Text(
-                                "未确认平台作者编号；收录后仍可手动关联作者",
+                                "未确认平台作者编号；保存作品时不会根据昵称猜测作者",
                                 Modifier.padding(top=6.dp),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
                             Row(verticalAlignment=Alignment.CenterVertically) {
                                 GalleryTextButton(onClick={selection=if(selection.size==plan.items.size) emptySet() else plan.items.indices.toSet()}){Text(if(selection.size==plan.items.size)"取消全选" else "全选")}
@@ -120,12 +120,12 @@ import coil3.compose.AsyncImage
                             Text("清理已收录记录（$completedCount）")
                         }
                     }
-                    items(s.downloads.filter{it.state=="待收录"}.groupBy{it.source}.values.filter{it.size>1}.toList(),key={"batch-"+it.first().id}) {batch->
-                        GalleryTonalButton(onClick={target=batch},enabled=!s.busy,modifier=Modifier.fillMaxWidth()) {
-                            Text("收录同一来源的 ${batch.size} 项",style=MaterialTheme.typography.labelLarge)
+                    items(s.downloads.filter{it.state=="待收录"}.groupBy{job->job.batchId.ifBlank{job.source}}.values.filter{it.size>1}.toList(),key={"batch-"+it.first().id}) {batch->
+                        GalleryTonalButton(onClick={model.importDownloads(batch)},enabled=!s.busy,modifier=Modifier.fillMaxWidth()) {
+                            Text("保存「${batch.first().title.take(20)}」· ${batch.size} 项媒体",style=MaterialTheme.typography.labelLarge)
                         }
                     }
-                    if(s.downloads.isEmpty()) item {Text("下载完成后，选择一份档案收录。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)}
+                    if(s.downloads.isEmpty()) item {Text("下载完成后自动保存作品，无须创建档案。",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)}
                     items(s.downloads.asReversed(),key={it.id}) {job ->
                         Column(Modifier.fillMaxWidth().padding(vertical=6.dp)) {
                             Text(job.title,maxLines=2,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyLarge)
@@ -136,7 +136,7 @@ import coil3.compose.AsyncImage
                             if(job.state in listOf("下载中","等待网络","等待下载")) LinearProgressIndicator(progress={job.percent/100f},modifier=Modifier.fillMaxWidth().padding(top=8.dp))
                             Row {
                                 if(draft!=null)GalleryTextButton(onClick={model.closeDownloads();model.edit(draft)},enabled=!s.busy){Text("继续完成收录")}
-                                if(job.state=="待收录") GalleryTextButton(onClick={target=listOf(job)},enabled=!s.busy){Text("收录到档案")}
+                                if(job.state=="待收录") GalleryTextButton(onClick={model.importDownload(job)},enabled=!s.busy){Text("立即保存")}
                                 if(job.state in listOf("下载失败","文件已移除","下载已移除")) GalleryTextButton(onClick={model.retryDownload(job)}){Text("重新解析")}
                                 GalleryTextButton(onClick={model.removeDownload(job.id)},enabled=!s.busy){Text(if(job.state in listOf("下载中","等待网络","等待下载"))"取消下载" else "移除记录")}
                             }
@@ -148,7 +148,6 @@ import coil3.compose.AsyncImage
             }
         }
     }
-    target?.let{jobs->ArchiveTargetDialog("收录 ${jobs.size} 项到档案",s.library.active,s.busy,{target=null}){id->target=null;model.importDownloads(jobs,id)}}
     if(confirmCleanup) GalleryAlertDialog(onDismissRequest={confirmCleanup=false},title={Text("清理下载记录？")},text={
         Text("仅清理已保存到正式档案的 $completedCount 条记录，不删除档案内的原件。尚未完成的草稿、待收录媒体和下载任务都会保留。")
     },confirmButton={GalleryButton(onClick={confirmCleanup=false;model.clearCompletedDownloads()},enabled=!s.busy && completedCount>0){Text("确认清理")}},

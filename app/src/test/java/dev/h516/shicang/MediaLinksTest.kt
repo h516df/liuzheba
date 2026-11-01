@@ -28,6 +28,20 @@ class MediaLinksTest {
         assertEquals("图集",plan.title)
         assertEquals(mapOf("Referer" to "https://example.com/post"),plan.items.single().headers)
     }
+    @Test fun extractedWorkKeepsOriginalBodyIdentityAndMediaCount() {
+        val plan=MediaLinks.read("""{"id":"stablePost123","title":"作品","description":"第一行\n第二行 #原文","source":"https://www.xiaohongshu.com/explore/0123456789abcdef01234567","media":[{"url":"https://cdn.example.com/1.jpg","kind":"image","ext":"jpg"},{"url":"https://cdn.example.com/2.jpg","kind":"image","ext":"jpg"}]}""")
+        val origin=plan.origin(2)!!
+        assertEquals("stablePost123",origin.workId)
+        assertEquals("小红书",origin.platform)
+        assertEquals("第一行\n第二行 #原文",origin.description)
+        assertEquals(2,origin.expectedMedia)
+        assertEquals(origin,Codec.work(Codec.work(origin)))
+        assertTrue(origin.sameWork(origin.copy(url="https://www.xiaohongshu.com/explore/another",description="更名")))
+        assertFalse(origin.sameWork(origin.copy(platform="抖音")))
+        val unknown=WorkOrigin("其他","sameId","https://example.com/post/one")
+        assertFalse(unknown.sameWork(unknown.copy(url="https://another.example/post/two")))
+        assertThrows(IllegalArgumentException::class.java) { Codec.archive(Codec.archive(Archive(name="合成帖子")).put("work","invalid")) }
+    }
     @Test fun extractedPlatformAuthorIsOptionalAndBoundToItsOwnSource() {
         fun payload(source:String,profile:String)="""{"source":"$source","author":{"profile_url":"$profile","name":"同名创作者"},"media":[{"url":"https://cdn.example.com/a.jpg","kind":"image","ext":"jpg"}]}"""
         val xhs="https://www.xiaohongshu.com/user/profile/syntheticUser123"
@@ -37,6 +51,22 @@ class MediaLinksTest {
         assertEquals("",MediaLinks.read(payload("https://www.douyin.com/video/123456789",xhs)).authorProfile)
         assertEquals("",MediaLinks.read(payload("https://www.xiaohongshu.com/explore/0123456789abcdef01234567","https://www.xiaohongshu.com/explore/abcdef")).authorProfile)
         assertEquals("",MediaLinks.read("""{"media":[{"url":"https://cdn.example.com/a.jpg","kind":"image"}]}""").authorProfile)
+        val bili="https://space.bilibili.com/12501"
+        assertEquals(bili,MediaLinks.read(payload("https://www.bilibili.com/video/BVsynthetic",bili)).authorProfile)
+        assertEquals("",MediaLinks.read(payload("https://www.bilibili.com/video/BVsynthetic","https://www.bilibili.com/video/BVsynthetic")).authorProfile)
+    }
+    @Test fun instagramAuthorRequiresStableNumericPkAndKeepsHandleAsDisplayOnly() {
+        fun plan(id:String) = MediaLinks.read("""{"source":"https://www.instagram.com/p/post123/","id":"post123",
+            "author":{"platform_id":"$id","handle":"renamed.account","name":"同名"},
+            "media":[{"url":"https://cdn.example.com/a.jpg","kind":"image","ext":"jpg"}]}""")
+        val accepted=plan("123456789")
+        assertEquals("Instagram",accepted.origin(1)?.platform)
+        assertEquals("123456789",accepted.origin(1)?.authorPlatformId)
+        assertEquals("renamed.account",accepted.origin(1)?.authorHandle)
+        assertEquals("同名",accepted.authorName)
+        assertEquals("",plan("renamed.account").origin(1)?.authorPlatformId)
+        assertThrows(IllegalArgumentException::class.java){Codec.work(Codec.work(WorkOrigin(
+            "Instagram","post123","https://www.instagram.com/p/post123/",authorPlatformId="fake-name")))}
     }
     @Test fun mediaSizeLimitIsCheckedBeforeEnqueue() {
         assertThrows(IllegalArgumentException::class.java){MediaLinks.read("""{"media":[{"url":"https://example.com/large.jpg","kind":"image","bytes":1073741824}]}""")}

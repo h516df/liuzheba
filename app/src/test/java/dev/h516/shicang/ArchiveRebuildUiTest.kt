@@ -54,6 +54,8 @@ class ArchiveRebuildUiTest:UnifiedNavigationFixture() {
         model.edit(a);model.change(a.copy(photos=emptyList()));model.changeArchiveText("一份没有照片和视频的纯文字档案。")
         model.saveEditor();idle{!model.state.value.busy && model.state.value.editor==null}
         compose.onNodeWithText(a.name).performClick()
+        assertTrue("作品卡片应打开详情：${compose.onRoot().printToString(maxDepth=5)}",
+            compose.onAllNodesWithText("档案详情").fetchSemanticsNodes().isNotEmpty())
         compose.onNodeWithTag("archive-text").assertTextContains("纯文字档案",substring=true)
         compose.onNodeWithText("编辑").assertIsDisplayed()
         screenshot("rebuild-text-font200")

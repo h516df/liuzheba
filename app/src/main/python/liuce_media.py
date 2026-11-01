@@ -11,6 +11,7 @@ from http.cookiejar import Cookie
 from yt_dlp import YoutubeDL
 from yt_dlp.extractor.xiaohongshu import XiaoHongShuIE
 from yt_dlp.extractor.tiktok import DouyinIE
+from yt_dlp.extractor.instagram import InstagramIE
 from yt_dlp.utils import js_to_json, ExtractorError
 from yt_dlp.utils.traversal import traverse_obj
 
@@ -26,6 +27,16 @@ def work_author(platform, payload):
     """Only a platform-owned immutable author ID can create an author card."""
     if not isinstance(payload, dict):
         return None
+    if platform == 'instagram':
+        numeric = payload.get('uploader_id')
+        numeric = str(numeric) if isinstance(numeric, (str, int)) else ''
+        if not re.fullmatch(r'[0-9]{1,32}', numeric):
+            return None
+        handle = payload.get('channel') or ''
+        handle = handle if isinstance(handle, str) and re.fullmatch(r'[A-Za-z0-9._]{1,30}', handle) else ''
+        name = payload.get('uploader') or handle
+        name = name if isinstance(name, str) and len(name) <= 100 and not any(ord(c) < 32 or c in '<>' for c in name) else ''
+        return {'platform_id': numeric, 'handle': handle, 'name': name}
     if platform == 'xiaohongshu':
         user_id = payload.get('userId') or payload.get('user_id')
         profile = ('https://www.xiaohongshu.com/user/profile/' + user_id
@@ -34,11 +45,16 @@ def work_author(platform, payload):
         sec_uid = payload.get('sec_uid') or payload.get('secUid')
         profile = ('https://www.douyin.com/user/' + sec_uid
                    if isinstance(sec_uid, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,200}', sec_uid) else '')
+    elif platform == 'bilibili':
+        # yt-dlp extracts the numeric account mid from the platform's video data.
+        mid = payload.get('uploader_id')
+        mid = str(mid) if isinstance(mid, (str, int)) else ''
+        profile = 'https://space.bilibili.com/' + mid if re.fullmatch(r'[0-9]{1,32}', mid) else ''
     else:
         profile = ''
     if not profile:
         return None
-    name = payload.get('nickname') or payload.get('nickName') or ''
+    name = payload.get('nickname') or payload.get('nickName') or (payload.get('uploader') if platform == 'bilibili' else '') or ''
     if not isinstance(name, str) or len(name) > 100 or any(ord(c) < 32 or c in '<>' for c in name):
         name = ''
     return {'profile_url': profile, 'name': name}
@@ -63,6 +79,7 @@ def xhs_album(note, note_id):
     if not entries:
         raise ExtractorError('No album images available', expected=True)
     return {'id': note_id, 'title': note.get('title') or note.get('desc') or '小红书图集',
+            'description': note.get('desc') or '',
             '_type': 'liuce_album', 'media': entries,
             'author': work_author('xiaohongshu', note.get('user'))}
 
@@ -86,6 +103,7 @@ class LiuceXhsIE(XiaoHongShuIE):
         info = super()._real_extract(url)
         if isinstance(info, dict):
             info['author'] = work_author('xiaohongshu', note.get('user'))
+            info['description'] = note.get('desc') or info.get('description') or ''
         return info
 
 
@@ -108,12 +126,52 @@ class LiuceDouyinIE(DouyinIE):
                     media.append({'url': addresses[0], 'kind': 'image', 'ext': 'jpg'})
             if media:
                 return {'id': post_id, 'title': detail.get('desc') or '抖音图集',
+                        'description': detail.get('desc') or '',
                         '_type': 'liuce_album', 'media': media,
                         'author': work_author('douyin', detail.get('author'))}
         info = self._parse_aweme_video_app(detail)
         if isinstance(info, dict):
             info['author'] = work_author('douyin', detail.get('author'))
+            info['description'] = detail.get('desc') or info.get('description') or ''
         return info
+
+
+class LiuceInstagramIE(InstagramIE):
+    """Keep Instagram's own media type so photo URLs are never video covers.
+
+    Upstream yt-dlp supports videos and reports carousel media, but photo-only
+    entries normally have no video formats. We use their image_versions2 only
+    when the upstream API explicitly says media_type == 1 (photo).
+    """
+    IE_NAME = 'liuce:instagram'
+
+    def _extract_product(self, product_info, video_id=None, get_comments=True):
+        product = product_info[0] if isinstance(product_info, list) else product_info
+        result = super()._extract_product(product_info, video_id=video_id, get_comments=get_comments)
+        if result.get('_type') == 'playlist':
+            for child, raw in zip(result.get('entries') or [], product.get('carousel_media') or []):
+                child['_liuce_photo'] = raw.get('media_type') == 1
+        else:
+            result['_liuce_photo'] = product.get('media_type') == 1
+        return result
+
+
+def instagram_media(info, limit=100):
+    entries = info.get('entries') or [] if info.get('_type') == 'playlist' else [info]
+    selected = []
+    for entry in entries:
+        if len(selected) >= limit:
+            break
+        if entry.get('_liuce_photo'):
+            versions = [item for item in entry.get('thumbnails') or []
+                        if item.get('url') and urlparse(item['url']).scheme == 'https']
+            if not versions:
+                raise ExtractorError('Instagram photo is not available', expected=True)
+            photo = max(versions, key=lambda v: (v.get('width') or 0) * (v.get('height') or 0))
+            selected.append({'url': photo['url'], 'kind': 'image', 'ext': 'jpg'})
+        else:
+            selected.extend(flatten_info(entry, limit - len(selected)))
+    return selected
 
 
 def safe_headers(headers):
@@ -220,14 +278,29 @@ def resolve(url, browser_cookies=''):
         if 'iesdouyin.com' in (parsed.hostname or '') and '/share/video/' in parsed.path:
             url = 'https://www.douyin.com/video/' + parsed.path.split('/share/video/')[1].strip('/')
         # Invoke adapters directly: standard yt-dlp post-processing assumes video formats.
-        adapter = LiuceXhsIE(ydl) if LiuceXhsIE.suitable(url) else LiuceDouyinIE(ydl) if LiuceDouyinIE.suitable(url) else None
+        adapter = LiuceXhsIE(ydl) if LiuceXhsIE.suitable(url) else LiuceDouyinIE(ydl) if LiuceDouyinIE.suitable(url) else LiuceInstagramIE(ydl) if LiuceInstagramIE.suitable(url) else None
         info = adapter.extract(url) if adapter else ydl.extract_info(url, download=False)
-        media = flatten_info(info)
+        media = instagram_media(info) if isinstance(adapter, LiuceInstagramIE) else flatten_info(info)
         if not media:
             raise ExtractorError('No downloadable media found', expected=True)
         for item in media:
             if item['url'].startswith('http://'):
                 item['url'] = 'https://' + item['url'][7:]
             item.setdefault('headers', {'Referer': url, 'User-Agent': ydl.params.get('http_headers', {}).get('User-Agent', 'Mozilla/5.0')})
+        caption = info.get('description') or ''
+        if not isinstance(caption, str):
+            caption = ''
+        if len(caption) > 100_000:
+            raise ExtractorError('Work text exceeds the local note size limit', expected=True)
+        work_id = info.get('id') or ''
+        if not isinstance(work_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,200}', work_id):
+            work_id = ''
+        host = urlparse(url).hostname or ''
+        author = info.get('author') if isinstance(info.get('author'), dict) else None
+        if not author and (host == 'b23.tv' or host == 'bilibili.com' or host.endswith('.bilibili.com')):
+            author = work_author('bilibili', info)
+        if not author and host in ('instagram.com', 'www.instagram.com', 'm.instagram.com'):
+            author = work_author('instagram', info)
         return json.dumps({'title': (info.get('title') or '链接收录')[:160],
-                           'source': url, 'media': media, 'author': info.get('author')}, ensure_ascii=False)
+                           'source': url, 'id': work_id, 'description': caption,
+                           'media': media, 'author': author}, ensure_ascii=False)

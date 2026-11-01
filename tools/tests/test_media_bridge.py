@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'app/src/main/python'))
-from liuce_media import LiuceXhsIE, LiuceDouyinIE, flatten_info, safe_headers, QuietLogger, xhs_album, xhs_login_redirect_target, xhs_error_redirect_target, resolve, work_author
+from liuce_media import LiuceXhsIE, LiuceDouyinIE, LiuceInstagramIE, instagram_media, flatten_info, safe_headers, QuietLogger, xhs_album, xhs_login_redirect_target, xhs_error_redirect_target, resolve, work_author
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import ExtractorError
 
@@ -21,10 +21,16 @@ class MediaBridgeTest(unittest.TestCase):
         self.assertIsNone(work_author('xiaohongshu', {'nickname': '仅有昵称'}))
         self.assertIsNone(work_author('douyin', {'sec_uid': '/malicious/path'}))
         self.assertIsNone(work_author('instagram', {'userId': 'syntheticUser123'}))
+        self.assertEqual(work_author('instagram', {'uploader_id': '123456', 'channel': 'new.handle', 'uploader': '同名'}),
+                         {'platform_id': '123456', 'handle': 'new.handle', 'name': '同名'})
+        self.assertIsNone(work_author('instagram', {'uploader_id': 'new.handle', 'channel': 'new.handle'}))
+        self.assertEqual(work_author('bilibili', {'uploader_id': 123456, 'uploader': 'B站作者'})['profile_url'],
+                         'https://space.bilibili.com/123456')
+        self.assertIsNone(work_author('bilibili', {'uploader_id': 'someNickname'}))
 
     def test_xhs_album_preserves_image_order_without_previews(self):
         note_id = '6411cf99000000001300b6d9'
-        note = {'type':'normal', 'title':'合成图集', 'user':{'userId':'syntheticAuthor','nickname':'合成作者'}, 'imageList':[
+        note = {'type':'normal', 'title':'合成图集', 'desc':'完整文案\n第二行', 'user':{'userId':'syntheticAuthor','nickname':'合成作者'}, 'imageList':[
             {'urlDefault':'https://example.com/full-1.jpg','urlPre':'https://example.com/thumbnail-1.jpg'},
             {'urlDefault':'https://example.com/full-2.jpg'}]}
         state = {'note':{'noteDetailMap':{note_id:{'note':note}}}}
@@ -34,6 +40,7 @@ class MediaBridgeTest(unittest.TestCase):
         self.assertEqual([m['url'] for m in flatten_info(result)], ['https://example.com/full-1.jpg','https://example.com/full-2.jpg'])
         self.assertTrue(all(m['kind']=='image' for m in flatten_info(result)))
         self.assertEqual(result['author']['profile_url'], 'https://www.xiaohongshu.com/user/profile/syntheticAuthor')
+        self.assertEqual(result['description'], '完整文案\n第二行')
 
     def test_xhs_alternate_image_data_prefers_full_items_not_preview(self):
         note = {'type': 'normal', 'image_list': [
@@ -51,13 +58,15 @@ class MediaBridgeTest(unittest.TestCase):
             url = target
             def __enter__(self): return self
             def __exit__(self, *_): return False
-        album = {'title':'完整图文', '_type':'liuce_album', 'media':[
+        album = {'id':'6411cf99000000001300b6d9', 'title':'完整图文', 'description':'原文 #生活', '_type':'liuce_album', 'media':[
             {'url':'https://example.com/image1.jpg','kind':'image','ext':'jpg'},
             {'url':'https://example.com/image2.jpg','kind':'image','ext':'jpg'}]}
         with patch.object(YoutubeDL, 'urlopen', return_value=Redirect()), patch.object(LiuceXhsIE, 'extract', return_value=album) as extractor:
             result = json.loads(resolve('https://xhslink.cn/o/SyntheticShort', 'web_session=fake'))
         extractor.assert_called_once_with(target)
         self.assertEqual(result['source'], target)
+        self.assertEqual(result['id'], '6411cf99000000001300b6d9')
+        self.assertEqual(result['description'], '原文 #生活')
         self.assertEqual(len(result['media']), 2)
         self.assertTrue(all(item['headers']['Referer']==target for item in result['media']))
 
@@ -120,6 +129,7 @@ class MediaBridgeTest(unittest.TestCase):
         self.assertEqual(len(flatten_info(result)), 2)
         self.assertNotIn('cover.jpg', json.dumps(result))
         self.assertEqual(result['author']['profile_url'], 'https://www.douyin.com/user/syntheticSec')
+        self.assertEqual(result['description'], '合成作品')
 
     def test_douyin_public_playback_remains_usable_when_creator_disables_download(self):
         """No download_addr is needed when the publisher still exposes a public playable MP4."""
@@ -170,18 +180,60 @@ class MediaBridgeTest(unittest.TestCase):
 
     def test_instagram_reel_uses_its_normal_extractor_with_browser_cookies(self):
         url = 'https://www.instagram.com/reel/De6y3nBMmnZ/?dlrf=synthetic'
-
-        def extraction(ydl, requested_url, download=False):
+        def extraction(extractor, requested_url):
             self.assertEqual(url, requested_url)
-            self.assertFalse(download)
-            self.assertEqual('synthetic-session', ydl.cookiejar._cookies['www.instagram.com']['/']['sessionid'].value)
+            self.assertEqual('synthetic-session', extractor._get_cookies('https://www.instagram.com/')['sessionid'].value)
             return {'title': '公开 Reel', 'formats': [
                 {'url': 'https://example.com/instagram.mp4', 'ext': 'mp4', 'acodec': 'aac', 'vcodec': 'h264'}]}
-
-        with patch.object(YoutubeDL, 'extract_info', extraction):
+        with patch.object(LiuceInstagramIE, 'extract', extraction):
             result = json.loads(resolve(url, 'sessionid=synthetic-session'))
         self.assertEqual(result['source'], url)
         self.assertEqual(result['media'][0]['url'], 'https://example.com/instagram.mp4')
+
+    def test_instagram_carousel_preserves_only_real_photos_in_order_and_video(self):
+        from_info = {'_type': 'playlist', 'id': 'synthetic-post', 'description': '图文原文', 'entries': [
+            {'_liuce_photo': True, 'thumbnails': [
+                {'url': 'https://example.com/preview-a.jpg', 'width': 320, 'height': 320},
+                {'url': 'https://example.com/original-a.jpg', 'width': 1440, 'height': 1920}]},
+            {'_liuce_photo': False, 'thumbnails': [{'url': 'https://example.com/cover.jpg'}],
+             'formats': [{'url': 'https://example.com/real-video.mp4', 'ext': 'mp4', 'acodec': 'aac', 'vcodec': 'h264'}]},
+            {'_liuce_photo': True, 'thumbnails': [{'url': 'https://example.com/original-b.jpg', 'width': 1000, 'height': 1200}]}]}
+        self.assertEqual([entry['url'] for entry in instagram_media(from_info)], [
+            'https://example.com/original-a.jpg', 'https://example.com/real-video.mp4',
+            'https://example.com/original-b.jpg'])
+        with patch.object(LiuceInstagramIE, 'extract', return_value=from_info):
+            result = json.loads(resolve('https://www.instagram.com/p/synthetic-post/'))
+        self.assertEqual(result['description'], '图文原文')
+        self.assertEqual([m['kind'] for m in result['media']], ['image', 'video', 'image'])
+
+    def test_instagram_does_not_save_video_cover_when_video_is_inaccessible(self):
+        info = {'_type': 'playlist', 'entries': [{'_liuce_photo': False,
+                'thumbnails': [{'url': 'https://example.com/cover.jpg'}]}]}
+        with self.assertRaises(ExtractorError):
+            instagram_media(info)
+
+    def test_instagram_photo_tag_is_from_upstream_media_type_only(self):
+        extractor = LiuceInstagramIE(self.engine())
+        raw = {'media_type': 1, 'pk': '100', 'user': {'username': 'synthetic'},
+               'image_versions2': {'candidates': [{'url': 'https://example.com/full.jpg', 'width': 900, 'height': 1200}]}}
+        result = extractor._extract_product(raw, get_comments=False)
+        self.assertTrue(result['_liuce_photo'])
+        self.assertEqual(instagram_media(result)[0]['url'], 'https://example.com/full.jpg')
+
+    def test_bilibili_video_uses_verified_numeric_mid_not_display_name(self):
+        url = 'https://www.bilibili.com/video/BVsynthetic'
+        def extraction(_, requested_url, download=False):
+            self.assertEqual(url, requested_url)
+            return {'id': 'BVsynthetic', 'title': '公开视频', 'description': '原作者文案',
+                    'uploader_id': '12501', 'uploader': '同名作者',
+                    'formats': [{'url': 'https://example.com/bilibili.mp4', 'ext': 'mp4',
+                                 'acodec': 'aac', 'vcodec': 'h264'}]}
+        with patch.object(YoutubeDL, 'extract_info', extraction):
+            result = json.loads(resolve(url))
+        self.assertEqual(result['author']['profile_url'], 'https://space.bilibili.com/12501')
+        self.assertEqual(result['author']['name'], '同名作者')
+        self.assertEqual(result['description'], '原作者文案')
+        self.assertEqual(result['id'], 'BVsynthetic')
 
     def test_raw_upstream_video_formats_keep_sound(self):
         result={'formats':[

@@ -54,28 +54,28 @@ class ArchiveUiSnapshotTest {
     fun narrowMaximumText()=render("library-320-font200",fontScale=2f)
     @Test fun searchAndLayoutSurviveDetailReturn()=render("search-return",verify={
         compose.onNode(hasSetTextAction()).performTextInput("一封")
-        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 篇内容").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("列表").performClick()
         compose.onNodeWithText("一封旧信").performClick()
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("封面").assertExists()
         compose.onNode(hasSetTextAction()).assertTextContains("一封")
         compose.onNodeWithContentDescription("清除搜索").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("4 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("4 篇内容").fetchSemanticsNodes().isNotEmpty()}
     })
     @Test fun appliedCategoryCanBeRemoved()=render("filtered",verify={
         compose.onNodeWithContentDescription("筛选").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("3 篇内容").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("移除分类筛选").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("4 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("4 篇内容").fetchSemanticsNodes().isNotEmpty()}
     })
     @Test fun deletingActiveCategoryWhileAwayRestoresLibrary()=render("deleted-filter-return",verify={model->
         compose.onNodeWithContentDescription("筛选").performClick()
         compose.onAllNodesWithText("日常收藏").onLast().performClick()
         compose.onNodeWithText("完成").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("3 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("3 篇内容").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("nav-settings").performClick()
         val category=model.state.value.library.labels.first{it.kind=="category"}
         compose.runOnIdle{model.deleteLabel(category)}
@@ -84,7 +84,7 @@ class ArchiveUiSnapshotTest {
             model.state.value.library.labels.none{it.id==category.id}
         }
         compose.onNodeWithContentDescription("返回").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("4 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("4 篇内容").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("移除分类筛选").assertDoesNotExist()
     })
     @Test fun emptySearchStillCreatesFirstArchive()=render("empty-search-new",empty=true,verify={
@@ -157,7 +157,7 @@ class ArchiveUiSnapshotTest {
         compose.runOnIdle{model.searchPreferences(SearchPreferences(aliases=listOf(SearchAlias("旧回忆","一封旧信"))))}
         compose.waitUntil(10000){org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();!model.state.value.busy}
         compose.onNodeWithContentDescription("搜索档案").performTextInput("旧回忆")
-        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 篇内容").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("一封旧信").assertExists()
         compose.onNode(hasText("自定义别名",substring=true)).assertExists()
     })
@@ -178,12 +178,12 @@ class ArchiveUiSnapshotTest {
     })
     @Test fun mediaTapOpensViewerAndReturnsToSameFilteredCard()=render("viewer-return",verify={
         compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
-        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 篇内容").fetchSemanticsNodes().isNotEmpty()}
         val before=compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithContentDescription("浏览山间的一个下午的照片与视频").performClick()
         verifyImmersiveViewer()
         compose.onNodeWithText("返回").performClick()
-        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 篇内容").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("搜索档案").assertTextContains("山间")
         compose.onNodeWithText("列表").assertExists()
         org.junit.Assert.assertEquals(before,compose.onNodeWithText("山间的一个下午").fetchSemanticsNode().boundsInRoot)
@@ -204,7 +204,7 @@ class ArchiveUiSnapshotTest {
     @Test @Config(qualifiers="zh-rCN-w320dp-h900dp-xhdpi")
     fun narrowImmersiveViewer()=render("viewer-320-font200",fontScale=2f,verify={
         compose.onNodeWithContentDescription("搜索档案").performTextInput("山间")
-        compose.waitUntil(10000){compose.onAllNodesWithText("1 份档案").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithText("1 篇内容").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("浏览山间的一个下午的照片与视频").performClick()
         compose.onNodeWithText("返回").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").assertIsDisplayed()

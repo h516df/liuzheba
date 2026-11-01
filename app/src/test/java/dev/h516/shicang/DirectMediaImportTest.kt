@@ -189,17 +189,34 @@ class DirectMediaImportTest {
             }
         }finally{image.delete()}
     }
-    private fun downloadedBatch(authorProfile:String="",authorName:String=""):Pair<MediaDownloads,List<MediaDownload>> {
+    private fun downloadedBatch(authorProfile:String="",authorName:String="",workId:String="",caption:String=""):Pair<MediaDownloads,List<MediaDownload>> {
         val downloads=MediaDownloads(app)
         val media=(1..2).map{RemoteMedia("https://example.com/$it.mp4","video","mp4")}
-        downloads.enqueue(MediaPlan("合成图集","https://example.com/post",media,authorProfile,authorName),media)
+        downloads.enqueue(MediaPlan("合成图集","https://example.com/post",media,authorProfile,authorName,workId,caption),media)
         val manager=app.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-        downloads.list().forEach{job->
+        downloads.list().filter{it.archiveId.isEmpty()}.forEach{job->
             source.copyTo(downloads.file(job),overwrite=true)
             org.robolectric.Shadows.shadowOf(org.robolectric.Shadows.shadowOf(manager).getRequest(job.managerId))
                 .setStatus(android.app.DownloadManager.STATUS_SUCCESSFUL)
         }
-        return downloads to downloads.list()
+        return downloads to downloads.list().filter{it.archiveId.isEmpty()}
+    }
+    @Test fun finishedDownloadsSaveOneFormalWorkWithoutASecondTap() {
+        val (downloads,jobs)=downloadedBatch(workId="automatic-work",caption="完整正文，应当自动入库")
+        assertEquals(2,jobs.count{it.state=="待收录"})
+        // The background watcher is persistent; a finished batch is imported once,
+        // preserving media order and source metadata without an archive picker.
+        scheduler.advanceTimeBy(1200)
+        scheduler.runCurrent()
+        await{runBlocking {model.store.load().active.size}==2 && !model.state.value.busy}
+        val saved=runBlocking{model.store.load()}.active.single{it.id!=formal.id}
+        assertEquals("automatic-work",saved.work?.workId)
+        assertEquals("完整正文，应当自动入库",saved.work?.description)
+        assertEquals(2,saved.photos.size)
+        assertTrue(downloads.list().all{it.state=="已收录"})
+        scheduler.advanceTimeBy(2400)
+        scheduler.runCurrent()
+        assertEquals(2,runBlocking{model.store.load()}.active.size)
     }
     @Test fun downloadedWorksAutoLinkVerifiedCreatorAndKeepOriginalMedia() {
         val profile="https://www.xiaohongshu.com/user/profile/syntheticMediaAuthor"
@@ -236,28 +253,58 @@ class DirectMediaImportTest {
         assertEquals("还没保存的标题",stored.drafts.single().name)
         assertEquals(2,stored.active.single().photos.size)
     }
-    @Test fun completedHistoryCleanupWaitsForFormalSaveAndPreservesPendingDownloads() {
+    @Test fun downloadedPostIsSavedWithoutAnExtraArchiveEditorAndPendingDownloadsStayAvailable() {
         val (downloads,jobs)=downloadedBatch()
         val originalSource=sha(source)
-        // New collection is only a draft: its download record is the way back to finish it.
+        // A link download is a post. The first successful item becomes a formal post;
+        // another unfinished download is kept until it is saved or retried.
         model.importDownloads(listOf(jobs.first()));await{!model.state.value.busy}
-        val draft=runBlocking{model.store.load()}.drafts.single()
+        val newPost=runBlocking{model.store.load()}.active.first{it.id!=formal.id}
         assertEquals("已收录",downloads.list().first{it.id==jobs.first().id}.state)
-        assertEquals(emptyList<MediaDownload>(),completedDownloadRecords(downloads.list(),setOf(formal.id)))
-        model.clearCompletedDownloads();await{!model.state.value.busy}
-        assertEquals(2,downloads.list().size)
-        assertEquals(draft.id,model.state.value.editor?.id)
-        // After saving, only its completed history is disposable, not the other source.
-        model.saveEditor();await{!model.state.value.busy}
-        val saved=runBlocking{model.store.load()}.active.first{it.id==draft.id}
-        val savedMedia=saved.photos.single()
-        assertEquals(listOf(jobs.first().id),completedDownloadRecords(downloads.list(),setOf(formal.id,draft.id)).map{it.id})
+        assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
+        assertNull(model.state.value.editor)
+        assertEquals(1,newPost.photos.size)
         model.clearCompletedDownloads();await{!model.state.value.busy}
         assertEquals(listOf(jobs.last().id),downloads.list().map{it.id})
         assertEquals("待收录",downloads.list().single().state)
         assertEquals(originalSource,sha(source))
-        assertEquals(originalSource,sha(File(model.store.photoDir,savedMedia.file)))
+        assertEquals(originalSource,sha(File(model.store.photoDir,newPost.photos.single().file)))
         assertTrue(runBlocking{model.store.load()}.drafts.isEmpty())
+    }
+    @Test fun remoteWorkMetadataSurvivesQueueAndBackupRoundtrip() {
+        val (downloads,jobs)=downloadedBatch(workId="postStable123",caption="原作者的完整正文\n第二行 #标签")
+        assertEquals(1,jobs.map{it.batchId}.distinct().size)
+        assertEquals(listOf(0,1),jobs.map{it.mediaOrder})
+        assertEquals("postStable123",jobs.first().work?.workId)
+        model.importDownloads(jobs);await{!model.state.value.busy}
+        val library=runBlocking{model.store.load()}
+        val post=library.active.first{it.id!=formal.id}
+        assertEquals("postStable123",post.work?.workId)
+        assertEquals("原作者的完整正文\n第二行 #标签",library.archiveNote(post.id)?.body)
+        assertEquals(post.work,Codec.library(Codec.library(library)).active.first{it.id==post.id}.work)
+        assertTrue(downloads.list().all{it.state=="已收录"})
+    }
+    @Test fun invalidOptionalWorkIndexCannotHideOutstandingDownloadJobs() {
+        val (downloads,jobs)=downloadedBatch(workId="syntheticPost123",caption="正文")
+        app.getSharedPreferences("media-downloads",0).edit().putString("works","not-json").commit()
+        val recovered=downloads.list()
+        assertEquals(jobs.map{it.id},recovered.map{it.id})
+        assertTrue(recovered.all{it.state=="待收录" && it.work==null})
+    }
+    @Test fun repeatDownloadAppendsToTheSamePostWithoutDuplicatingOriginalFiles() {
+        val (first,jobs)=downloadedBatch(workId="samePost123",caption="初次保存")
+        model.importDownloads(jobs);await{!model.state.value.busy}
+        val before=runBlocking{model.store.load()}
+        val post=before.active.first{it.id!=formal.id}
+        val files=post.photos.map{it.file to sha(File(model.store.photoDir,it.file))}
+        val (second,again)=downloadedBatch(workId="samePost123",caption="初次保存")
+        model.importDownloads(again);await{!model.state.value.busy}
+        val after=runBlocking{model.store.load()}
+        assertEquals(2,after.active.size)
+        assertEquals(files,after.active.first{it.id==post.id}.photos.map{it.file to sha(File(model.store.photoDir,it.file))})
+        assertEquals(files.size,model.store.photoDir.listFiles().orEmpty().size)
+        assertTrue(first.list().all{it.state=="已收录"})
+        assertTrue(second.list().all{it.state=="已收录"})
     }
     @Test fun failedDownloadInBatchRemainsAvailableWhileSuccessfulItemIsLinked() {
         val (downloads,jobs)=downloadedBatch()

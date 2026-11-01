@@ -6,6 +6,25 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AuthorProfilesTest {
+    @Test fun instagramHandleIsNotAStableAuthorIdentity() {
+        assertEquals("Instagram",AuthorProfiles.platform("https://www.instagram.com/reel/synthetic/"))
+        assertNull(AuthorProfiles.parse("https://www.instagram.com/renamed.user/"))
+        assertNull(AuthorProfiles.parse("https://www.instagram.com/reel/synthetic/"))
+        val identity=PlatformIdentity(platform="Instagram",platformId="123456789",idType="pk",publicAccount="renamed.user")
+        assertTrue(AuthorProfiles.valid(identity))
+        assertFalse(AuthorProfiles.valid(identity.copy(platformId="renamed.user")))
+    }
+    @Test fun bilibiliMidIsStableAndVideoOrShortLinkIsNotAnAuthor() {
+        val identity=AuthorProfiles.parse("https://space.bilibili.com/12501?from=share")!!
+        assertEquals("哔哩哔哩",identity.platform)
+        assertEquals("mid",identity.idType)
+        assertEquals("12501",identity.platformId)
+        assertEquals("https://space.bilibili.com/12501",identity.profileUrl)
+        assertTrue(AuthorProfiles.valid(identity))
+        listOf("https://www.bilibili.com/video/BVsynthetic", "https://b23.tv/Synthetic", "https://space.bilibili.com/not-a-mid", "https://space.bilibili.com/12501/video", "https://space.bilibili.com.evil.test/12501").forEach { url ->
+            assertNull(url,AuthorProfiles.parse(url))
+        }
+    }
     @Test fun parsesFourPlatformsWithoutInventingNicknameOrPublicHandle() {
         val links=listOf("https://www.xiaohongshu.com/user/profile/abc123?xsec_token=public" to "小红书", "https://www.douyin.com/user/MS4wLjABabc" to "抖音", "https://www.kuaishou.com/profile/abc123" to "快手", "https://m.weibo.cn/profile/123456" to "微博")
         links.forEach { (url,platform) ->

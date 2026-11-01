@@ -171,7 +171,13 @@ internal fun durationLabel(ms:Long):String = "%d:%02d".format(ms/60000,(ms/1000)
             PlayerControls(player,speed,muted,{speed=it;player.setPlaybackSpeed(it)},
                 {muted=!muted;player.volume=if(muted)0f else 1f},{position=player.currentPosition;landscape=false;started=false},playIntentChange={playIntent=it},bottomInset=controlsInset,
                 landscape=landscape,rotate={landscape=!landscape},readText=readText)
-            if(buffering && !failure) CircularProgressIndicator(Modifier.align(Alignment.Center),color=Color.White)
+            // Keep the cached poster on top until the first frame can render.
+            // Without it the newly attached AndroidView exposes a black rectangle
+            // during decoder creation on every vertical-feed transition.
+            if(buffering && !failure) {
+                MediaThumb(p,model,Modifier.fillMaxSize(),scale=ContentScale.Fit)
+                CircularProgressIndicator(Modifier.align(Alignment.Center),color=Color.White)
+            }
             if(failure) Surface(Modifier.align(Alignment.Center),color=Color.Black.copy(alpha=.85f)){
                 Column(Modifier.padding(16.dp),horizontalAlignment=Alignment.CenterHorizontally){
                     Text("视频暂时无法播放，原文件仍保留",color=Color.White)

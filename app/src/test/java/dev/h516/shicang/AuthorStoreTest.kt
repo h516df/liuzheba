@@ -68,6 +68,22 @@ class AuthorStoreTest {
         assertEquals(listOf(one),store.load().drafts.first{it.id==a.id}.authorIds)
         assertEquals(listOf(two),store.load().drafts.first{it.id==b.id}.authorIds)
     }
+    @Test fun instagramWorksMergeOnlyByNumericPkEvenAfterHandleChanges()=runBlocking {
+        val first=Archive(name="第一篇");val second=Archive(name="第二篇");val third=Archive(name="同名的另一位")
+        listOf(first,second,third).forEach{store.save(it)}
+        val one=store.linkImportedInstagramAuthor("11223344","old.handle","同名",first.id)
+        val again=store.linkImportedInstagramAuthor("11223344","new.handle","同名",second.id)
+        val other=store.linkImportedInstagramAuthor("55667788","new.handle","同名",third.id)
+        assertEquals(one,again);assertNotEquals(one,other)
+        val library=store.load()
+        assertEquals(2,library.authors.size)
+        assertEquals("new.handle",library.authors.first{it.id==one}.identities.single().publicAccount)
+        assertEquals(listOf(one,one,other),listOf(first,second,third).map{a->
+            library.active.first{it.id==a.id}.authorIds.single()
+        })
+        assertEquals(library.authors,Codec.library(Codec.library(library)).authors)
+        assertTrue(runCatching{store.linkImportedInstagramAuthor("handle-not-number","person","同名",first.id)}.isFailure)
+    }
     @Test fun workUrlCanNeverBecomeAnAuthorCard()=runBlocking {
         val a=Archive(name="素材");store.draft(a)
         assertTrue(runCatching{store.linkImportedAuthor("https://www.xiaohongshu.com/explore/123","错误的作者",a.id)}.isFailure)

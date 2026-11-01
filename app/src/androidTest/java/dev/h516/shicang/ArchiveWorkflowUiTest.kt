@@ -52,13 +52,13 @@ class ArchiveWorkflowUiTest {
         val output=File(context.getExternalFilesDir(null),"archive-workflow").apply{mkdirs()}
         fun screenshot(name:String){Thread.sleep(250);val bitmap=checkNotNull(ui.takeScreenshot());try{File(output,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}}finally{bitmap.recycle()}}
         try {
-            waitFor("2 份档案")
+            waitFor("2 篇内容")
             assertNull(find("定制规则"));assertNull(find("按意思找 · AI"));assertNull(find("我的别名"))
             assertTrue("Text-only card must not reserve a cover-sized placeholder",bounds(text.name).height()<bounds(photo.name).height())
             screenshot("compact-wall")
             click("${photo.name}的封面");waitFor("全幅照片，双击或双指缩放");waitFor("返回")
             screenshot("media-tap-viewer")
-            click("返回");waitFor("2 份档案")
+            click("返回");waitFor("2 篇内容")
             click("高级搜索");waitFor("定制规则");click("收起高级搜索");assertNull(find("定制规则"))
             click(text.name);waitFor("编辑");waitFor("尚未添加照片与视频");waitFor("添加");screenshot("text-detail")
             click("编辑");waitFor("编辑档案");setName("取消的修改")

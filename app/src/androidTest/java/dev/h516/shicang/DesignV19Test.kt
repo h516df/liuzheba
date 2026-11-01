@@ -105,7 +105,7 @@ class DesignV19Test {
         fun start():Activity=instrumentation.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         try {
             activity=start();waitNode("搜索档案");screenshot("home");click("发现");waitNode("完整照片，双击或双指缩放");controls()
-            click("切换到档案");waitNode("搜索档案");Thread.sleep(500);screenshot("mine")
+            click("切换到我的");waitNode("搜索档案");Thread.sleep(500);screenshot("mine")
             click("筛选");waitNode("完成");click("朋友");click("完成");waitNode("资料")
             click("筛选 · 1");click("清除");click("完成");waitNode("筛选")
             click("封面");waitNode("列表");assertTrue(prefs.getBoolean("libraryCovers",false));screenshot("covers");click("列表");waitNode("封面")
@@ -143,8 +143,8 @@ class DesignV19Test {
             assertEquals("常联系",store.load().labels.single{it.id==saved.tags.single()}.name)
             instrumentation.runOnMainSync{activity?.finish()};Thread.sleep(200);activity=start()
             // The saved record survives an Activity/model reopen. Find it through the library.
-            if(node("切换到档案")==null) controls()
-            click("切换到档案");waitNode("搜索档案");fill(0,"杭州");waitNode("妈妈");screenshot("search")
+            if(node("切换到我的")==null) controls()
+            click("切换到我的");waitNode("搜索档案");fill(0,"杭州");waitNode("妈妈");screenshot("search")
             val searchDeadline=SystemClock.uptimeMillis()+5000
             while(node("林雨（示例）")!=null && SystemClock.uptimeMillis()<searchDeadline) Thread.sleep(80)
             assertNull(node("林雨（示例）"));click("妈妈");waitNode("档案详情");waitNode("杭州")
@@ -155,8 +155,8 @@ class DesignV19Test {
                 store.save(Archive(name="周末的城市散步",category=category,photos=photos.take(1),fields=listOf(Field(name="地点",value="老街与河岸"))))
                 store.save(Archive(name="外婆的手写食谱与节日记忆",photos=photos.take(2)))
                 instrumentation.runOnMainSync{activity?.finish()};Thread.sleep(250);activity=start()
-                if(node("切换到档案")==null) controls()
-                click("切换到档案");waitNode("搜索档案");waitNode("4 份档案")
+                if(node("切换到我的")==null) controls()
+                click("切换到我的");waitNode("搜索档案");waitNode("4 篇内容")
                 screenshot("populated-list")
                 click("封面");waitNode("列表");screenshot("populated-covers")
                 reveal("妈妈");click("妈妈");waitNode("档案详情");waitNode("杭州")

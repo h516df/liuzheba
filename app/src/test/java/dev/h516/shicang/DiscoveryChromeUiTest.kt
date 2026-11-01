@@ -79,6 +79,7 @@ class DiscoveryChromeUiTest:UnifiedNavigationFixture() {
 
 class AuthorCollectedWorksUiTest:UnifiedNavigationFixture() {
     @Test fun creatorCardOpensItsLinkedWorksWithoutEditingAnything()=fixture {model,a->
+        compose.onNodeWithContentDescription("切换作品、笔记或作者").performClick()
         compose.onNodeWithText("作者").performClick()
         compose.onNodeWithText("查看珍藏（1）").performClick()
         compose.onNodeWithText("1 份档案 · 3 项珍藏").assertExists()

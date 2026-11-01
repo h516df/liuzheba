@@ -37,20 +37,20 @@ class ArchiveBookshelfTest {
         fun shot(name:String){if(name!="failure"){i.waitForIdleSync();ui.waitForIdle(300,5000)};val bitmap=ui.takeScreenshot()!!;File(out,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
         fun back(){val at=SystemClock.uptimeMillis();check(ui.injectInputEvent(KeyEvent(at,at,KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_BACK,0),true));check(ui.injectInputEvent(KeyEvent(at,SystemClock.uptimeMillis(),KeyEvent.ACTION_UP,KeyEvent.KEYCODE_BACK,0),true));Thread.sleep(500)}
         try {
-            wait("4 份档案");wait("设置");shot("wall")
-            search("不存在");wait("没有匹配的档案");wait("设置");shot("no-results");click("清除搜索与筛选");wait("4 份档案")
-            click("筛选");wait("筛选档案");click("日常收藏");click("完成");wait("2 份档案");wait("设置");shot("filtered")
-            click("移除分类筛选");wait("4 份档案")
-            click("筛选");wait("筛选档案");click("日常收藏");back();wait("4 份档案")
+            wait("4 篇内容");wait("设置");shot("wall")
+            search("不存在");wait("没有匹配的作品");wait("设置");shot("no-results");click("清除搜索与筛选");wait("4 篇内容")
+            click("筛选");wait("筛选档案");click("日常收藏");click("完成");wait("2 篇内容");wait("设置");shot("filtered")
+            click("移除分类筛选");wait("4 篇内容")
+            click("筛选");wait("筛选档案");click("日常收藏");back();wait("4 篇内容")
             click("列表");wait("封面");shot("list")
-            search("一封");wait("1 份档案")
-            click("一封旧信");wait("档案");wait("补充资料");shot("name-detail");click("返回");wait("1 份档案");wait("封面")
-            click("清除搜索");wait("4 份档案")
+            search("一封");wait("1 篇内容")
+            click("一封旧信");wait("档案");wait("补充资料");shot("name-detail");click("返回");wait("1 篇内容");wait("封面")
+            click("清除搜索");wait("4 篇内容")
             click("山间的一个下午");wait("编辑");shot("detail")
             // Delete remains available without relying on a swipe gesture.
             repeat(5){if(find("移入回收站")==null){nodes().lastOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);Thread.sleep(300)}}
             click("移入回收站");wait("确认");click("取消");assertTrue(store.load().active.any{it.id==archive.id})
-            click("移入回收站");click("确认");wait("3 份档案")
+            click("移入回收站");click("确认");wait("3 篇内容")
             click("设置");wait("整理与外观");shot("settings");click("回收站");click("恢复档案")
             val deadline=SystemClock.uptimeMillis()+10000
             while(store.load().active.none{it.id==archive.id} && SystemClock.uptimeMillis()<deadline) Thread.sleep(100)

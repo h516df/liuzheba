@@ -17,7 +17,7 @@ internal fun Library.archiveTextDraft(a: Archive, generation: String): ArchiveTe
         archives.firstOrNull { it.id == a.id }, generation)
 }
 
-internal fun Library.archiveSummary(a: Archive): String = archiveNote(a.id)?.body
+internal fun Library.archiveSummary(a: Archive): String = (archiveNote(a.id)?.body?.takeIf(String::isNotBlank) ?: a.work?.description)
     ?.take(320)?.lineSequence()?.map(String::trim)?.filter(String::isNotEmpty)?.joinToString(" ")
     ?.takeIf(String::isNotBlank) ?: archiveCaption(a, this)
 

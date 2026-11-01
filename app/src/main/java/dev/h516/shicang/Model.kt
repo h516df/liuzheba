@@ -8,11 +8,21 @@ import kotlin.random.Random
 fun uid() = UUID.randomUUID().toString()
 data class Field(val id: String = uid(), val name: String = "", val type: String = "文本", val value: String = "")
 data class Photo(val id: String, val file: String, val bytes: Long, val sha256: String, val mime: String, val duration: Long = 0) { val isVideo get()=mime.startsWith("video/") }
+/** A post is distinct from a legacy archive. External identity is never inferred from a nickname. */
+data class WorkOrigin(
+    val platform: String, val workId: String = "", val url: String,
+    val description: String = "", val expectedMedia: Int = 0,
+    val authorPlatformId: String = "", val authorHandle: String = ""
+) {
+    fun sameWork(other: WorkOrigin): Boolean = platform == other.platform &&
+        (if (platform != "其他" && workId.isNotBlank() && other.workId.isNotBlank()) workId == other.workId else url == other.url)
+}
 data class Archive(
     val id: String = uid(), val name: String = "", val category: String = "",
     val tags: List<String> = emptyList(), val fields: List<Field> = emptyList(),
     val photos: List<Photo> = emptyList(), val cover: String = "", val fill: Boolean = false,
-    val updated: Long = System.currentTimeMillis(), val deleted: Long = 0, val authorIds: List<String> = emptyList()
+    val updated: Long = System.currentTimeMillis(), val deleted: Long = 0, val authorIds: List<String> = emptyList(),
+    val work: WorkOrigin? = null
 ) {
     fun coverPhoto() = photos.firstOrNull { it.id == cover } ?: photos.firstOrNull()
 }
@@ -21,12 +31,29 @@ data class PhotoTrash(val id: String = uid(), val archiveId: String, val photo: 
 data class Library(val archives: List<Archive> = emptyList(), val drafts: List<Archive> = emptyList(), val labels: List<Label> = emptyList(), val photoTrash: List<PhotoTrash> = emptyList(), val templates: List<FieldTemplate> = emptyList(), val searchPreferences:SearchPreferences = SearchPreferences(), val authors: List<Author> = emptyList(), val notes:List<LongNote> = emptyList(), val noteDrafts:List<LongNote> = emptyList()) {
     val active get() = archives.filter { it.deleted == 0L }
     fun labelName(id: String) = labels.firstOrNull { it.id == id }?.name.orEmpty()
-    fun searchable(a: Archive) = listOf(a.name, labelName(a.category), a.tags.joinToString(" ") { labelName(it) }, a.fields.joinToString(" ") { "${it.name} ${it.value}" }, authors.filter { it.id in a.authorIds }.joinToString(" ") { author -> author.name + " " + author.identities.joinToString(" ") { "${it.platform} ${it.nickname} ${it.publicAccount}" } }, notesFor(a).joinToString("\n") { "${it.title}\n${it.body}" }).joinToString(" ")
+    fun searchable(a: Archive) = listOf(a.name, labelName(a.category), a.tags.joinToString(" ") { labelName(it) }, a.fields.joinToString(" ") { "${it.name} ${it.value}" }, a.work?.let { "${it.platform} ${it.url} ${it.description}" }.orEmpty(), authors.filter { it.id in a.authorIds }.joinToString(" ") { author -> author.name + " " + author.identities.joinToString(" ") { "${it.platform} ${it.nickname} ${it.publicAccount}" } }, notesFor(a).joinToString("\n") { "${it.title}\n${it.body}" }).joinToString(" ")
     fun find(query: String, category: String = "", tag: String = "") = active.filter {
         (category.isEmpty() || it.category == category) && (tag.isEmpty() || tag in it.tags) && searchable(it).contains(query.trim(), ignoreCase = true)
     }
 }
 object Codec {
+    fun work(w: WorkOrigin): JSONObject = JSONObject().put("platform",w.platform).put("workId",w.workId)
+        .put("url",w.url).put("description",w.description).put("expectedMedia",w.expectedMedia)
+        .also { if(w.authorPlatformId.isNotBlank())it.put("authorPlatformId",w.authorPlatformId)
+            if(w.authorHandle.isNotBlank())it.put("authorHandle",w.authorHandle) }
+    fun work(o: JSONObject): WorkOrigin {
+        val w=WorkOrigin(o.getString("platform"),o.optString("workId"),o.getString("url"),
+            o.optString("description"),o.optInt("expectedMedia"),o.optString("authorPlatformId"),o.optString("authorHandle"))
+        require(w.platform in setOf("小红书","抖音","快手","Instagram","哔哩哔哩","微博","其他")) { "作品平台无效" }
+        require(w.workId.length<=200 && (w.workId.isEmpty() || w.workId.matches(Regex("[A-Za-z0-9_-]+")))) { "作品编号无效" }
+        require(w.url.length<=2048 && Links.normalize(w.url)==w.url && w.url.startsWith("https://")) { "作品来源无效" }
+        require(w.description.length<=LongNote.BODY_LIMIT && !w.description.contains('\u0000')) { "作品正文无效" }
+        require(w.expectedMedia in 0..100) { "作品媒体数量无效" }
+        require((w.authorPlatformId.isEmpty() && w.authorHandle.isEmpty()) ||
+            (w.platform=="Instagram" && w.authorPlatformId.matches(Regex("[0-9]{1,32}")) &&
+                (w.authorHandle.isEmpty() || w.authorHandle.matches(Regex("[A-Za-z0-9._]{1,30}"))))) { "平台作者身份无效" }
+        return w
+    }
     fun identity(i: PlatformIdentity) = JSONObject().put("id",i.id).put("platform",i.platform).put("nickname",i.nickname).put("publicAccount",i.publicAccount).put("platformId",i.platformId).put("idType",i.idType).put("profileUrl",i.profileUrl)
     fun identity(o: JSONObject): PlatformIdentity {
         val i=PlatformIdentity(o.getString("id"),o.getString("platform"),o.getString("nickname"),o.getString("publicAccount"),o.getString("platformId"),o.getString("idType"),o.getString("profileUrl"))
@@ -55,12 +82,14 @@ object Codec {
     fun archive(a: Archive) = JSONObject().put("id",a.id).put("name",a.name).put("category",a.category).put("tags",JSONArray(a.tags))
         .put("fields",JSONArray(a.fields.map { JSONObject().put("id",it.id).put("name",it.name).put("type",it.type).put("value",it.value) }))
         .put("photos",JSONArray(a.photos.map(::photo))).put("cover",a.cover).put("fill",a.fill).put("updated",a.updated).put("deleted",a.deleted).put("authorIds",JSONArray(a.authorIds))
+        .also { a.work?.let { w -> it.put("work",work(w)) } }
     fun archive(o: JSONObject): Archive {
         val id=o.getString("id"); require(validId(id)) { "档案编号无效" }
         require(!o.has("authorIds") || o.opt("authorIds") is JSONArray) { "作者关联格式无效" }
+        require(!o.has("work") || o.opt("work") is JSONObject) { "作品来源格式无效" }
         val fs=o.getJSONArray("fields").objects().map { Field(it.getString("id"),it.getString("name"),it.getString("type"),it.getString("value")) }
         require(fs.all { validId(it.id) && it.type in Templates.types }) { "字段格式不支持" }
-        return Archive(id,o.getString("name"),o.optString("category"),o.getJSONArray("tags").strings(),fs,o.getJSONArray("photos").objects().map(::photo),o.optString("cover"),o.optBoolean("fill"),o.getLong("updated"),o.optLong("deleted"),(o.optJSONArray("authorIds") ?: JSONArray()).strings().also { ids -> require(ids.size<=1000 && ids.all(::validId) && ids.distinct().size==ids.size) { "作者关联无效" } })
+        return Archive(id,o.getString("name"),o.optString("category"),o.getJSONArray("tags").strings(),fs,o.getJSONArray("photos").objects().map(::photo),o.optString("cover"),o.optBoolean("fill"),o.getLong("updated"),o.optLong("deleted"),(o.optJSONArray("authorIds") ?: JSONArray()).strings().also { ids -> require(ids.size<=1000 && ids.all(::validId) && ids.distinct().size==ids.size) { "作者关联无效" } },o.optJSONObject("work")?.let(::work))
     }
     fun library(l: Library) = JSONObject().put("format",6).put("notes",JSONArray(l.notes.map{it.json()})).put("noteDrafts",JSONArray(l.noteDrafts.map{it.json()})).put("authors",JSONArray(l.authors.map(::author))).put("searchPreferences",l.searchPreferences.json()).put("templates",JSONArray(l.templates.map(Templates::json))).put("archives",JSONArray(l.archives.map(::archive))).put("drafts",JSONArray(l.drafts.map(::archive)))
         .put("labels",JSONArray(l.labels.map { JSONObject().put("id",it.id).put("kind",it.kind).put("name",it.name) }))

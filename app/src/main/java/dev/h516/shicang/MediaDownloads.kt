@@ -16,7 +16,17 @@ import java.net.URI
 
 /** Extraction is local and lazy: the Python runtime never starts just for browsing. */
 data class RemoteMedia(val url:String,val kind:String,val ext:String,val bytes:Long=0,val headers:Map<String,String> = emptyMap())
-data class MediaPlan(val title:String,val source:String,val items:List<RemoteMedia>,val authorProfile:String="",val authorName:String="")
+data class MediaPlan(val title:String,val source:String,val items:List<RemoteMedia>,val authorProfile:String="",val authorName:String="",
+    val workId:String="",val description:String="",val authorStableId:String="",val authorHandle:String="") {
+    fun origin(selected:Int):WorkOrigin? = source.takeIf{it.isNotBlank()}?.let { url ->
+        Codec.work(Codec.work(WorkOrigin(SharedLinks.platform(url) ?: when(runCatching{URI(url).host.lowercase()}.getOrDefault("")) {
+            "instagram.com", "www.instagram.com", "m.instagram.com" -> "Instagram"
+            "bilibili.com", "www.bilibili.com", "m.bilibili.com", "b23.tv" -> "哔哩哔哩"
+            else -> "其他"
+        },
+            workId,url,description,selected,authorStableId,authorHandle)))
+    }
+}
 object MediaLinks {
     private val images=setOf("jpg","jpeg","png","gif","webp","heic","avif")
     private val videos=setOf("mp4","mov","m4v","webm","mkv")
@@ -43,9 +53,18 @@ object MediaLinks {
         val author=value.optJSONObject("author")
         val identity=author?.optString("profile_url")?.let(AuthorProfiles::parse)
             ?.takeIf{it.platform==AuthorProfiles.platform(source)}
+        val numericAuthor=author?.optString("platform_id").orEmpty().takeIf{
+            SharedLinks.platform(source)=="Instagram" && it.matches(Regex("[0-9]{1,32}"))
+        }.orEmpty()
+        val authorHandle=author?.optString("handle").orEmpty().takeIf{
+            numericAuthor.isNotBlank() && it.matches(Regex("[A-Za-z0-9._]{1,30}"))
+        }.orEmpty()
         val name=author?.optString("name").orEmpty().trim()
             .takeIf{it.length<=100 && it.none{char->char.isISOControl() || char in "<>"}}.orEmpty()
-        return MediaPlan(value.optString("title","链接收录").take(160),source,items,identity?.profileUrl.orEmpty(),if(identity!=null)name else "")
+        val id=value.optString("id").takeIf{it.length<=200 && it.matches(Regex("[A-Za-z0-9_-]+"))}.orEmpty()
+        val description=value.optString("description")
+        require(description.length<=LongNote.BODY_LIMIT && !description.contains('\u0000')) { "作品正文过长或含无效字符" }
+        return MediaPlan(value.optString("title","链接收录").take(160),source,items,identity?.profileUrl.orEmpty(),if(identity!=null || numericAuthor.isNotBlank())name else "",id,description,numericAuthor,authorHandle)
     }
     suspend fun resolve(context:Context,input:String):MediaPlan=withContext(Dispatchers.IO) {
         val url=validUrl(input)
@@ -58,7 +77,16 @@ object MediaLinks {
         try {read(Python.getInstance().getModule("liuce_media").callAttr("resolve",url,cookies).toString())}
         catch(e:Exception) {
             val platform=SharedLinks.platform(url) ?: Links.title(url).takeIf{it=="Instagram"}
-            val hint=if(platform=="小红书" || platform=="抖音")
+            val failures=generateSequence<Throwable>(e){it.cause}.mapNotNull{it.message}.joinToString(" ").lowercase()
+            val hint=if(listOf("certificate_verify_failed","certificate verify failed","ssl handshake","sslcertverificationerror").any{it in failures})
+                "安全连接证书校验失败，请检查当前网络或 VPN；未确认作品本身是否可下载，不会忽略证书验证。"
+            else if(listOf("http error 429","too many requests","rate limit").any{it in failures})
+                "平台请求次数受限，请稍后再试；已保存的作品不受影响。"
+            else if(listOf("http error 401","http error 403","login required","sign in to confirm").any{it in failures})
+                "平台要求访问授权或拒绝了本次请求，请打开网页确认作品可见，再返回重试。"
+            else if(listOf("unsupported url","no suitable extractor").any{it in failures})
+                "当前版本暂不支持解析此平台页面，请使用分享原图、视频的方式保存。"
+            else if(platform=="小红书" || platform=="抖音")
                 "$platform 没有返回可下载的原图或视频。请点「打开网页验证」，完成验证后返回重新解析；部分作品可能禁止下载。"
             else if(platform=="Instagram")
                 "Instagram 没有返回可保存的视频或图片。请点「打开网页验证」，在网页内确认能正常查看作品，再返回重新解析；有些作品需要登录后才能读取媒体。"
@@ -70,7 +98,7 @@ object MediaLinks {
 
 data class MediaDownload(val id:String,val title:String,val source:String,val kind:String,val ext:String,val managerId:Long,
     val generation:String,val state:String="等待下载",val percent:Int=0,val bytes:Long=0,val archiveId:String="",val failure:String="",
-    val authorProfile:String="",val authorName:String="")
+    val authorProfile:String="",val authorName:String="",val batchId:String="",val mediaOrder:Int=0,val work:WorkOrigin?=null)
 
 /** Only formal archives are safe to hide from the download queue. Drafts need their resume entry. */
 internal fun completedDownloadRecords(jobs:List<MediaDownload>,formalArchiveIds:Set<String>):List<MediaDownload> =
@@ -95,22 +123,35 @@ class MediaDownloads(private val context:Context) {
     private val manager=context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     private val folder=context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: error("下载目录暂不可用")
     private fun generation()=device.getString("generation","initial").orEmpty()
-    private fun read()=runCatching {JSONArray(prefs.getString("jobs","[]")).objects().map {o ->
-        MediaDownload(o.getString("id"),o.getString("title"),o.getString("source"),o.getString("kind"),o.getString("ext"),o.getLong("managerId"),o.getString("generation"),archiveId=o.optString("archiveId"),
-            authorProfile=o.optString("authorProfile"),authorName=o.optString("authorName"))
-    }}.getOrDefault(emptyList())
-    private fun write(jobs:List<MediaDownload>) {check(prefs.edit().putString("jobs",JSONArray(jobs.map {j ->JSONObject()
+    private fun read()=runCatching {
+        // The optional metadata index must never make an otherwise valid download journal disappear.
+        val works=runCatching{JSONObject(prefs.getString("works","{}") ?: "{}")}.getOrDefault(JSONObject())
+        JSONArray(prefs.getString("jobs","[]")).objects().map {o ->
+            val batch=o.optString("batchId")
+            MediaDownload(o.getString("id"),o.getString("title"),o.getString("source"),o.getString("kind"),o.getString("ext"),o.getLong("managerId"),o.getString("generation"),archiveId=o.optString("archiveId"),
+                authorProfile=o.optString("authorProfile"),authorName=o.optString("authorName"),batchId=batch,mediaOrder=o.optInt("mediaOrder"),
+                work=works.optJSONObject(batch)?.let{runCatching{Codec.work(it)}.getOrNull()})
+        }
+    }.getOrDefault(emptyList())
+    private fun write(jobs:List<MediaDownload>) {
+        val works=JSONObject()
+        jobs.forEach{j->if(j.batchId.isNotBlank())j.work?.let{works.put(j.batchId,Codec.work(it))}}
+        check(prefs.edit().putString("works",works.toString()).putString("jobs",JSONArray(jobs.map {j ->JSONObject()
         .put("id",j.id).put("title",j.title).put("source",j.source).put("kind",j.kind).put("ext",j.ext)
         .put("managerId",j.managerId).put("generation",j.generation).put("archiveId",j.archiveId)
-        .put("authorProfile",j.authorProfile).put("authorName",j.authorName)}).toString()).commit())}
+        .put("authorProfile",j.authorProfile).put("authorName",j.authorName)
+        .put("batchId",j.batchId).put("mediaOrder",j.mediaOrder)}).toString()).commit())
+    }
     fun file(job:MediaDownload)=File(folder,"${job.id}.download")
     @Synchronized fun enqueue(plan:MediaPlan,items:List<RemoteMedia>) {
         val jobs=read().toMutableList()
         require(items.isNotEmpty()) {"请至少选择一项媒体"}
         require(jobs.count{it.generation==generation()}+items.size<=200) {"下载记录已达上限，请先清理已完成记录"}
+        val batchId=uid()
+        val work=plan.origin(items.size)
         val newJobs=mutableListOf<MediaDownload>()
         try {
-            items.forEach {item ->
+            items.forEachIndexed {index,item ->
                 val id=uid()
                 val request=DownloadManager.Request(Uri.parse(MediaLinks.validUrl(item.url)))
                     .setTitle("留着吧媒体下载").setDescription(if(item.kind=="video") "视频" else "图片")
@@ -121,7 +162,7 @@ class MediaDownloads(private val context:Context) {
                 if(!cookie.isNullOrBlank()) request.addRequestHeader("Cookie",cookie)
                 val managerId=manager.enqueue(request)
                 newJobs+=MediaDownload(id,plan.title,plan.source,item.kind,item.ext.filter{it.isLetterOrDigit()}.take(8),managerId,generation(),
-                    authorProfile=plan.authorProfile,authorName=plan.authorName)
+                    authorProfile=plan.authorProfile,authorName=plan.authorName,batchId=batchId,mediaOrder=index,work=work)
             }
             write(jobs+newJobs)
         } catch(e:Exception) {newJobs.forEach{manager.remove(it.managerId)};throw e}

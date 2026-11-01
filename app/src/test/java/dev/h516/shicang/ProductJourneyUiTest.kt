@@ -57,6 +57,7 @@ class ProductJourneyUiTest:UnifiedNavigationFixture() {
     @Test fun archiveNoteIndexUsesUnifiedEditorAndKeepsItsMedia()=fixture {model,a->
         model.edit(a);model.changeArchiveText("从笔记索引继续写同一份档案");model.saveEditor()
         idle{model.state.value.editor==null && !model.state.value.busy}
+        compose.onNodeWithContentDescription("切换作品、笔记或作者").performClick()
         compose.onNodeWithText("笔记").performClick()
         compose.onNodeWithText("从笔记索引继续写同一份档案").performClick()
         compose.onNodeWithText("编辑档案").performClick()
