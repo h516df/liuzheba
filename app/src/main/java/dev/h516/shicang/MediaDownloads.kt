@@ -111,12 +111,12 @@ class MediaDownloads(private val context:Context) {
     private fun read()=runCatching {
         val works=JSONObject(prefs.getString("works","{}") ?: "{}")
         JSONArray(prefs.getString("jobs","[]")).objects().map {o ->
-        val batch=o.optString("batchId")
-        MediaDownload(o.getString("id"),o.getString("title"),o.getString("source"),o.getString("kind"),o.getString("ext"),o.getLong("managerId"),o.getString("generation"),archiveId=o.optString("archiveId"),
-            authorProfile=o.optString("authorProfile"),authorName=o.optString("authorName"),batchId=batch,mediaOrder=o.optInt("mediaOrder"),
-            work=works.optJSONObject(batch)?.let{runCatching{Codec.work(it)}.getOrNull()})
+            val batch=o.optString("batchId")
+            MediaDownload(o.getString("id"),o.getString("title"),o.getString("source"),o.getString("kind"),o.getString("ext"),o.getLong("managerId"),o.getString("generation"),archiveId=o.optString("archiveId"),
+                authorProfile=o.optString("authorProfile"),authorName=o.optString("authorName"),batchId=batch,mediaOrder=o.optInt("mediaOrder"),
+                work=works.optJSONObject(batch)?.let{runCatching{Codec.work(it)}.getOrNull()})
         }
-    }}.getOrDefault(emptyList())
+    }.getOrDefault(emptyList())
     private fun write(jobs:List<MediaDownload>) {
         val works=JSONObject()
         jobs.forEach{j->if(j.batchId.isNotBlank())j.work?.let{works.put(j.batchId,Codec.work(it))}}
