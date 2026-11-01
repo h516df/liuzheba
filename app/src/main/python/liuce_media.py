@@ -63,6 +63,7 @@ def xhs_album(note, note_id):
     if not entries:
         raise ExtractorError('No album images available', expected=True)
     return {'id': note_id, 'title': note.get('title') or note.get('desc') or '小红书图集',
+            'description': note.get('desc') or '',
             '_type': 'liuce_album', 'media': entries,
             'author': work_author('xiaohongshu', note.get('user'))}
 
@@ -86,6 +87,7 @@ class LiuceXhsIE(XiaoHongShuIE):
         info = super()._real_extract(url)
         if isinstance(info, dict):
             info['author'] = work_author('xiaohongshu', note.get('user'))
+            info['description'] = note.get('desc') or info.get('description') or ''
         return info
 
 
@@ -108,11 +110,13 @@ class LiuceDouyinIE(DouyinIE):
                     media.append({'url': addresses[0], 'kind': 'image', 'ext': 'jpg'})
             if media:
                 return {'id': post_id, 'title': detail.get('desc') or '抖音图集',
+                        'description': detail.get('desc') or '',
                         '_type': 'liuce_album', 'media': media,
                         'author': work_author('douyin', detail.get('author'))}
         info = self._parse_aweme_video_app(detail)
         if isinstance(info, dict):
             info['author'] = work_author('douyin', detail.get('author'))
+            info['description'] = detail.get('desc') or info.get('description') or ''
         return info
 
 
@@ -229,5 +233,14 @@ def resolve(url, browser_cookies=''):
             if item['url'].startswith('http://'):
                 item['url'] = 'https://' + item['url'][7:]
             item.setdefault('headers', {'Referer': url, 'User-Agent': ydl.params.get('http_headers', {}).get('User-Agent', 'Mozilla/5.0')})
+        caption = info.get('description') or ''
+        if not isinstance(caption, str):
+            caption = ''
+        if len(caption) > 100_000:
+            raise ExtractorError('Work text exceeds the local note size limit', expected=True)
+        work_id = info.get('id') or ''
+        if not isinstance(work_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,200}', work_id):
+            work_id = ''
         return json.dumps({'title': (info.get('title') or '链接收录')[:160],
-                           'source': url, 'media': media, 'author': info.get('author')}, ensure_ascii=False)
+                           'source': url, 'id': work_id, 'description': caption,
+                           'media': media, 'author': info.get('author')}, ensure_ascii=False)

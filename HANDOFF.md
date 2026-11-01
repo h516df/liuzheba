@@ -1,3 +1,13 @@
+# 当前接续（2026-11-01）：留着吧作品化改版 · P0 数据与下载基础批次
+
+- **用户目标**：接手 0.22 并开始实施“自己发帖 + 五平台作品收藏”的完整产品改版。优先保存完整帖子、同作品去重、稳定作者 ID 归集；旧资料和原证书不变。手机实际版本尚未确认。
+- **基线**：main `5653e76`，正式标签 v0.22；历史 PR #31 仍是 draft，当前 main 不包含其 head，不自动合并。新独立分支 `feat/content-work-foundation-20261101`。
+- **本批修改**：引入可选外部作品元信息、提取器原文/作品 ID 传输、下载批次和媒体顺序持久化；下载后单击保存为正式作品而非手动建档案；旧备份格式保持6；同作品追加时按媒体摘要避开重复文件。完整范围、边界及下一批计划见 [作品化改版记录](docs/CONTENT_WORK_FOUNDATION.md)。
+- **验证**：锁定 `yt-dlp==2026.10.26` 的本地离线 Python 回归 14/14 passed；Android 构建、JVM、设备、CI、真实平台下载及 APK 升级须按分支最终提交继续回读，未通过前不宣称完成。
+- **下一步**：提交并开 PR → GitHub Android/Cloud/API35/Secret 同源检查 → 按失败修复 → 继续 P0 平台真实链接可靠性与作者完整支持 → P1 双列我的页/编辑器/沉浸发现 → 稳定后正式签名发行。未获完整同源检查时不发版。
+
+---
+
 # 当前接续（2026-11-01）：两台 GitHub Runner 分片完成全量 Cloud 提速
 
 - **已合入**：[PR #73](https://github.com/h516df/liuzheba/pull/73) head `4fb4842eb795ddce38fba4faacaf0fb306620bf9`，squash main `1d8e0a0e6fa3229b343a4109dad4c0c347eae2bd`。Cloud 的 `scope` 保守分类后，`app-build` 构建两份 APK+lint；两台独立 GitHub Linux Runner 用互补 `*Ui*Test` 类过滤并行跑 `unit-tests-ui/other`；最后 `check` 严格依赖所有结果，失败/漏项不报绿。

@@ -28,6 +28,17 @@ class MediaLinksTest {
         assertEquals("图集",plan.title)
         assertEquals(mapOf("Referer" to "https://example.com/post"),plan.items.single().headers)
     }
+    @Test fun extractedWorkKeepsOriginalBodyIdentityAndMediaCount() {
+        val plan=MediaLinks.read("""{"id":"stablePost123","title":"作品","description":"第一行\n第二行 #原文","source":"https://www.xiaohongshu.com/explore/0123456789abcdef01234567","media":[{"url":"https://cdn.example.com/1.jpg","kind":"image","ext":"jpg"},{"url":"https://cdn.example.com/2.jpg","kind":"image","ext":"jpg"}]}""")
+        val origin=plan.origin(2)!!
+        assertEquals("stablePost123",origin.workId)
+        assertEquals("小红书",origin.platform)
+        assertEquals("第一行\n第二行 #原文",origin.description)
+        assertEquals(2,origin.expectedMedia)
+        assertEquals(origin,Codec.work(Codec.work(origin)))
+        assertTrue(origin.sameWork(origin.copy(url="https://www.xiaohongshu.com/explore/another",description="更名")))
+        assertFalse(origin.sameWork(origin.copy(platform="抖音")))
+    }
     @Test fun extractedPlatformAuthorIsOptionalAndBoundToItsOwnSource() {
         fun payload(source:String,profile:String)="""{"source":"$source","author":{"profile_url":"$profile","name":"同名创作者"},"media":[{"url":"https://cdn.example.com/a.jpg","kind":"image","ext":"jpg"}]}"""
         val xhs="https://www.xiaohongshu.com/user/profile/syntheticUser123"

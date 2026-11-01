@@ -235,33 +235,43 @@ class AppModel(app: Application): AndroidViewModel(app) {
     fun importDownloads(jobs:List<MediaDownload>,targetId:String?=null) {
         if(jobs.isEmpty() || jobs.any{it.state!="待收录"})return
         draftJob?.cancel()
-        work("正在收录 ${jobs.size} 项下载媒体") {
+        work("正在保存 ${jobs.size} 项作品媒体") {
             val current=withContext(Dispatchers.IO){mediaDownloads.list()}
             require(jobs.all{job->current.any{it.id==job.id && it.state=="待收录"}}){"下载记录已变化，请重新选择"}
+            require(jobs.map { it.batchId.ifBlank { it.source } }.distinct().size==1) { "请选择同一次作品下载的媒体" }
             mutable.value.editor?.let{store.draft(it,editorTextFor(it))}
-            val uris=jobs.map{Uri.fromFile(mediaDownloads.file(it))}
-            val editor=mutable.value.editor?.takeIf{it.id==targetId}
+            val ordered=jobs.sortedWith(compareBy<MediaDownload>{it.mediaOrder}.thenBy{it.id})
+            val uris=ordered.map{Uri.fromFile(mediaDownloads.file(it))}
+            val origin=ordered.first().work ?: MediaPlan(ordered.first().title,ordered.first().source,emptyList()).origin(ordered.size)
+            val existing=if(targetId==null && origin!=null)store.load().active.firstOrNull{it.work?.sameWork(origin)==true} else null
+            val destination=targetId ?: existing?.id
+            val editor=mutable.value.editor?.takeIf{it.id==destination}
             var result:ImportResult
             var target:String
-            if(targetId==null) {
-                val base=Archive(name=jobs.first().title,fields=listOf(Field(name="来源链接",type="链接",value=jobs.first().source)))
+            if(destination==null) {
+                val base=Archive(name=ordered.first().title.ifBlank{"收藏的作品"},fields=listOf(Field(name="来源链接",type="链接",value=ordered.first().source)),work=origin)
+                val originalText=origin?.description.orEmpty()
+                val text=ArchiveTextDraft(LongNote("archive",base.id,body=originalText),null,null,store.generationToken)
                 val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
-                try{result=store.importIntoArchive(base.id,uris,base,onLinked=linked::set).first}
-                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,draftStatus="已存为草稿 · 保存后完成收录")}}}
+                try{result=store.importIntoArchive(base.id,uris,base,onLinked=linked::set,text=text,dedupeByContent=true).first}
+                finally{linked.get()?.let{draft->mutable.update{it.copy(editor=draft,draftStatus="作品草稿已保存")}}}
                 require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"媒体读取失败"}}
+                // A new downloaded work is a post, not a folder waiting for manual creation.
+                store.save(requireNotNull(linked.get()){"作品媒体尚未完成保存"},text)
+                mutable.update{state->state.copy(editor=state.editor?.takeUnless{it.id==base.id},draftStatus="")}
                 target=base.id
             } else {
                 val linked=java.util.concurrent.atomic.AtomicReference<Archive?>()
-                try {result=store.importIntoArchive(targetId,uris,editor,progress={text->mutable.update{it.copy(progress=text)}},onLinked=linked::set).first}
+                try {result=store.importIntoArchive(destination,uris,editor,progress={text->mutable.update{it.copy(progress=text)}},onLinked=linked::set,dedupeByContent=existing!=null).first}
                 finally {linked.get()?.let{next->if(editor!=null)mutable.update{it.copy(editor=next,draftStatus="草稿已保存")}}}
                 require(result.photos.isNotEmpty()){result.errors.joinToString("；").ifBlank{"媒体读取失败"}}
-                target=targetId
-                message("已添加 ${result.photos.size} 项照片与视频")
+                target=destination
+                message(if(existing!=null) "已归入同一作品，重复媒体不会再保存" else "已添加 ${result.photos.size} 项照片与视频")
             }
-            val importedAuthor=jobs.map{it.authorProfile}.distinct().singleOrNull().orEmpty()
+            val importedAuthor=ordered.map{it.authorProfile}.distinct().singleOrNull().orEmpty()
             if(importedAuthor.isNotBlank()) {
                 try {
-                    val authorId=store.linkImportedAuthor(importedAuthor,jobs.first().authorName,target)
+                    val authorId=store.linkImportedAuthor(importedAuthor,ordered.first().authorName,target)
                     mutable.update{state->state.copy(editor=state.editor?.let{draft->
                         if(draft.id==target)draft.copy(authorIds=(draft.authorIds+authorId).distinct()) else draft
                     })}
@@ -271,10 +281,10 @@ class AppModel(app: Application): AndroidViewModel(app) {
             }
             // Only records whose copies were linked may release their temporary downloads.
             // Failed sources remain available for retry. This never submits unrelated draft fields.
-            withContext(NonCancellable+Dispatchers.IO){result.sourceIndices.forEach{mediaDownloads.imported(jobs[it].id,target)}}
+            withContext(NonCancellable+Dispatchers.IO){result.sourceIndices.forEach{mediaDownloads.imported(ordered[it].id,target)}}
             if(result.errors.isNotEmpty())message("已收录 ${result.photos.size} 项；${result.errors.joinToString("；")}")
             // Keep the task list open when appending; a new draft opens in the editor.
-            val refreshed=withContext(Dispatchers.IO){mediaDownloads.list()};mutable.update{it.copy(downloadsOpen=targetId!=null,downloads=refreshed)}
+            val refreshed=withContext(Dispatchers.IO){mediaDownloads.list()};mutable.update{it.copy(downloadsOpen=targetId!=null || result.errors.isNotEmpty(),downloads=refreshed)}
         }
     }
     fun refreshSpace() {viewModelScope.launch {try {val value=store.space();mutable.value=mutable.value.copy(space=value)} catch(e:Exception){message("空间统计暂不可用")}}}

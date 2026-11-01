@@ -24,7 +24,7 @@ class MediaBridgeTest(unittest.TestCase):
 
     def test_xhs_album_preserves_image_order_without_previews(self):
         note_id = '6411cf99000000001300b6d9'
-        note = {'type':'normal', 'title':'合成图集', 'user':{'userId':'syntheticAuthor','nickname':'合成作者'}, 'imageList':[
+        note = {'type':'normal', 'title':'合成图集', 'desc':'完整文案\n第二行', 'user':{'userId':'syntheticAuthor','nickname':'合成作者'}, 'imageList':[
             {'urlDefault':'https://example.com/full-1.jpg','urlPre':'https://example.com/thumbnail-1.jpg'},
             {'urlDefault':'https://example.com/full-2.jpg'}]}
         state = {'note':{'noteDetailMap':{note_id:{'note':note}}}}
@@ -34,6 +34,7 @@ class MediaBridgeTest(unittest.TestCase):
         self.assertEqual([m['url'] for m in flatten_info(result)], ['https://example.com/full-1.jpg','https://example.com/full-2.jpg'])
         self.assertTrue(all(m['kind']=='image' for m in flatten_info(result)))
         self.assertEqual(result['author']['profile_url'], 'https://www.xiaohongshu.com/user/profile/syntheticAuthor')
+        self.assertEqual(result['description'], '完整文案\n第二行')
 
     def test_xhs_alternate_image_data_prefers_full_items_not_preview(self):
         note = {'type': 'normal', 'image_list': [
@@ -51,13 +52,15 @@ class MediaBridgeTest(unittest.TestCase):
             url = target
             def __enter__(self): return self
             def __exit__(self, *_): return False
-        album = {'title':'完整图文', '_type':'liuce_album', 'media':[
+        album = {'id':'6411cf99000000001300b6d9', 'title':'完整图文', 'description':'原文 #生活', '_type':'liuce_album', 'media':[
             {'url':'https://example.com/image1.jpg','kind':'image','ext':'jpg'},
             {'url':'https://example.com/image2.jpg','kind':'image','ext':'jpg'}]}
         with patch.object(YoutubeDL, 'urlopen', return_value=Redirect()), patch.object(LiuceXhsIE, 'extract', return_value=album) as extractor:
             result = json.loads(resolve('https://xhslink.cn/o/SyntheticShort', 'web_session=fake'))
         extractor.assert_called_once_with(target)
         self.assertEqual(result['source'], target)
+        self.assertEqual(result['id'], '6411cf99000000001300b6d9')
+        self.assertEqual(result['description'], '原文 #生活')
         self.assertEqual(len(result['media']), 2)
         self.assertTrue(all(item['headers']['Referer']==target for item in result['media']))
 
@@ -120,6 +123,7 @@ class MediaBridgeTest(unittest.TestCase):
         self.assertEqual(len(flatten_info(result)), 2)
         self.assertNotIn('cover.jpg', json.dumps(result))
         self.assertEqual(result['author']['profile_url'], 'https://www.douyin.com/user/syntheticSec')
+        self.assertEqual(result['description'], '合成作品')
 
     def test_douyin_public_playback_remains_usable_when_creator_disables_download(self):
         """No download_addr is needed when the publisher still exposes a public playable MP4."""

@@ -345,7 +345,7 @@ class Store(private val context: Context) {
             (library.archives+library.drafts).any{it.id==receipt.optString("archive") && it.photos.any{p->p.id==receipt.optString("media")}}
         }==true}.toSet()
     }}
-    internal suspend fun importIntoArchive(id:String,uris:List<Uri>,editor:Archive?=null,progress:(String)->Unit={},onLinked:(Archive)->Unit={},sourceKeys:List<String>?=null,text:ArchiveTextDraft?=null):Pair<ImportResult,Archive> = withContext(Dispatchers.IO) {gate.withLock {
+    internal suspend fun importIntoArchive(id:String,uris:List<Uri>,editor:Archive?=null,progress:(String)->Unit={},onLinked:(Archive)->Unit={},sourceKeys:List<String>?=null,text:ArchiveTextDraft?=null,dedupeByContent:Boolean=false):Pair<ImportResult,Archive> = withContext(Dispatchers.IO) {gate.withLock {
         require(editor==null || editor.id==id){"编辑档案已变更"}
         require(sourceKeys==null || sourceKeys.size==uris.size && sourceKeys.all(Codec::validId)){"收录任务编号无效"}
         val formal=row("archive",id)?.let(Codec::archive)?.takeIf{it.deleted==0L}
@@ -363,10 +363,18 @@ class Store(private val context: Context) {
         }
         val pending=uris.indices.filterNot{it in acknowledged}
         val fresh=if(pending.isEmpty())ImportResult(emptyList(),emptyList()) else importPhotosUnsafe(pending.map{uris[it]},progress)
-        val result=ImportResult(acknowledged.values.toList()+fresh.photos,fresh.errors,
+        // Only remote-work reimports use hash dedupe. Ordinary personal imports may intentionally
+        // contain the same image twice. Never remove a previously linked original.
+        val accepted=mutableListOf<Photo>()
+        val linkedPhotos=fresh.photos.map { photo ->
+            val old=if(dedupeByContent)base.photos.firstOrNull{it.sha256==photo.sha256 && it.bytes==photo.bytes && it.mime==photo.mime} else null
+            if(old==null) accepted.add(photo) else File(photoDir,photo.file).delete()
+            old ?: photo
+        }
+        val result=ImportResult(acknowledged.values.toList()+linkedPhotos,fresh.errors,
             acknowledged.keys.toList()+fresh.sourceIndices.map{pending[it]})
-        if(fresh.photos.isEmpty())return@withLock result to base
-        val next=base.copy(photos=base.photos+fresh.photos,updated=System.currentTimeMillis())
+        if(accepted.isEmpty())return@withLock result to base
+        val next=base.copy(photos=base.photos+accepted,updated=System.currentTimeMillis())
         // No suspension or cancellation boundary can strand a successfully copied batch before linking it.
         // A failed SQL transaction removes only this batch's new copies; the picker sources stay untouched.
         var linked=false
@@ -377,10 +385,10 @@ class Store(private val context: Context) {
                     if(editor!=null || formal==null)put("draft",id,Codec.archive(next))
                     else {
                         put("archive",id,Codec.archive(next.copy(cover=next.coverPhoto()?.id.orEmpty())))
-                        draft?.let{put("draft",id,Codec.archive(it.copy(photos=it.photos+fresh.photos,updated=next.updated)))}
+                        draft?.let{put("draft",id,Codec.archive(it.copy(photos=it.photos+accepted,updated=next.updated)))}
                     }
                     sourceKeys?.let{keys->fresh.sourceIndices.forEachIndexed{photoIndex,sourceIndex->
-                        put("incomingReceipt",keys[pending[sourceIndex]],JSONObject().put("archive",id).put("media",fresh.photos[photoIndex].id))
+                        put("incomingReceipt",keys[pending[sourceIndex]],JSONObject().put("archive",id).put("media",linkedPhotos[photoIndex].id))
                     }}
                     db.setTransactionSuccessful()
                 }finally{db.endTransaction()}
@@ -390,7 +398,7 @@ class Store(private val context: Context) {
                 onLinked(next)
                 settleImportedMedia()
             }
-        }finally{if(!linked)fresh.photos.forEach{File(photoDir,it.file).delete()}}
+        }finally{if(!linked)accepted.forEach{File(photoDir,it.file).delete()}}
         result to next
     }}
     /** Append a separate derivative to the current archive, never replace its source or stale metadata. */
