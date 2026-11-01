@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -84,6 +85,9 @@ import androidx.compose.ui.semantics.semantics
     var results by remember{mutableStateOf<List<Archive>?>(null)}
     var completedQuery by remember{mutableStateOf<ArchiveQuery?>(null)}
     val c=MaterialTheme.colorScheme
+    // Two columns are comfortable at normal text sizes. Accessibility text
+    // needs full-width cards so titles and the media action stay reachable.
+    val wallColumns=if(LocalDensity.current.fontScale>1.4f || LocalConfiguration.current.screenWidthDp<300) 1 else 2
     LaunchedEffect(s.library,selection,s.modelDownloading){
         val found=model.search(s.library,selection)
         hits=found;results=found.map{it.archive};completedQuery=selection
@@ -138,7 +142,7 @@ import androidx.compose.ui.semantics.semantics
             Spacer(Modifier.height(16.dp))
             if(s.library.active.isEmpty()) GalleryTonalButton(onClick={model.edit()},enabled=!s.busy){Text("新建第一份档案")}
             if(selection.filtered) GalleryTextButton(onClick={clear()}){Text("清除搜索与筛选")}
-        } else if(covers) LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(2),verticalItemSpacing=12.dp,horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
+        } else if(covers) LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(wallColumns),verticalItemSpacing=12.dp,horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
             items(results.orEmpty(),key={it.id}){a->
                 val swipe=rememberSwipeToDismissBoxState(confirmValueChange={value->if(value==SwipeToDismissBoxValue.EndToStart) deleteTarget=a;false})
                 SwipeToDismissBox(state=swipe,modifier=Modifier.animateItem(),enableDismissFromStartToEnd=false,gesturesEnabled=!s.busy,

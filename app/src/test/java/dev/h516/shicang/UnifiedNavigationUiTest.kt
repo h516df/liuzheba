@@ -170,7 +170,7 @@ class UnifiedKeyboardUiTest:UnifiedNavigationFixture() {
 class UnifiedCreateUiTest:UnifiedNavigationFixture() {
     @Test fun newArchiveShowsDistinctCreationAndOpensOnlyAfterSave()=fixture {model,_->
         compose.onNodeWithContentDescription("添加内容").performClick()
-        compose.onNodeWithText("新建档案").performClick()
+        compose.onNodeWithText("发布帖子").performClick()
         compose.onNodeWithText("新建档案").assertExists()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("新建合成档案")
         compose.onNodeWithText("保存").performClick()
