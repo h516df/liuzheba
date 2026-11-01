@@ -56,3 +56,21 @@ main push、正式发布、签名隔离、原包名/证书、v0.16→新 APK 数
 [PR #71](https://github.com/h516df/liuzheba/pull/71) 只有 `HANDOFF.md` 与本文件，维护快车道 Cloud [41204400365](https://github.com/h516df/liuzheba/actions/runs/41204400365) 23秒 success、未执行 Android Gradle；该 PR 的 Android、Secret 也 success。合并后 main `40c91cc9f70098dd5d794f3c31cbdbeb7ec15ada` 四组 push 中 [Cloud 41204487496](https://github.com/h516df/liuzheba/actions/runs/41204487496) **failure**，另外三组 success。
 
 Cloud 日志明确是 **330 个 JVM/Compose 测试中一个 `ProductJourneyUiTest.discoveryFeedReturnsToSameMediaAfterReadingAndEditing` 在 `ProductJourneyUiTest.kt:52` 抛 `ComposeTimeoutException`**，并非编译/JVM 参数非法。此前此测试及同夹具测试曾有时序性故障，不能把这一次归因于新JIT参数，亦不能忽略失败或继续声称稳定提速24%。为最小化变量，`fix/revert-jit-warmup-after-flake-20261031` 候选撤回仅CI使用的 `-XX:TieredStopAtLevel=1`，恢复原2个测试fork/每类新JVM，保留330项完整回归和所有其它检查。需在新 PR/main 精确提交复验；如故障仍存在，则独立定位 Compose 异步回流/可见计数，不用减少测试覆盖来换绿灯。
+
+
+## 两台免费标准 Runner 并行分片：实际交付（2026-11-01）
+
+先前同机3fork与JIT试验均无稳定可靠收益，已回退。真正的结构改动在 [PR #73](https://github.com/h516df/liuzheba/pull/73)，不减少完整单元/Compose、原生8项设备用例、lint或正式产物审查：
+
+- `scope` 仍按保守 `cloud/ci_scope.py`；主线/发行/未知路径全部走完整检查，文档/发布工具允许名单仍走低开销Python快车道。
+- `app-build` 原样构建开发/测试两个APK、lint；artifact仍叫 `development-${{ github.sha }}`。JUnit XML从该单包拆到两个独立 `unit-tests-ui/other-${{ github.sha }}` artifact；生产脚本只需要原Artifact内两份APK且**没有改动**。
+- `unit-tests-ui`、`unit-tests-other` 同时使用两个独立4核/16GB标准 GitHub-hosted Ubuntu Runner，类名过滤 `*Ui*Test` 与其补集，每片仍2个fork/`forkEvery=1`。最终 required `check` 的Python门禁核对scope/build/两个test job的success或有依据的skip，下载XML检查各片非空、归属正确、无重复/失败/跳过，**总数不少于330**。11项轻量门禁回归和YAML/Bash静态检查已通过，异常状态会失败，未对真实业务用例添加skip。
+- 标准GitHub-hosted runners在公开仓库中免费，未启用付费 larger runner；本地仍单 worker。不触及签名、发布或用户原始媒体。
+
+| 真实同源阶段 | Cloud端到端 | JVM测试计数 | 结论 |
+| --- | ---: | --- | --- |
+| 旧 main `95c18c3` · [41205657918](https://github.com/h516df/liuzheba/actions/runs/41205657918) | 449 s | 完整330（未分片） | success |
+| PR #73 `4fb4842` · [41261200033](https://github.com/h516df/liuzheba/actions/runs/41261200033) | 260 s | ui68 + other262 = 330 | success |
+| 新 main `1d8e0a0` · [41261561630](https://github.com/h516df/liuzheba/actions/runs/41261561630) | **310 s** | ui68 + other262 = 330 | success |
+
+新 main 相对该旧基线缩短139秒（约31%）；PR表现更快但不同运行器缓存/负载造成浮动，不能承诺所有项目/所有提交固定减少31%。目前CI关键路径为UI分片（main约292秒 job），未来优先从消除Compose偶发异步等待和评估均衡分片入手，不应再盲目加同机线程数。维护快车道仍需用本次后续纯文档 PR 实测验证；正式发行未触发。

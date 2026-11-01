@@ -1,3 +1,13 @@
+# 当前接续（2026-11-01）：两台 GitHub Runner 分片完成全量 Cloud 提速
+
+- **已合入**：[PR #73](https://github.com/h516df/liuzheba/pull/73) head `4fb4842eb795ddce38fba4faacaf0fb306620bf9`，squash main `1d8e0a0e6fa3229b343a4109dad4c0c347eae2bd`。Cloud 的 `scope` 保守分类后，`app-build` 构建两份 APK+lint；两台独立 GitHub Linux Runner 用互补 `*Ui*Test` 类过滤并行跑 `unit-tests-ui/other`；最后 `check` 严格依赖所有结果，失败/漏项不报绿。
+- **真实耗时**：原 main `95c18c3` 的 [Cloud 41205657918](https://github.com/h516df/liuzheba/actions/runs/41205657918) 449秒；PR #73 [Cloud 41261200033](https://github.com/h516df/liuzheba/actions/runs/41261200033) 260秒；新 main [Cloud 41261561630](https://github.com/h516df/liuzheba/actions/runs/41261561630) 310秒，**首次 main 实测较旧 main 缩短139秒约31%**。Runner/缓存和PR/main情况会波动，不保证每次固定31%。
+- **覆盖与安全证据**：PR及新 main 的最终 `check` 日志都核对 `ui=68, other=262, total=330`、无重复/失败/跳过；新 Python 保护用例11/11和Bash/YAML轻量检查通过。main 同源 [Android 41261561688](https://github.com/h516df/liuzheba/actions/runs/41261561688)、[API35 device 41261561654](https://github.com/h516df/liuzheba/actions/runs/41261561654)、[Secret 41261561687](https://github.com/h516df/liuzheba/actions/runs/41261561687) 全 success。开发 `development-<SHA>` 原名 Artifact 含两份 APK（main约66.6MB），JUnit XML 改存两份独立3日短期 Artifact；既有生产发行脚本及签名门禁没有改动。
+- **边界**：每片仍 `forkEvery=1`、最多2fork、单JVM2GiB；本地 `bash cloud/check.sh` 仍完整检查、1 worker。旧 Compose 偶发超时不宣称永久修复；完整 main、发行与未知改动不得走维护快车道。没有签名发布新版、安装手机、变动用户资料或 v0.22 正式资产。
+- **后续观察**：纯文档维护分支 `docs/ci-sharding-evidence-20261101` 用于验证新 `scope → app-build → check` 快车道真实耗时；其 PR/main 精确结果需继续读回。代码变动期间维持全量两分片/330用例、同源 four-check 自查。详见 `docs/CI_OPTIMIZATION.md`。
+
+---
+
 # 当前接续（2026-10-31）：第二次 main 回归失败，撤回 JVM 预热实验
 
 - **新证据（不可忽略）**：纯交接文档 [PR #71](https://github.com/h516df/liuzheba/pull/71) 的维护快车道三组检查 success、Cloud约23秒；squash main `40c91cc9f70098dd5d794f3c31cbdbeb7ec15ada` 的 [Cloud 41204487496](https://github.com/h516df/liuzheba/actions/runs/41204487496) **failure**：330项 JVM/Compose 用例中 `ProductJourneyUiTest.discoveryFeedReturnsToSameMediaAfterReadingAndEditing` 在源码第52行 `mediaNumber(3)` 等待超时；[Android 41204487612](https://github.com/h516df/liuzheba/actions/runs/41204487612)、[API35 device 41204487503](https://github.com/h516df/liuzheba/actions/runs/41204487503)、[Secret 41204487451](https://github.com/h516df/liuzheba/actions/runs/41204487451) 均 success。文档改动不涉及 App。
