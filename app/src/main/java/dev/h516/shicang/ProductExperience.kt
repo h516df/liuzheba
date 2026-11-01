@@ -45,11 +45,12 @@ import kotlinx.coroutines.launch
 @Composable internal fun ArchiveStoryCard(a:Archive,library:Library,model:AppModel,compact:Boolean,open:()->Unit,view:()->Unit) {
     val c=MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surface)
+        .clickable(onClickLabel="打开${a.name}的档案",onClick=open)
         .testTag("story-${a.id}")) {
         val cover=a.coverPhoto()
         if(cover!=null) Box(Modifier.fillMaxWidth().aspectRatio(if(compact) {
             if(cover.isVideo) .82f else if(a.photos.size>1) 1.04f else .9f
-        } else 1.28f).clickable(onClickLabel="打开${a.name}的帖子",onClick=open)) {
+        } else 1.28f)) {
             // Covers can crop; the common viewer always offers the complete original.
             MediaThumb(cover,model,Modifier.fillMaxSize(),"${a.name}的封面")
             Surface(onClick=view,modifier=Modifier.align(Alignment.BottomEnd).padding(8.dp)
@@ -60,7 +61,7 @@ import kotlinx.coroutines.launch
                 }
             }
         }
-        Column(Modifier.fillMaxWidth().clickable(onClickLabel="打开${a.name}的档案",onClick=open).padding(if(compact)12.dp else 18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(if(compact)12.dp else 18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if(a.work!=null) Text("来自 ${a.work.platform}",style=MaterialTheme.typography.labelSmall,color=c.primary)
             else if(cover==null) Text("文字帖子",style=MaterialTheme.typography.labelMedium,color=c.onSurfaceVariant)
             Text(a.name,style=if(compact)MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,maxLines=if(compact)2 else 3,overflow=TextOverflow.Ellipsis)
