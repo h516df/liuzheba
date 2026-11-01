@@ -267,6 +267,13 @@ class DirectMediaImportTest {
         assertEquals(post.work,Codec.library(Codec.library(library)).active.first{it.id==post.id}.work)
         assertTrue(downloads.list().all{it.state=="已收录"})
     }
+    @Test fun invalidOptionalWorkIndexCannotHideOutstandingDownloadJobs() {
+        val (downloads,jobs)=downloadedBatch(workId="syntheticPost123",caption="正文")
+        app.getSharedPreferences("media-downloads",0).edit().putString("works","not-json").commit()
+        val recovered=downloads.list()
+        assertEquals(jobs.map{it.id},recovered.map{it.id})
+        assertTrue(recovered.all{it.state=="待收录" && it.work==null})
+    }
     @Test fun repeatDownloadAppendsToTheSamePostWithoutDuplicatingOriginalFiles() {
         val (first,jobs)=downloadedBatch(workId="samePost123",caption="初次保存")
         model.importDownloads(jobs);await{!model.state.value.busy}

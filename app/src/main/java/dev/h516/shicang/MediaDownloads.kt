@@ -109,7 +109,8 @@ class MediaDownloads(private val context:Context) {
     private val folder=context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: error("下载目录暂不可用")
     private fun generation()=device.getString("generation","initial").orEmpty()
     private fun read()=runCatching {
-        val works=JSONObject(prefs.getString("works","{}") ?: "{}")
+        // The optional metadata index must never make an otherwise valid download journal disappear.
+        val works=runCatching{JSONObject(prefs.getString("works","{}") ?: "{}")}.getOrDefault(JSONObject())
         JSONArray(prefs.getString("jobs","[]")).objects().map {o ->
             val batch=o.optString("batchId")
             MediaDownload(o.getString("id"),o.getString("title"),o.getString("source"),o.getString("kind"),o.getString("ext"),o.getLong("managerId"),o.getString("generation"),archiveId=o.optString("archiveId"),

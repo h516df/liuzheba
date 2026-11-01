@@ -38,6 +38,9 @@ class MediaLinksTest {
         assertEquals(origin,Codec.work(Codec.work(origin)))
         assertTrue(origin.sameWork(origin.copy(url="https://www.xiaohongshu.com/explore/another",description="更名")))
         assertFalse(origin.sameWork(origin.copy(platform="抖音")))
+        val unknown=WorkOrigin("其他","sameId","https://example.com/post/one")
+        assertFalse(unknown.sameWork(unknown.copy(url="https://another.example/post/two")))
+        assertThrows(IllegalArgumentException::class.java) { Codec.archive(Codec.archive(Archive(name="合成帖子")).put("work","invalid")) }
     }
     @Test fun extractedPlatformAuthorIsOptionalAndBoundToItsOwnSource() {
         fun payload(source:String,profile:String)="""{"source":"$source","author":{"profile_url":"$profile","name":"同名创作者"},"media":[{"url":"https://cdn.example.com/a.jpg","kind":"image","ext":"jpg"}]}"""

@@ -14,7 +14,7 @@ data class WorkOrigin(
     val description: String = "", val expectedMedia: Int = 0
 ) {
     fun sameWork(other: WorkOrigin): Boolean = platform == other.platform &&
-        (if (workId.isNotBlank() && other.workId.isNotBlank()) workId == other.workId else url == other.url)
+        (if (platform != "其他" && workId.isNotBlank() && other.workId.isNotBlank()) workId == other.workId else url == other.url)
 }
 data class Archive(
     val id: String = uid(), val name: String = "", val category: String = "",
@@ -80,6 +80,7 @@ object Codec {
     fun archive(o: JSONObject): Archive {
         val id=o.getString("id"); require(validId(id)) { "档案编号无效" }
         require(!o.has("authorIds") || o.opt("authorIds") is JSONArray) { "作者关联格式无效" }
+        require(!o.has("work") || o.opt("work") is JSONObject) { "作品来源格式无效" }
         val fs=o.getJSONArray("fields").objects().map { Field(it.getString("id"),it.getString("name"),it.getString("type"),it.getString("value")) }
         require(fs.all { validId(it.id) && it.type in Templates.types }) { "字段格式不支持" }
         return Archive(id,o.getString("name"),o.optString("category"),o.getJSONArray("tags").strings(),fs,o.getJSONArray("photos").objects().map(::photo),o.optString("cover"),o.optBoolean("fill"),o.getLong("updated"),o.optLong("deleted"),(o.optJSONArray("authorIds") ?: JSONArray()).strings().also { ids -> require(ids.size<=1000 && ids.all(::validId) && ids.distinct().size==ids.size) { "作者关联无效" } },o.optJSONObject("work")?.let(::work))
