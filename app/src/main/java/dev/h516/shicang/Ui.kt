@@ -185,11 +185,8 @@ private val Muted: Color
         BackHandler(enabled=editing || route!="library" || zoomPhoto.isNotEmpty()) {backPage()}
         Scaffold(containerColor=scheme.background,contentWindowInsets=if(immersive) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets,snackbarHost={if(unlocked && !immersive) SnackbarHost(snackbar)},
             topBar={if(!immersive && !editing && route!="detail") Column(Modifier.statusBarsPadding()) {
-                Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                    if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
-                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"我的";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},style=if(route in listOf("frame","library","settings")) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge)
-                        if(route=="frame" && !editing && androidx.compose.ui.platform.LocalDensity.current.fontScale<=1.4f) Text("留着吧 · 私人档案",style=MaterialTheme.typography.bodySmall,color=Muted)
-                        if(route=="library" && unlocked && s.ready && s.protection.location.isEmpty())Text("资料仅保存在应用内",fontSize=11.sp,color=Muted)}
+                val largeHeader=androidx.compose.ui.platform.LocalDensity.current.fontScale>1.4f
+                val headerActions: @Composable RowScope.()->Unit = {
                     if(unlocked && s.ready && route in listOf("frame","library")) {
                         GalleryTextButton(onClick={openSettings()},modifier=Modifier.testTag("nav-settings").semantics{contentDescription="设置"}){FrameGlyph("设置",scheme.onSurfaceVariant)}
                     }
@@ -208,6 +205,19 @@ private val Muted: Color
                         GalleryTonalButton(onClick={collectMenu=true},enabled=!s.busy,colors=ButtonDefaults.filledTonalButtonColors(containerColor=scheme.surface,contentColor=scheme.onSurface),shape=RoundedCornerShape(24.dp),modifier=Modifier.heightIn(min=48.dp).semantics{contentDescription="添加内容"},contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
                             FrameGlyph("新建",scheme.onSurface);Spacer(Modifier.width(5.dp));Text("添加",style=MaterialTheme.typography.labelLarge)
                         }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
+                    if(editing || route !in listOf("frame","library")) GalleryIcon("返回",scheme.onSurface){backPage()}
+                    Column(Modifier.weight(1f)) {Text(if(editing) "编辑档案" else when(route){"frame"->"发现";"library"->"我的";"detail"->"档案详情";"photos"->"照片与视频 · ${s.library.active.firstOrNull{it.id==selected}?.photos?.size ?: 0}";"settings"->"设置";"backup"->"备份与恢复";"bin"->"回收站";"labels"->"分类与标签";"updates"->"检查更新";else->"留着吧"},style=if(route in listOf("frame","library","settings")) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge)
+                        if(route=="frame" && !editing && !largeHeader) Text("留着吧 · 私人档案",style=MaterialTheme.typography.bodySmall,color=Muted)
+                        if(route=="library" && unlocked && s.ready && s.protection.location.isEmpty() && !largeHeader)Text("资料仅保存在应用内",fontSize=11.sp,color=Muted)}
+                    if(!largeHeader)headerActions()
+                }
+                if(largeHeader && unlocked && s.ready && route in listOf("frame","library")) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=12.dp,vertical=4.dp),
+                        horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
+                        headerActions()
                     }
                 }
                 if(unlocked && s.ready && !editing && route=="library" && !updater.promptDismissed) updater.hint()?.let { hint ->
