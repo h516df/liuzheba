@@ -6,6 +6,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AuthorProfilesTest {
+    @Test fun instagramHandleIsNotAStableAuthorIdentity() {
+        assertEquals("Instagram",AuthorProfiles.platform("https://www.instagram.com/reel/synthetic/"))
+        assertNull(AuthorProfiles.parse("https://www.instagram.com/renamed.user/"))
+        assertNull(AuthorProfiles.parse("https://www.instagram.com/reel/synthetic/"))
+        val identity=PlatformIdentity(platform="Instagram",platformId="123456789",idType="pk",publicAccount="renamed.user")
+        assertTrue(AuthorProfiles.valid(identity))
+        assertFalse(AuthorProfiles.valid(identity.copy(platformId="renamed.user")))
+    }
     @Test fun bilibiliMidIsStableAndVideoOrShortLinkIsNotAnAuthor() {
         val identity=AuthorProfiles.parse("https://space.bilibili.com/12501?from=share")!!
         assertEquals("哔哩哔哩",identity.platform)

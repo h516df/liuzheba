@@ -205,6 +205,34 @@ class Store(private val context: Context) {
         }finally{db.endTransaction()}
         author.id
     }}
+    /** Instagram usernames are mutable; a work's numeric uploader PK is the only merge key. */
+    suspend fun linkImportedInstagramAuthor(stableId:String,handle:String,nickname:String,archiveId:String):String=withContext(Dispatchers.IO) {gate.withLock {
+        require(stableId.matches(Regex("[0-9]{1,32}"))) {"Instagram 作者编号无效"}
+        require(handle.isEmpty() || handle.matches(Regex("[A-Za-z0-9._]{1,30}"))) {"Instagram 账号无效"}
+        require(nickname.length<=100 && nickname.none{it.isISOControl() || it in "<>"}) {"作者称呼无效"}
+        val library=loadUnsafe()
+        val formal=library.active.firstOrNull{it.id==archiveId}
+        val draft=library.drafts.firstOrNull{it.id==archiveId}
+        require(formal!=null || draft!=null) {"收录的帖子已变化"}
+        val matches=library.authors.filter{author->author.identities.any{
+            it.platform=="Instagram" && it.idType=="pk" && it.platformId==stableId
+        }}
+        require(matches.size<=1) {"发现重复的平台作者身份，请手动核对"}
+        val old=matches.singleOrNull()
+        val author=old?.copy(identities=old.identities.map { identity ->
+            if(identity.platform=="Instagram" && identity.idType=="pk" && identity.platformId==stableId && handle.isNotBlank())
+                identity.copy(publicAccount=handle) else identity
+        }) ?: Author(name=nickname.ifBlank{handle.ifBlank{"Instagram 作者"}},identities=listOf(
+            PlatformIdentity(platform="Instagram",platformId=stableId,idType="pk",nickname=nickname,publicAccount=handle)))
+        fun linked(a:Archive)=a.copy(authorIds=(a.authorIds+author.id).distinct(),updated=System.currentTimeMillis())
+        db.beginTransaction();try {
+            put("author",author.id,Codec.author(author))
+            formal?.let{put("archive",it.id,Codec.archive(linked(it)))}
+            draft?.let{put("draft",it.id,Codec.archive(linked(it)))}
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
+        author.id
+    }}
     suspend fun linkAuthor(authorId:String,archiveId:String,linked:Boolean)=withContext(Dispatchers.IO) {gate.withLock {
         val library=loadUnsafe()
         require(library.authors.any{it.id==authorId}) {"作者已不存在"}

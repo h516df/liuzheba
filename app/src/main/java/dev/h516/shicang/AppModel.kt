@@ -273,6 +273,8 @@ class AppModel(app: Application): AndroidViewModel(app) {
             val uris=ordered.map{Uri.fromFile(mediaDownloads.file(it))}
             val origin=ordered.first().work ?: MediaPlan(ordered.first().title,ordered.first().source,emptyList()).origin(ordered.size)
             val existing=if(targetId==null && origin!=null)store.load().active.firstOrNull{it.work?.sameWork(origin)==true} else null
+            require(existing?.work?.authorPlatformId.isNullOrBlank() || origin?.authorPlatformId.isNullOrBlank() ||
+                existing?.work?.authorPlatformId==origin?.authorPlatformId) {"同一作品的作者编号发生冲突，已停止合并，请核对原链接"}
             val destination=targetId ?: existing?.id
             val editor=mutable.value.editor?.takeIf{it.id==destination}
             var result:ImportResult
@@ -298,9 +300,12 @@ class AppModel(app: Application): AndroidViewModel(app) {
                 message(if(existing!=null) "已归入同一作品，重复媒体不会再保存" else "已添加 ${result.photos.size} 项照片与视频")
             }
             val importedAuthor=ordered.map{it.authorProfile}.distinct().singleOrNull().orEmpty()
-            if(importedAuthor.isNotBlank()) {
+            val instagramId=origin?.authorPlatformId.orEmpty().takeIf{origin?.platform=="Instagram"}.orEmpty()
+            if(importedAuthor.isNotBlank() || instagramId.isNotBlank()) {
                 try {
-                    val authorId=store.linkImportedAuthor(importedAuthor,ordered.first().authorName,target)
+                    val authorId=if(instagramId.isNotBlank())
+                        store.linkImportedInstagramAuthor(instagramId,origin?.authorHandle.orEmpty(),ordered.first().authorName,target)
+                    else store.linkImportedAuthor(importedAuthor,ordered.first().authorName,target)
                     mutable.update{state->state.copy(editor=state.editor?.let{draft->
                         if(draft.id==target)draft.copy(authorIds=(draft.authorIds+authorId).distinct()) else draft
                     })}

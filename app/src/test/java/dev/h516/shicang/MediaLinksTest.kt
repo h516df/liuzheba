@@ -55,6 +55,19 @@ class MediaLinksTest {
         assertEquals(bili,MediaLinks.read(payload("https://www.bilibili.com/video/BVsynthetic",bili)).authorProfile)
         assertEquals("",MediaLinks.read(payload("https://www.bilibili.com/video/BVsynthetic","https://www.bilibili.com/video/BVsynthetic")).authorProfile)
     }
+    @Test fun instagramAuthorRequiresStableNumericPkAndKeepsHandleAsDisplayOnly() {
+        fun plan(id:String) = MediaLinks.read("""{"source":"https://www.instagram.com/p/post123/","id":"post123",
+            "author":{"platform_id":"$id","handle":"renamed.account","name":"同名"},
+            "media":[{"url":"https://cdn.example.com/a.jpg","kind":"image","ext":"jpg"}]}""")
+        val accepted=plan("123456789")
+        assertEquals("Instagram",accepted.origin(1)?.platform)
+        assertEquals("123456789",accepted.origin(1)?.authorPlatformId)
+        assertEquals("renamed.account",accepted.origin(1)?.authorHandle)
+        assertEquals("同名",accepted.authorName)
+        assertEquals("",plan("renamed.account").origin(1)?.authorPlatformId)
+        assertThrows(IllegalArgumentException::class.java){Codec.work(Codec.work(WorkOrigin(
+            "Instagram","post123","https://www.instagram.com/p/post123/",authorPlatformId="fake-name")))}
+    }
     @Test fun mediaSizeLimitIsCheckedBeforeEnqueue() {
         assertThrows(IllegalArgumentException::class.java){MediaLinks.read("""{"media":[{"url":"https://example.com/large.jpg","kind":"image","bytes":1073741824}]}""")}
     }

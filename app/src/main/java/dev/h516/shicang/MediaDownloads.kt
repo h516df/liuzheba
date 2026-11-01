@@ -17,14 +17,14 @@ import java.net.URI
 /** Extraction is local and lazy: the Python runtime never starts just for browsing. */
 data class RemoteMedia(val url:String,val kind:String,val ext:String,val bytes:Long=0,val headers:Map<String,String> = emptyMap())
 data class MediaPlan(val title:String,val source:String,val items:List<RemoteMedia>,val authorProfile:String="",val authorName:String="",
-    val workId:String="",val description:String="") {
+    val workId:String="",val description:String="",val authorStableId:String="",val authorHandle:String="") {
     fun origin(selected:Int):WorkOrigin? = source.takeIf{it.isNotBlank()}?.let { url ->
         Codec.work(Codec.work(WorkOrigin(SharedLinks.platform(url) ?: when(runCatching{URI(url).host.lowercase()}.getOrDefault("")) {
             "instagram.com", "www.instagram.com", "m.instagram.com" -> "Instagram"
             "bilibili.com", "www.bilibili.com", "m.bilibili.com", "b23.tv" -> "哔哩哔哩"
             else -> "其他"
         },
-            workId,url,description,selected)))
+            workId,url,description,selected,authorStableId,authorHandle)))
     }
 }
 object MediaLinks {
@@ -53,12 +53,18 @@ object MediaLinks {
         val author=value.optJSONObject("author")
         val identity=author?.optString("profile_url")?.let(AuthorProfiles::parse)
             ?.takeIf{it.platform==AuthorProfiles.platform(source)}
+        val numericAuthor=author?.optString("platform_id").orEmpty().takeIf{
+            SharedLinks.platform(source)=="Instagram" && it.matches(Regex("[0-9]{1,32}"))
+        }.orEmpty()
+        val authorHandle=author?.optString("handle").orEmpty().takeIf{
+            numericAuthor.isNotBlank() && it.matches(Regex("[A-Za-z0-9._]{1,30}"))
+        }.orEmpty()
         val name=author?.optString("name").orEmpty().trim()
             .takeIf{it.length<=100 && it.none{char->char.isISOControl() || char in "<>"}}.orEmpty()
         val id=value.optString("id").takeIf{it.length<=200 && it.matches(Regex("[A-Za-z0-9_-]+"))}.orEmpty()
         val description=value.optString("description")
         require(description.length<=LongNote.BODY_LIMIT && !description.contains('\u0000')) { "作品正文过长或含无效字符" }
-        return MediaPlan(value.optString("title","链接收录").take(160),source,items,identity?.profileUrl.orEmpty(),if(identity!=null)name else "",id,description)
+        return MediaPlan(value.optString("title","链接收录").take(160),source,items,identity?.profileUrl.orEmpty(),if(identity!=null || numericAuthor.isNotBlank())name else "",id,description,numericAuthor,authorHandle)
     }
     suspend fun resolve(context:Context,input:String):MediaPlan=withContext(Dispatchers.IO) {
         val url=validUrl(input)

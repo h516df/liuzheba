@@ -14,13 +14,14 @@ data class PlatformIdentity(
 data class AuthorImportResult(val identity: PlatformIdentity, val message: String, val metadataFetched: Boolean = false)
 
 object AuthorProfiles {
-    val platforms = listOf("小红书", "抖音", "快手", "微博", "哔哩哔哩")
+    val platforms = listOf("小红书", "抖音", "快手", "微博", "哔哩哔哩", "Instagram")
     private val hosts = mapOf(
         "小红书" to setOf("xiaohongshu.com", "www.xiaohongshu.com", "xhslink.com", "www.xhslink.com", "xhslink.cn"),
         "抖音" to setOf("douyin.com", "www.douyin.com", "v.douyin.com", "www.iesdouyin.com", "iesdouyin.com", "live.douyin.com"),
         "快手" to setOf("kuaishou.com", "www.kuaishou.com", "v.kuaishou.com", "live.kuaishou.com", "gifshow.com", "www.gifshow.com"),
         "微博" to setOf("weibo.com", "www.weibo.com", "m.weibo.cn", "weibo.cn", "www.weibo.cn"),
-        "哔哩哔哩" to setOf("space.bilibili.com", "www.bilibili.com", "m.bilibili.com", "bilibili.com", "b23.tv")
+        "哔哩哔哩" to setOf("space.bilibili.com", "www.bilibili.com", "m.bilibili.com", "bilibili.com", "b23.tv"),
+        "Instagram" to setOf("instagram.com", "www.instagram.com", "m.instagram.com")
     )
     fun platform(url: String): String? = runCatching {
         val u = URI(url)
@@ -58,6 +59,9 @@ object AuthorProfiles {
                 val mid=Regex("^/([0-9]{1,32})$").matchEntire(path)?.groupValues?.get(1) ?: return null
                 Triple(mid, "mid", "https://space.bilibili.com/$mid")
             }
+            // Instagram usernames can change. A profile URL alone does not
+            // establish an immutable identity; numeric PKs come from the work API.
+            "Instagram" -> return null
             else -> {
                 val numeric = Regex("^/(?:u/|profile/)?([0-9]{1,32})$").matchEntire(path)?.groupValues?.get(1)
                 val screenName = Regex("^/n/([^/]{1,160})$").matchEntire(path)?.groupValues?.get(1)
@@ -183,6 +187,9 @@ object AuthorProfiles {
     fun valid(identity: PlatformIdentity): Boolean {
         if (!Codec.validId(identity.id) || identity.platform !in platforms || identity.nickname.length > 200 || identity.publicAccount.length > 200 || identity.platformId.length > 200 || identity.idType.length > 40 || identity.profileUrl.length > 2048) return false
         if (listOf(identity.nickname, identity.publicAccount, identity.platformId, identity.idType, identity.profileUrl).any { value -> value.any { it.isISOControl() } }) return false
+        if(identity.platform=="Instagram")return identity.profileUrl.isEmpty() && identity.idType=="pk" &&
+            identity.platformId.matches(Regex("[0-9]{1,32}")) &&
+            (identity.publicAccount.isEmpty() || identity.publicAccount.matches(Regex("[A-Za-z0-9._]{1,30}")))
         if (identity.profileUrl.isEmpty()) return true
         if(platform(identity.profileUrl)!=identity.platform)return false
         val parsed = parse(identity.profileUrl) ?: return false

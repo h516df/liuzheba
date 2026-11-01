@@ -11,7 +11,8 @@ data class Photo(val id: String, val file: String, val bytes: Long, val sha256: 
 /** A post is distinct from a legacy archive. External identity is never inferred from a nickname. */
 data class WorkOrigin(
     val platform: String, val workId: String = "", val url: String,
-    val description: String = "", val expectedMedia: Int = 0
+    val description: String = "", val expectedMedia: Int = 0,
+    val authorPlatformId: String = "", val authorHandle: String = ""
 ) {
     fun sameWork(other: WorkOrigin): Boolean = platform == other.platform &&
         (if (platform != "其他" && workId.isNotBlank() && other.workId.isNotBlank()) workId == other.workId else url == other.url)
@@ -38,14 +39,19 @@ data class Library(val archives: List<Archive> = emptyList(), val drafts: List<A
 object Codec {
     fun work(w: WorkOrigin): JSONObject = JSONObject().put("platform",w.platform).put("workId",w.workId)
         .put("url",w.url).put("description",w.description).put("expectedMedia",w.expectedMedia)
+        .also { if(w.authorPlatformId.isNotBlank())it.put("authorPlatformId",w.authorPlatformId)
+            if(w.authorHandle.isNotBlank())it.put("authorHandle",w.authorHandle) }
     fun work(o: JSONObject): WorkOrigin {
         val w=WorkOrigin(o.getString("platform"),o.optString("workId"),o.getString("url"),
-            o.optString("description"),o.optInt("expectedMedia"))
+            o.optString("description"),o.optInt("expectedMedia"),o.optString("authorPlatformId"),o.optString("authorHandle"))
         require(w.platform in setOf("小红书","抖音","快手","Instagram","哔哩哔哩","微博","其他")) { "作品平台无效" }
         require(w.workId.length<=200 && (w.workId.isEmpty() || w.workId.matches(Regex("[A-Za-z0-9_-]+")))) { "作品编号无效" }
         require(w.url.length<=2048 && Links.normalize(w.url)==w.url && w.url.startsWith("https://")) { "作品来源无效" }
         require(w.description.length<=LongNote.BODY_LIMIT && !w.description.contains('\u0000')) { "作品正文无效" }
         require(w.expectedMedia in 0..100) { "作品媒体数量无效" }
+        require((w.authorPlatformId.isEmpty() && w.authorHandle.isEmpty()) ||
+            (w.platform=="Instagram" && w.authorPlatformId.matches(Regex("[0-9]{1,32}")) &&
+                (w.authorHandle.isEmpty() || w.authorHandle.matches(Regex("[A-Za-z0-9._]{1,30}"))))) { "平台作者身份无效" }
         return w
     }
     fun identity(i: PlatformIdentity) = JSONObject().put("id",i.id).put("platform",i.platform).put("nickname",i.nickname).put("publicAccount",i.publicAccount).put("platformId",i.platformId).put("idType",i.idType).put("profileUrl",i.profileUrl)
