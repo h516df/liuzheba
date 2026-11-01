@@ -48,6 +48,9 @@ class MediaLinksTest {
         assertEquals("",MediaLinks.read(payload("https://www.douyin.com/video/123456789",xhs)).authorProfile)
         assertEquals("",MediaLinks.read(payload("https://www.xiaohongshu.com/explore/0123456789abcdef01234567","https://www.xiaohongshu.com/explore/abcdef")).authorProfile)
         assertEquals("",MediaLinks.read("""{"media":[{"url":"https://cdn.example.com/a.jpg","kind":"image"}]}""").authorProfile)
+        val bili="https://space.bilibili.com/12501"
+        assertEquals(bili,MediaLinks.read(payload("https://www.bilibili.com/video/BVsynthetic",bili)).authorProfile)
+        assertEquals("",MediaLinks.read(payload("https://www.bilibili.com/video/BVsynthetic","https://www.bilibili.com/video/BVsynthetic")).authorProfile)
     }
     @Test fun mediaSizeLimitIsCheckedBeforeEnqueue() {
         assertThrows(IllegalArgumentException::class.java){MediaLinks.read("""{"media":[{"url":"https://example.com/large.jpg","kind":"image","bytes":1073741824}]}""")}

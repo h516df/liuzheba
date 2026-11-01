@@ -124,7 +124,7 @@ private fun authorTitle(a:Author)=a.name.ifBlank{a.identities.firstOrNull{it.nic
                 if(preview==null) {
                     item {
                         Text(if(s.authorBase==null) "从作者主页开始" else "添加平台主页",style=MaterialTheme.typography.titleMedium)
-                        Text("小红书、抖音、快手、微博。只读取公开资料，不使用登录状态。",style=MaterialTheme.typography.bodySmall)
+                        Text("小红书、抖音、快手、微博、哔哩哔哩。只读取公开资料，不使用登录状态。",style=MaterialTheme.typography.bodySmall)
                         GalleryTextField(s.authorInput,model::authorInput,Modifier.fillMaxWidth().padding(top=12.dp),label={Text("粘贴作者主页分享链接")},enabled=!s.busy,minLines=2,maxLines=4)
                         GalleryButton(onClick=model::importAuthor,enabled=!s.busy && s.authorInput.isNotBlank(),modifier=Modifier.padding(top=8.dp)){Text("导入并预览")}
                         if(source!=null) {

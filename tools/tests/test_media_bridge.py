@@ -21,6 +21,9 @@ class MediaBridgeTest(unittest.TestCase):
         self.assertIsNone(work_author('xiaohongshu', {'nickname': '仅有昵称'}))
         self.assertIsNone(work_author('douyin', {'sec_uid': '/malicious/path'}))
         self.assertIsNone(work_author('instagram', {'userId': 'syntheticUser123'}))
+        self.assertEqual(work_author('bilibili', {'uploader_id': 123456, 'uploader': 'B站作者'})['profile_url'],
+                         'https://space.bilibili.com/123456')
+        self.assertIsNone(work_author('bilibili', {'uploader_id': 'someNickname'}))
 
     def test_xhs_album_preserves_image_order_without_previews(self):
         note_id = '6411cf99000000001300b6d9'
@@ -186,6 +189,21 @@ class MediaBridgeTest(unittest.TestCase):
             result = json.loads(resolve(url, 'sessionid=synthetic-session'))
         self.assertEqual(result['source'], url)
         self.assertEqual(result['media'][0]['url'], 'https://example.com/instagram.mp4')
+
+    def test_bilibili_video_uses_verified_numeric_mid_not_display_name(self):
+        url = 'https://www.bilibili.com/video/BVsynthetic'
+        def extraction(_, requested_url, download=False):
+            self.assertEqual(url, requested_url)
+            return {'id': 'BVsynthetic', 'title': '公开视频', 'description': '原作者文案',
+                    'uploader_id': '12501', 'uploader': '同名作者',
+                    'formats': [{'url': 'https://example.com/bilibili.mp4', 'ext': 'mp4',
+                                 'acodec': 'aac', 'vcodec': 'h264'}]}
+        with patch.object(YoutubeDL, 'extract_info', extraction):
+            result = json.loads(resolve(url))
+        self.assertEqual(result['author']['profile_url'], 'https://space.bilibili.com/12501')
+        self.assertEqual(result['author']['name'], '同名作者')
+        self.assertEqual(result['description'], '原作者文案')
+        self.assertEqual(result['id'], 'BVsynthetic')
 
     def test_raw_upstream_video_formats_keep_sound(self):
         result={'formats':[

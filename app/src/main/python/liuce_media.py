@@ -34,11 +34,16 @@ def work_author(platform, payload):
         sec_uid = payload.get('sec_uid') or payload.get('secUid')
         profile = ('https://www.douyin.com/user/' + sec_uid
                    if isinstance(sec_uid, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,200}', sec_uid) else '')
+    elif platform == 'bilibili':
+        # yt-dlp extracts the numeric account mid from the platform's video data.
+        mid = payload.get('uploader_id')
+        mid = str(mid) if isinstance(mid, (str, int)) else ''
+        profile = 'https://space.bilibili.com/' + mid if re.fullmatch(r'[0-9]{1,32}', mid) else ''
     else:
         profile = ''
     if not profile:
         return None
-    name = payload.get('nickname') or payload.get('nickName') or ''
+    name = payload.get('nickname') or payload.get('nickName') or (payload.get('uploader') if platform == 'bilibili' else '') or ''
     if not isinstance(name, str) or len(name) > 100 or any(ord(c) < 32 or c in '<>' for c in name):
         name = ''
     return {'profile_url': profile, 'name': name}
@@ -241,6 +246,10 @@ def resolve(url, browser_cookies=''):
         work_id = info.get('id') or ''
         if not isinstance(work_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,200}', work_id):
             work_id = ''
+        host = urlparse(url).hostname or ''
+        author = info.get('author') if isinstance(info.get('author'), dict) else None
+        if not author and (host == 'b23.tv' or host == 'bilibili.com' or host.endswith('.bilibili.com')):
+            author = work_author('bilibili', info)
         return json.dumps({'title': (info.get('title') or '链接收录')[:160],
                            'source': url, 'id': work_id, 'description': caption,
-                           'media': media, 'author': info.get('author')}, ensure_ascii=False)
+                           'media': media, 'author': author}, ensure_ascii=False)
