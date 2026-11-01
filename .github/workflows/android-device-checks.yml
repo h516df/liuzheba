@@ -137,7 +137,7 @@ jobs:
           disk-size: 3072M
           disable-animations: true
           emulator-boot-timeout: 600
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: python3 cloud/isolated_build.py wait && bash cloud/device_acceptance.sh
       - name: Show isolated build log on failure
         if: failure()
